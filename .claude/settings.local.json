@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(~/.platformio/penv/Scripts/pio run:*)",
+      "Bash(pio run:*)",
+      "Bash(cmd /c \"pio run -t upload 2>&1\")",
+      "Bash(where pio:*)",
+      "Bash(where platformio:*)",
+      "Read(//c/dev/modbus_logo/$USERPROFILE/.platformio/penv/Scripts/**)",
+      "Bash(/c/Users/otto1/.platformio/penv/Scripts/pio.exe run:*)",
+      "Read(//c/dev/**)",
+      "Bash(cmd /c mode)",
+      "Bash(cmd /c \"reg query HKLM\\\\HARDWARE\\\\DEVICEMAP\\\\SERIALCOMM 2>/dev/null\")",
+      "Bash(ls /c/Users/otto1/.platformio/penv/Scripts/pio*)",
+      "Bash(ls /c/Users/otto1/AppData/Local/Programs/platformio/penv/Scripts/pio*)",
+      "Bash(~/.platformio/penv/Scripts/pio.exe run:*)"
+    ]
+  }
+}

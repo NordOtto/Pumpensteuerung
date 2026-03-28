@@ -1,0 +1,46 @@
+version: '3.9'
+
+services:
+  backend:
+    image: pumpe-backend:latest
+    environment:
+      - MQTT_BROKER=${MQTT_BROKER:-localhost}
+      - MQTT_PORT=${MQTT_PORT:-1883}
+      - MQTT_USER=${MQTT_USER:-}
+      - MQTT_PASS=${MQTT_PASS:-}
+      - TZ=${TZ:-Europe/Berlin}
+      - DATA_DIR=/data
+    volumes:
+      - app-data:/data
+    networks:
+      - pumpe-net
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 5
+
+  nginx:
+    image: pumpe-nginx:latest
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ssl-certs:/etc/nginx/ssl
+    networks:
+      - pumpe-net
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 5
+
+volumes:
+  ssl-certs:
+  app-data:
+
+networks:
+  pumpe-net:
+    driver: overlay

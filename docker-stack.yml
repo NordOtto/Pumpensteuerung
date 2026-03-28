@@ -24,8 +24,8 @@ services:
   nginx:
     image: pumpe-nginx:latest
     ports:
-      - "80:80"
-      - "443:443"
+      - "6061:80"
+      - "6060:443"
     volumes:
       - ssl-certs:/etc/nginx/ssl
     networks:

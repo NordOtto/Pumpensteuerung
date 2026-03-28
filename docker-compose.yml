@@ -3,6 +3,7 @@ version: '3.9'
 services:
   backend:
     image: ghcr.io/nordotto/pumpe-backend:latest
+    init: true
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
     environment:
@@ -20,6 +21,7 @@ services:
 
   nginx:
     image: ghcr.io/nordotto/pumpe-nginx:latest
+    init: true
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
     ports:

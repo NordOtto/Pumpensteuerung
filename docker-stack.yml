@@ -3,6 +3,8 @@ version: '3.9'
 services:
   backend:
     image: ghcr.io/nordotto/pumpe-backend:latest
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
     environment:
       - MQTT_BROKER=${MQTT_BROKER:-localhost}
       - MQTT_PORT=${MQTT_PORT:-1883}
@@ -23,6 +25,8 @@ services:
 
   nginx:
     image: ghcr.io/nordotto/pumpe-nginx:latest
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
     ports:
       - "6061:80"
       - "6060:443"

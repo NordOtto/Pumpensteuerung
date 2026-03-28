@@ -2,7 +2,7 @@ version: '3.9'
 
 services:
   backend:
-    image: pumpe-backend:latest
+    image: ghcr.io/nordotto/pumpe-backend:latest
     environment:
       - MQTT_BROKER=${MQTT_BROKER:-localhost}
       - MQTT_PORT=${MQTT_PORT:-1883}
@@ -22,7 +22,7 @@ services:
         max_attempts: 5
 
   nginx:
-    image: pumpe-nginx:latest
+    image: ghcr.io/nordotto/pumpe-nginx:latest
     ports:
       - "6061:80"
       - "6060:443"

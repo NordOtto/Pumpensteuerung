@@ -1,7 +1,7 @@
 'use strict';
 
 // ============================================================
-//  server.js – Haupteinstieg Backend
+//  server.js – Haupteinstieg Backend v2
 // ============================================================
 
 const http         = require('http');

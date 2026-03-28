@@ -120,7 +120,7 @@ async function main() {
   setInterval(() => ws.broadcast(),    1000);  // Browser WS
   setInterval(() => mqttClient.publishHA(), 2000); // HA Topics
 
-  console.log('[Server] Gestartet. TZ:', process.env.TZ || '(nicht gesetzt)');
+  console.log('[Server] Gestartet. TZ:', process.env.TZ || '(nicht gesetzt)', '| Build:', new Date().toISOString());
 }
 
 main().catch(e => {

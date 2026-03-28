@@ -41,11 +41,3 @@ jobs:
           file: docker/nginx/Dockerfile
           push: true
           tags: ghcr.io/${{ env.OWNER }}/pumpe-nginx:latest
-
-      - name: Redeploy Portainer Stack
-        run: |
-          curl -s -k -X POST \
-            -H "X-API-Key: ${{ secrets.PORTAINER_TOKEN }}" \
-            -H "Content-Type: application/json" \
-            -d '{"pullImage":true}' \
-            "${{ secrets.PORTAINER_URL }}/api/stacks/69/git/redeploy?endpointId=2"

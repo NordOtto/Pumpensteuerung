@@ -8,6 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Pumpe">
 <link rel="manifest" href="/manifest.json">
+<script>document.documentElement.setAttribute('data-theme',localStorage.getItem('theme')||'dark');</script>
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/icon.svg">
 <title>Modbus Gateway</title>
@@ -26,6 +27,18 @@ body{font-family:system-ui,-apple-system,sans-serif}
 .card.drag-over{border-top:3px solid #3b82f6!important}
 .drag-handle{cursor:grab;touch-action:none;opacity:0.3;transition:opacity 0.2s}
 .drag-handle:hover,.drag-handle:active{opacity:1}
+
+/* ── Light Theme ── */
+html[data-theme="light"] body{background-color:#f3f4f6!important;color:#111827!important}
+html[data-theme="light"] header{background-color:rgba(255,255,255,0.95)!important;border-color:#e5e7eb!important}
+html[data-theme="light"] .card{background-color:rgba(255,255,255,0.88)!important;border-color:#e5e7eb!important}
+html[data-theme="light"] .text-gray-100{color:#111827!important}
+html[data-theme="light"] .text-gray-400{color:#6b7280!important}
+html[data-theme="light"] .text-gray-500{color:#4b5563!important}
+html[data-theme="light"] .card [class*="bg-gray-7"]{background-color:rgba(243,244,246,0.9)!important}
+html[data-theme="light"] [class*="bg-gray-7"].rounded-full{background-color:#e5e7eb!important}
+html[data-theme="light"] #logBox{background-color:#1e293b!important;color:#4ade80!important;border-color:#334155!important}
+html[data-theme="light"] #themeToggle{background-color:#e5e7eb!important;color:#374151!important}
 </style>
 <script>tailwind.config={darkMode:'class',theme:{extend:{}}}</script>
 </head>
@@ -39,6 +52,10 @@ body{font-family:system-ui,-apple-system,sans-serif}
    <h1 class="text-xl font-bold">Modbus Gateway</h1>
    <span id="hdrIP" class="text-xs text-gray-500"></span>
   </div>
+  <button id="themeToggle" onclick="toggleTheme()" class="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 transition text-gray-400 hover:text-gray-200" title="Theme wechseln">
+   <svg id="themeIconMoon" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/></svg>
+   <svg id="themeIconSun" class="w-5 h-5 hidden" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"/></svg>
+  </button>
  </header>
 
  <!-- Grid -->
@@ -1035,11 +1052,33 @@ function appendLog(lines,seq){
  }
 }
 
+// ── Theme Toggle ──
+function toggleTheme(){
+ const html=document.documentElement;
+ const light=html.getAttribute('data-theme')==='light';
+ const next=light?'dark':'light';
+ html.setAttribute('data-theme',next);
+ localStorage.setItem('theme',next);
+ updateThemeIcons(next);
+ document.querySelector('meta[name="theme-color"]').content=next==='light'?'#f3f4f6':'#111827';
+}
+function updateThemeIcons(theme){
+ const light=theme==='light';
+ document.getElementById('themeIconMoon').classList.toggle('hidden',light);
+ document.getElementById('themeIconSun').classList.toggle('hidden',!light);
+}
+
 // ── GSAP Entry Animation ──
 document.addEventListener('DOMContentLoaded',()=>{
  initCards();
  initDash();
  gsap.from('.card',{y:30,opacity:0,stagger:0.1,duration:0.5});
+ // Theme icons init
+ updateThemeIcons(localStorage.getItem('theme')||'dark');
+ // Service Worker registrieren
+ if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('/sw.js').catch(()=>{});
+ }
 });
 </script>
 </body>

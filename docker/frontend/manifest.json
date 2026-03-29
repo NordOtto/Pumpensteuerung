@@ -3,9 +3,11 @@
   "short_name": "Pumpe",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#111827",
-  "theme_color": "#111827",
+  "background_color": "#0a0f1a",
+  "theme_color": "#0a0f1a",
+  "description": "Pumpensteuerung Dashboard",
+  "orientation": "any",
   "icons": [
-    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
   ]
 }

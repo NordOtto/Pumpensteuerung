@@ -286,10 +286,10 @@ git push → GitHub Actions → Docker Build → ghcr.io/nordotto/pumpe-backend:
 ### ENV-Variablen (Portainer Stack)
 
 ```
-MQTT_BROKER=192.168.1.136
+MQTT_BROKER=<broker-ip>
 MQTT_PORT=1883
-MQTT_USER=mqtt
-MQTT_PASS=mqtt-ha1
+MQTT_USER=<mqtt-user>
+MQTT_PASS=<mqtt-password>
 TZ=Europe/Berlin
 ```
 

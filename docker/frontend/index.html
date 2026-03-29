@@ -19,70 +19,71 @@
 :root {
   --accent:#00b4ff;--accent2:#0ea5e9;
   --ok:#22c55e;--warn:#f59e0b;--danger:#ef4444;--info:#3b82f6;
-  --card-bg:rgba(15,23,42,0.75);--card-border:rgba(255,255,255,0.07);
-  --surface:rgba(255,255,255,0.05);--surface2:rgba(255,255,255,0.08);
+  --card-bg:#1a1a2e;--card-border:#2a2a44;
+  --surface:#1e1e34;--surface2:#24243c;
 }
 
 /* ── Base ── */
-body{font-family:system-ui,-apple-system,sans-serif;background:#0a0f1a;color:#e2e8f0}
+body{font-family:system-ui,-apple-system,sans-serif;background:#0d0d1a;color:#e2e8f0}
 
 /* ── Gauge ── */
-.gauge-wrap{position:relative;width:160px;height:160px;flex-shrink:0}
+.gauge-wrap{position:relative;width:190px;height:190px;flex-shrink:0}
 .gauge-svg{width:100%;height:100%;overflow:visible}
-.gauge-track{fill:none;stroke:#1e293b;stroke-width:9;stroke-linecap:round}
-.gauge-arc{fill:none;stroke-width:9;stroke-linecap:round;transition:stroke-dasharray .6s ease,stroke .4s ease}
+.gauge-track{fill:none;stroke:#12122a;stroke-width:12;stroke-linecap:butt}
+.gauge-arc{fill:none;stroke-width:12;stroke-linecap:butt;transition:stroke-dasharray .6s ease,stroke .4s ease}
 .gauge-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none}
-.gauge-val{font-size:1.6rem;font-weight:700;line-height:1;letter-spacing:-0.03em}
+.gauge-val{font-size:2rem;font-weight:700;line-height:1;letter-spacing:-0.03em}
 .gauge-unit{font-size:.65rem;color:#64748b;margin-top:2px;text-transform:uppercase;letter-spacing:.06em}
 .gauge-label{font-size:.6rem;color:#475569;margin-top:1px}
 
 /* ── Sparkline ── */
-.spark-svg{width:100%;height:32px;overflow:visible}
-.spark-line{fill:none;stroke:var(--accent2);stroke-width:1.5;opacity:.7}
+.spark-svg{width:100%;height:64px;overflow:visible}
+.spark-line{fill:none;stroke:var(--accent2);stroke-width:1.5;opacity:.9}
+.spark-grid{stroke:#1e1e34;stroke-width:0.5}
 
 /* ── KPI Bar ── */
-.kpi-bar{position:sticky;top:0;z-index:50;background:rgba(10,15,26,.92);backdrop-filter:blur(12px);border-bottom:1px solid rgba(255,255,255,.06)}
+.kpi-bar{position:sticky;top:0;z-index:50;background:#0d0d1a;border-bottom:2px solid #2a2a44}
 .kpi-item{display:flex;flex-direction:column;align-items:center;padding:.35rem .9rem;min-width:80px}
-.kpi-val{font-size:1.05rem;font-weight:700;line-height:1.2;font-variant-numeric:tabular-nums}
+.kpi-val{font-size:1.25rem;font-weight:700;line-height:1.2;font-variant-numeric:tabular-nums;letter-spacing:-0.02em}
 .kpi-lbl{font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:#475569}
 
 /* ── Cards ── */
-.card{background:var(--card-bg);backdrop-filter:blur(14px);border:1px solid var(--card-border);border-radius:1.25rem;padding:1.25rem;box-shadow:0 4px 24px rgba(0,0,0,.4)}
-.card-hdr{cursor:pointer;user-select:none}
+.card{background:var(--card-bg);border:1px solid var(--card-border);border-radius:4px;padding:1.25rem;box-shadow:inset 0 1px 0 rgba(255,255,255,.03)}
+.card-hdr{cursor:pointer;user-select:none;padding-bottom:.6rem;border-bottom:1px solid var(--card-border);margin-bottom:1rem}
 .card.dragging{opacity:.35;border:2px dashed #3b82f6!important}
 .card.drag-over{border-top:3px solid #3b82f6!important}
 .drag-handle{cursor:grab;touch-action:none;opacity:.25;transition:opacity .2s}
 .drag-handle:hover,.drag-handle:active{opacity:.8}
 
 /* ── KPI Mini-Box ── */
-.kpi-box{background:var(--surface);border:1px solid var(--card-border);border-radius:.75rem;padding:.6rem .75rem;text-align:center}
-.kpi-box-val{font-size:1.1rem;font-weight:700;line-height:1.2}
+.kpi-box{background:var(--surface);border:1px solid var(--card-border);border-radius:3px;padding:.65rem .8rem;text-align:center;box-shadow:inset 0 1px 3px rgba(0,0,0,.3)}
+.kpi-box-val{font-size:1.2rem;font-weight:700;line-height:1.2;font-variant-numeric:tabular-nums}
 .kpi-box-lbl{font-size:.6rem;text-transform:uppercase;letter-spacing:.06em;color:#64748b;margin-top:2px}
 
 /* ── Segmented Control ── */
-.seg-ctrl{display:flex;background:var(--surface);border:1px solid var(--card-border);border-radius:.6rem;padding:2px;gap:2px}
-.seg-btn{flex:1;padding:.35rem .25rem;border-radius:.45rem;font-size:.7rem;font-weight:600;text-align:center;cursor:pointer;transition:background .15s,color .15s;background:transparent;color:#64748b;border:none}
+.seg-ctrl{display:flex;background:var(--surface);border:1px solid var(--card-border);border-radius:3px;padding:2px;gap:2px}
+.seg-btn{flex:1;padding:.35rem .25rem;border-radius:2px;font-size:.7rem;font-weight:600;text-align:center;cursor:pointer;transition:background .15s,color .15s;background:transparent;color:#64748b;border:none}
 .seg-btn.active{background:var(--accent2);color:#fff}
 
 /* ── Day Pills ── */
-.day-pill{flex:1;padding:.4rem .25rem;border-radius:.5rem;font-size:.7rem;font-weight:600;text-align:center;cursor:pointer;transition:background .15s,color .15s;border:none;background:var(--surface);color:#64748b}
+.day-pill{flex:1;padding:.4rem .25rem;border-radius:3px;font-size:.7rem;font-weight:600;text-align:center;cursor:pointer;transition:background .15s,color .15s;border:none;background:var(--surface);color:#64748b}
 .day-pill.active{background:#d97706;color:#fff}
 
 /* ── Status Dot ── */
-.dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex-shrink:0}
+.dot{width:12px;height:12px;border-radius:3px;display:inline-block;flex-shrink:0}
 .dot-green{background:#22c55e}.dot-red{background:#ef4444}
 .dot-yellow{background:#eab308}.dot-gray{background:#475569}
 @keyframes pulse-green{0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,.4)}50%{box-shadow:0 0 0 5px rgba(34,197,94,0)}}
 .dot-pulse{animation:pulse-green 1.8s infinite}
 
 /* ── Buttons ── */
-.btn-start{background:#16a34a;border-radius:.6rem;padding:.5rem 0;font-weight:600;font-size:.8rem;transition:background .15s;display:flex;align-items:center;justify-content:center;gap:.35rem;border:none;color:#fff;cursor:pointer}
+.btn-start{background:#16a34a;border-radius:3px;padding:.5rem 0;font-weight:600;font-size:.75rem;transition:background .15s;display:flex;align-items:center;justify-content:center;gap:.35rem;border:none;color:#fff;cursor:pointer;text-transform:uppercase;letter-spacing:.04em;box-shadow:inset 0 -1px 0 rgba(0,0,0,.2)}
 .btn-start:hover{background:#15803d}
-.btn-stop{background:#dc2626;border-radius:.6rem;padding:.5rem 0;font-weight:600;font-size:.8rem;transition:background .15s;display:flex;align-items:center;justify-content:center;gap:.35rem;border:none;color:#fff;cursor:pointer}
+.btn-stop{background:#dc2626;border-radius:3px;padding:.5rem 0;font-weight:600;font-size:.75rem;transition:background .15s;display:flex;align-items:center;justify-content:center;gap:.35rem;border:none;color:#fff;cursor:pointer;text-transform:uppercase;letter-spacing:.04em;box-shadow:inset 0 -1px 0 rgba(0,0,0,.2)}
 .btn-stop:hover{background:#b91c1c}
-.btn-reset{background:#d97706;border-radius:.6rem;padding:.5rem 0;font-weight:600;font-size:.8rem;transition:background .15s;display:flex;align-items:center;justify-content:center;gap:.35rem;border:none;color:#fff;cursor:pointer}
+.btn-reset{background:#d97706;border-radius:3px;padding:.5rem 0;font-weight:600;font-size:.75rem;transition:background .15s;display:flex;align-items:center;justify-content:center;gap:.35rem;border:none;color:#fff;cursor:pointer;text-transform:uppercase;letter-spacing:.04em;box-shadow:inset 0 -1px 0 rgba(0,0,0,.2)}
 .btn-reset:hover{background:#b45309}
-.btn-save{width:100%;border-radius:.6rem;padding:.55rem 0;font-weight:600;font-size:.8rem;transition:background .15s,opacity .15s;border:none;cursor:pointer}
+.btn-save{width:100%;border-radius:3px;padding:.55rem 0;font-weight:600;font-size:.75rem;transition:background .15s,opacity .15s;border:none;cursor:pointer;text-transform:uppercase;letter-spacing:.04em}
 .btn-save:disabled{opacity:.4;cursor:not-allowed}
 
 /* ── Fan ── */
@@ -99,23 +100,23 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#0a0f1a;color:#e2
 
 /* ── Toast ── */
 #toast-container{position:fixed;bottom:1.25rem;right:1.25rem;z-index:9999;display:flex;flex-direction:column;gap:.5rem;pointer-events:none}
-.toast{background:#1e293b;border:1px solid rgba(255,255,255,.1);border-radius:.75rem;padding:.6rem 1rem;font-size:.8rem;color:#e2e8f0;box-shadow:0 4px 20px rgba(0,0,0,.5);pointer-events:auto;animation:toast-in .25s ease}
+.toast{background:#1e293b;border:1px solid rgba(255,255,255,.1);border-radius:4px;padding:.6rem 1rem;font-size:.8rem;color:#e2e8f0;box-shadow:0 4px 20px rgba(0,0,0,.5);pointer-events:auto;animation:toast-in .25s ease}
 .toast.success{border-left:3px solid #22c55e}
 .toast.error{border-left:3px solid #ef4444}
 .toast.info{border-left:3px solid #3b82f6}
 @keyframes toast-in{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
 
 /* ── Status Mini-Cards ── */
-.stat-card{background:var(--surface);border:1px solid var(--card-border);border-radius:.75rem;padding:.6rem .85rem;display:flex;align-items:center;justify-content:space-between;gap:.5rem}
+.stat-card{background:var(--surface);border:1px solid var(--card-border);border-radius:3px;padding:.7rem 1rem;display:flex;align-items:center;justify-content:space-between;gap:.5rem;box-shadow:inset 0 1px 3px rgba(0,0,0,.2)}
 
 /* ── Range Input ── */
 input[type=range]{accent-color:#3b82f6;width:100%}
-input[type=number],input[type=text],input[type=time],select{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:.5rem;padding:.4rem .65rem;font-size:.8rem;color:#e2e8f0;outline:none;width:100%}
+input[type=number],input[type=text],input[type=time],select{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:3px;padding:.4rem .65rem;font-size:.8rem;color:#e2e8f0;outline:none;width:100%}
 input[type=number]:focus,input[type=text]:focus,input[type=time]:focus,select:focus{border-color:var(--accent2);box-shadow:0 0 0 2px rgba(14,165,233,.25)}
 select option{background:#1e293b}
 
 /* ── Chip Buttons ── */
-.chip{padding:.3rem .75rem;border-radius:999px;font-size:.7rem;font-weight:600;background:var(--surface2);border:1px solid var(--card-border);color:#94a3b8;cursor:pointer;transition:background .15s,color .15s;white-space:nowrap}
+.chip{padding:.3rem .75rem;border-radius:3px;font-size:.7rem;font-weight:600;background:var(--surface2);border:1px solid var(--card-border);color:#94a3b8;cursor:pointer;transition:background .15s,color .15s;white-space:nowrap}
 .chip:hover{background:rgba(14,165,233,.2);color:var(--accent)}
 
 /* ── Chevron ── */
@@ -123,9 +124,9 @@ select option{background:#1e293b}
 .chev.collapsed{transform:rotate(-90deg)}
 
 /* ── Light Theme ── */
-html[data-theme="light"] body{background:#f1f5f9!important;color:#0f172a!important}
-html[data-theme="light"] .kpi-bar{background:rgba(241,245,249,.95)!important;border-color:#e2e8f0!important}
-html[data-theme="light"] .card{background:rgba(255,255,255,.88)!important;border-color:#e2e8f0!important}
+html[data-theme="light"] body{background:#e8ecf0!important;color:#0f172a!important}
+html[data-theme="light"] .kpi-bar{background:#dde3ea!important;border-color:#c0c8d4!important}
+html[data-theme="light"] .card{background:#f0f2f6!important;border-color:#c8cdd6!important}
 html[data-theme="light"] :root{--surface:rgba(0,0,0,.04);--surface2:rgba(0,0,0,.06);--card-border:rgba(0,0,0,.08)}
 html[data-theme="light"] .kpi-lbl,html[data-theme="light"] .gauge-unit,html[data-theme="light"] .kpi-box-lbl{color:#64748b!important}
 html[data-theme="light"] .gauge-track{stroke:#e2e8f0}
@@ -171,7 +172,7 @@ html[data-theme="light"] .kpi-box{background:rgba(0,0,0,.04);border-color:#e2e8f
    </div>
   </div>
   <!-- Theme toggle -->
-  <button onclick="toggleTheme()" id="themeToggle" class="p-2 rounded-lg transition" style="background:var(--surface)" title="Theme wechseln">
+  <button onclick="toggleTheme()" id="themeToggle" class="p-2 rounded transition" style="background:var(--surface)" title="Theme wechseln">
    <svg id="themeIconMoon" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/></svg>
    <svg id="themeIconSun" class="w-4 h-4 hidden" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"/></svg>
   </button>
@@ -179,7 +180,7 @@ html[data-theme="light"] .kpi-box{background:rgba(0,0,0,.04);border-color:#e2e8f
 </div>
 
 <!-- ========== MAIN GRID ========== -->
-<main class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 max-w-6xl mx-auto">
+<main class="grid grid-cols-1 md:grid-cols-2 gap-2 p-3 max-w-6xl mx-auto">
 
  <!-- CARD 1: V20 Frequenzumrichter -->
  <div id="card-v20" class="card">
@@ -229,9 +230,11 @@ html[data-theme="light"] .kpi-box{background:rgba(0,0,0,.04);border-color:#e2e8f
   <span id="v20freq" class="hidden">0.00 Hz</span>
   <div id="v20bar" class="hidden" style="width:0%"></div>
   <!-- Sparkline -->
-  <div class="mb-3" style="height:32px">
-   <svg id="sparkFreq" class="spark-svg" preserveAspectRatio="none" viewBox="0 0 120 32">
-    <polyline id="sparkFreqLine" class="spark-line" points="0,32"/>
+  <div class="mb-3" style="height:64px">
+   <svg id="sparkFreq" class="spark-svg" preserveAspectRatio="none" viewBox="0 0 120 64">
+    <line class="spark-grid" x1="0" y1="16" x2="120" y2="16"/><line class="spark-grid" x1="0" y1="32" x2="120" y2="32"/><line class="spark-grid" x1="0" y1="48" x2="120" y2="48"/>
+    <line class="spark-grid" x1="30" y1="0" x2="30" y2="64"/><line class="spark-grid" x1="60" y1="0" x2="60" y2="64"/><line class="spark-grid" x1="90" y1="0" x2="90" y2="64"/>
+    <polyline id="sparkFreqLine" class="spark-line" points="0,64"/>
    </svg>
   </div>
   <!-- Controls -->
@@ -277,7 +280,7 @@ html[data-theme="light"] .kpi-box{background:rgba(0,0,0,.04);border-color:#e2e8f
   </div>
   <!-- Gauge centered -->
   <div class="flex justify-center mb-4">
-   <div class="gauge-wrap" style="width:180px;height:180px">
+   <div class="gauge-wrap" style="width:200px;height:200px">
     <svg class="gauge-svg" viewBox="0 0 100 100">
      <circle class="gauge-track" cx="50" cy="50" r="38" stroke-dasharray="179 239" transform="rotate(-225 50 50)"/>
      <circle id="gaugeTempArc" class="gauge-arc" cx="50" cy="50" r="38" stroke="#3b82f6" stroke-dasharray="0 239" transform="rotate(-225 50 50)"/>
@@ -291,9 +294,11 @@ html[data-theme="light"] .kpi-box{background:rgba(0,0,0,.04);border-color:#e2e8f
   <!-- Hidden compat -->
   <div id="tempBar" class="hidden bg-green-500" style="width:25%"></div>
   <!-- Sparkline -->
-  <div style="height:32px">
-   <svg id="sparkTemp" class="spark-svg" preserveAspectRatio="none" viewBox="0 0 120 32">
-    <polyline id="sparkTempLine" class="spark-line" points="0,32" style="stroke:#fb923c"/>
+  <div style="height:64px">
+   <svg id="sparkTemp" class="spark-svg" preserveAspectRatio="none" viewBox="0 0 120 64">
+    <line class="spark-grid" x1="0" y1="16" x2="120" y2="16"/><line class="spark-grid" x1="0" y1="32" x2="120" y2="32"/><line class="spark-grid" x1="0" y1="48" x2="120" y2="48"/>
+    <line class="spark-grid" x1="30" y1="0" x2="30" y2="64"/><line class="spark-grid" x1="60" y1="0" x2="60" y2="64"/><line class="spark-grid" x1="90" y1="0" x2="90" y2="64"/>
+    <polyline id="sparkTempLine" class="spark-line" points="0,64" style="stroke:#fb923c"/>
    </svg>
   </div>
  </div>
@@ -411,7 +416,7 @@ html[data-theme="light"] .kpi-box{background:rgba(0,0,0,.04);border-color:#e2e8f
    <span id="tgClock" class="text-sm font-mono" style="color:#64748b">kein NTP</span>
   </div>
   <!-- Enabled Toggle -->
-  <div class="flex items-center justify-between mb-4 p-3 rounded-xl" style="background:var(--surface)">
+  <div class="flex items-center justify-between mb-4 p-3" style="border-radius:4px;background:var(--surface)">
    <span class="text-sm">Zeitsperre aktiv</span>
    <label class="toggle-wrap">
     <input type="checkbox" id="tgEnabled" onchange="tgDirty()">
@@ -457,9 +462,9 @@ html[data-theme="light"] .kpi-box{background:rgba(0,0,0,.04);border-color:#e2e8f
    <svg id="ccpi" class="chev w-4 h-4" style="color:#475569" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
   </div>
   <!-- Dry-run alert -->
-  <div id="piDryRunBox" class="hidden mb-3 p-3 rounded-xl flex items-center justify-between gap-2" style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3)">
+  <div id="piDryRunBox" class="hidden mb-3 p-3 flex items-center justify-between gap-2" style="border-radius:4px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3)">
    <span class="text-sm font-medium" style="color:#fca5a5">&#9888; Trockenlauf-Sperre aktiv (Auto-Reset 5 Min)</span>
-   <button onclick="resetDryRun()" class="px-3 py-1 rounded-lg text-xs font-bold text-white flex-shrink-0" style="background:#dc2626">Quittieren</button>
+   <button onclick="resetDryRun()" class="px-3 py-1 text-xs font-bold text-white flex-shrink-0" style="border-radius:3px;" style="background:#dc2626">Quittieren</button>
   </div>
   <!-- Gauge + Mini-KPIs -->
   <div class="flex items-center gap-4 mb-4">
@@ -493,13 +498,15 @@ html[data-theme="light"] .kpi-box{background:rgba(0,0,0,.04);border-color:#e2e8f
   <!-- Hidden compat -->
   <div id="piBar" class="hidden" style="width:0%"></div>
   <!-- Sparkline -->
-  <div class="mb-3" style="height:32px">
-   <svg id="sparkPi" class="spark-svg" preserveAspectRatio="none" viewBox="0 0 120 32">
-    <polyline id="sparkPiLine" class="spark-line" points="0,32"/>
+  <div class="mb-3" style="height:64px">
+   <svg id="sparkPi" class="spark-svg" preserveAspectRatio="none" viewBox="0 0 120 64">
+    <line class="spark-grid" x1="0" y1="16" x2="120" y2="16"/><line class="spark-grid" x1="0" y1="32" x2="120" y2="32"/><line class="spark-grid" x1="0" y1="48" x2="120" y2="48"/>
+    <line class="spark-grid" x1="30" y1="0" x2="30" y2="64"/><line class="spark-grid" x1="60" y1="0" x2="60" y2="64"/><line class="spark-grid" x1="90" y1="0" x2="90" y2="64"/>
+    <polyline id="sparkPiLine" class="spark-line" points="0,64"/>
    </svg>
   </div>
   <!-- PI Enabled Toggle -->
-  <div class="flex items-center justify-between mb-4 p-3 rounded-xl" style="background:var(--surface)">
+  <div class="flex items-center justify-between mb-4 p-3" style="border-radius:4px;background:var(--surface)">
    <span class="text-sm">PI-Regelung aktiv</span>
    <label class="toggle-wrap">
     <input type="checkbox" id="piEnabled" onchange="piDirty()">
@@ -550,7 +557,7 @@ html[data-theme="light"] .kpi-box{background:rgba(0,0,0,.04);border-color:#e2e8f
    <svg id="ccpreset" class="chev w-4 h-4" style="color:#475569" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
   </div>
   <!-- Aktiver Modus -->
-  <div class="flex items-center gap-3 mb-4 p-3 rounded-xl" style="background:rgba(45,212,191,.08);border:1px solid rgba(45,212,191,.15)">
+  <div class="flex items-center gap-3 mb-4 p-3" style="border-radius:4px;background:rgba(45,212,191,.08);border:1px solid rgba(45,212,191,.15)">
    <span id="presetDot" class="dot" style="background:#14b8a6"></span>
    <div class="flex-1 min-w-0">
     <div class="text-xs" style="color:#64748b">Aktiver Modus</div>
@@ -572,7 +579,7 @@ html[data-theme="light"] .kpi-box{background:rgba(0,0,0,.04);border-color:#e2e8f
   </div>
   <div id="presetEditorPanel" class="hidden space-y-3">
    <div id="presetEditList" class="space-y-2"></div>
-   <div class="p-3 rounded-xl" style="background:var(--surface)">
+   <div class="p-3" style="border-radius:4px;background:var(--surface)">
     <div id="npFormTitle" class="text-xs font-bold mb-2 uppercase tracking-wide" style="color:#2dd4bf">Neuer Preset</div>
     <div class="grid grid-cols-2 gap-2 mb-2">
      <div><label class="text-xs mb-1 block" style="color:#64748b">Name</label>
@@ -603,7 +610,7 @@ html[data-theme="light"] .kpi-box{background:rgba(0,0,0,.04);border-color:#e2e8f
  </div>
 
  <!-- CARD 8: Log (full-width) -->
- <div class="md:col-span-2 rounded-2xl overflow-hidden" style="background:var(--card-bg);backdrop-filter:blur(14px);border:1px solid var(--card-border);box-shadow:0 4px 24px rgba(0,0,0,.4)">
+ <div class="md:col-span-2 overflow-hidden" style="background:var(--card-bg);border:1px solid var(--card-border);border-radius:4px;box-shadow:inset 0 1px 0 rgba(255,255,255,.03)">
   <button onclick="toggleLog()" class="w-full flex items-center justify-between p-4 transition" style="background:none;border:none;cursor:pointer;color:inherit" onmouseover="this.style.background='var(--surface)'" onmouseout="this.style.background='none'">
    <h2 class="text-sm font-semibold flex items-center gap-2" style="color:#94a3b8">
     <svg class="w-4 h-4" fill="none" stroke="#4ade80" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
@@ -616,7 +623,7 @@ html[data-theme="light"] .kpi-box{background:rgba(0,0,0,.04);border-color:#e2e8f
     <button onclick="clearLog()" class="text-xs rounded px-3 py-1 transition" style="background:var(--surface2);color:#94a3b8;border:none;cursor:pointer">Löschen</button>
     <label class="text-xs flex items-center gap-1" style="color:#64748b;cursor:pointer"><input type="checkbox" id="logAuto" checked style="accent-color:#22c55e"> Auto-Scroll</label>
    </div>
-   <div id="logBox" class="rounded-lg p-3 font-mono text-xs h-64 overflow-y-auto whitespace-pre-wrap" style="background:#030712;color:#4ade80;border:1px solid #1e293b"></div>
+   <div id="logBox" class="p-3 font-mono text-xs h-64 overflow-y-auto whitespace-pre-wrap" style="background:#030712;color:#4ade80;border:1px solid #1e293b"></div>
   </div>
  </div>
 
@@ -653,7 +660,7 @@ function pushSparkline(key,value,lineId,minV,maxV){
  if(d.length>60)d.shift();
  const line=document.getElementById(lineId);
  if(!line||d.length<2)return;
- const W=120,H=32;
+ const W=120,H=64;
  const lo=minV!==undefined?minV:Math.min(...d);
  const hi=maxV!==undefined?maxV:Math.max(...d);
  const range=hi-lo||1;
@@ -1064,7 +1071,7 @@ function renderPresetButtons(){
   const active=(p.name===_activePreset);
   const btn=document.createElement('button');
   btn.textContent=p.name;
-  btn.style.cssText='padding:.5rem .75rem;border-radius:.6rem;font-size:.75rem;font-weight:600;cursor:pointer;transition:background .15s,color .15s;border:1px solid;text-overflow:ellipsis;overflow:hidden;white-space:nowrap;'+(active?'background:rgba(45,212,191,.2);border-color:rgba(45,212,191,.4);color:#2dd4bf;':'background:var(--surface);border-color:var(--card-border);color:#94a3b8;');
+  btn.style.cssText='padding:.5rem .75rem;border-radius:3px;font-size:.75rem;font-weight:600;cursor:pointer;transition:background .15s,color .15s;border:1px solid;text-overflow:ellipsis;overflow:hidden;white-space:nowrap;'+(active?'background:rgba(45,212,191,.2);border-color:rgba(45,212,191,.4);color:#2dd4bf;':'background:var(--surface);border-color:var(--card-border);color:#94a3b8;');
   btn.onclick=()=>applyPreset(p.name);
   c.appendChild(btn);
  });
@@ -1094,10 +1101,10 @@ function renderPresetEditor(){
  list.innerHTML='';
  _presets.forEach(p=>{
   const row=document.createElement('div');
-  row.style.cssText='display:flex;align-items:center;justify-content:space-between;background:var(--surface);border-radius:.5rem;padding:.4rem .65rem;font-size:.75rem;gap:.5rem';
+  row.style.cssText='display:flex;align-items:center;justify-content:space-between;background:var(--surface);border-radius:3px;padding:.4rem .65rem;font-size:.75rem;gap:.5rem';
   const esc=p.name.replace(/'/g,"\\'");
-  const editBtn=`<button onclick="editPreset('${esc}')" style="color:#2dd4bf;font-size:.65rem;padding:.2rem .5rem;border-radius:.35rem;border:1px solid rgba(45,212,191,.3);background:none;cursor:pointer;flex-shrink:0">Bearb.</button>`;
-  const delBtn=p.name!=='Normal'?`<button onclick="deletePreset('${esc}')" style="color:#f87171;font-size:.65rem;padding:.2rem .5rem;border-radius:.35rem;border:1px solid rgba(239,68,68,.3);background:none;cursor:pointer;flex-shrink:0">Löschen</button>`:'';
+  const editBtn=`<button onclick="editPreset('${esc}')" style="color:#2dd4bf;font-size:.65rem;padding:.2rem .5rem;border-radius:2px;border:1px solid rgba(45,212,191,.3);background:none;cursor:pointer;flex-shrink:0">Bearb.</button>`;
+  const delBtn=p.name!=='Normal'?`<button onclick="deletePreset('${esc}')" style="color:#f87171;font-size:.65rem;padding:.2rem .5rem;border-radius:2px;border:1px solid rgba(239,68,68,.3);background:none;cursor:pointer;flex-shrink:0">Löschen</button>`:'';
   row.innerHTML=`<span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</span>`+`<span style="color:#64748b;font-size:.65rem;flex-shrink:0">${p.mode===1?'Durchfluss':'Druck'} · ${p.setpoint}${p.mode===1?' L/min':' bar'}</span>`+`<span style="display:flex;gap:4px;flex-shrink:0">${editBtn}${delBtn}</span>`;
   list.appendChild(row);
  });

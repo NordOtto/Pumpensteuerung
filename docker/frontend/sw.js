@@ -1,5 +1,5 @@
 'use strict';
-const CACHE = 'pumpe-v2';
+const CACHE = 'pumpe-v3';
 const STATIC = [
   '/',
   '/index.html',

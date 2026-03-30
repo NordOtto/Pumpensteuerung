@@ -70,13 +70,20 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--hmi-bg);col
 
 /* ── Pages ── */
 #page-overview{display:grid}
-#page-settings{display:none;overflow-y:auto;height:calc(100vh - 96px);background:var(--hmi-bg)}
+#page-settings{display:none;height:calc(100vh - 96px);background:var(--hmi-bg)}
 #page-log{display:none;overflow-y:auto;height:calc(100vh - 96px);background:var(--hmi-bg);padding:1rem}
 
-/* ── Settings Grid ── */
-.settings-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;padding:.75rem;max-width:1200px}
-.settings-card{background:var(--hmi-panel);border:1px solid var(--hmi-panel-border);border-radius:4px;padding:.9rem}
-.settings-card-title{font-size:.62rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--hmi-text-dim);margin-bottom:.7rem;display:flex;align-items:center;gap:.4rem}
+/* ── Settings Layout: Sidebar + Content ── */
+.settings-layout{display:grid;grid-template-columns:200px 1fr;height:100%;overflow:hidden}
+.settings-sidebar{background:var(--hmi-panel);border-right:1px solid var(--hmi-panel-border);display:flex;flex-direction:column;overflow-y:auto}
+.settings-sidebar-title{font-size:.55rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--hmi-text-dim);padding:.6rem .75rem;border-bottom:1px solid var(--hmi-panel-border)}
+.settings-nav-item{display:flex;align-items:center;gap:.5rem;padding:.55rem .75rem;font-size:.72rem;font-weight:600;cursor:pointer;border:none;background:none;color:#8b949e;text-align:left;width:100%;transition:background .12s,color .12s;border-left:2px solid transparent}
+.settings-nav-item:hover{background:rgba(255,255,255,.03);color:#c9d1d9}
+.settings-nav-item.active{background:rgba(14,165,233,.06);color:var(--accent2);border-left-color:var(--accent2)}
+.settings-content{overflow-y:auto;padding:1.25rem;display:flex;flex-direction:column}
+.settings-panel{display:none;max-width:540px}
+.settings-panel.active{display:block}
+.settings-panel-title{font-size:.75rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#c9d1d9;margin-bottom:1rem;display:flex;align-items:center;gap:.5rem;padding-bottom:.6rem;border-bottom:1px solid var(--hmi-panel-border)}
 
 /* ── Schematic Panel ── */
 #panel-schematic{flex:1;overflow:hidden;display:flex;flex-direction:column}
@@ -496,68 +503,99 @@ html[data-theme="light"] .vacation-banner{background:#92400e!important}
 
 <!-- ── PAGE: SETTINGS ── -->
 <div id="page-settings">
-  <div class="settings-grid">
+  <div class="settings-layout">
 
-    <!-- PI-Regelung -->
-    <div class="settings-card">
-      <div class="settings-card-title">
-        <svg class="w-4 h-4" fill="none" stroke="#60a5fa" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+    <!-- Sidebar Navigation -->
+    <div class="settings-sidebar">
+      <div class="settings-sidebar-title">Einstellungen</div>
+      <button class="settings-nav-item active" data-stab="pi" onclick="switchSettingsTab('pi')">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="#60a5fa" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
         PI-Druckregelung
-      </div>
-      <div class="flex items-center justify-between mb-3 p-2" style="border-radius:3px;background:var(--surface)">
-        <span style="font-size:.75rem">PI-Regelung aktiv</span>
-        <label class="toggle-wrap">
-          <input type="checkbox" id="piEnabled" onchange="piDirty()">
-          <span class="toggle-track"></span>
-          <span class="toggle-thumb"></span>
-        </label>
-      </div>
-      <div class="grid grid-cols-3 gap-2 mb-2">
-        <div><label style="font-size:.65rem;color:#64748b;display:block;margin-bottom:.2rem">EIN (bar)</label>
-          <input type="number" id="piPon" value="2.2" step="0.1" min="0.1" max="6" oninput="piDirty()"></div>
-        <div><label style="font-size:.65rem;color:#64748b;display:block;margin-bottom:.2rem">Sollwert (bar)</label>
-          <input type="number" id="piSpNum" value="3.0" step="0.1" min="0.5" max="6" oninput="piDirty()"></div>
-        <div><label style="font-size:.65rem;color:#64748b;display:block;margin-bottom:.2rem">AUS (bar)</label>
-          <input type="number" id="piPoff" value="4.0" step="0.1" min="1" max="8" oninput="piDirty()"></div>
-      </div>
-      <div class="grid grid-cols-2 gap-2 mb-2">
-        <div><label style="font-size:.65rem;color:#64748b;display:block;margin-bottom:.2rem">Kp (Hz/bar)</label>
-          <input type="number" id="piKp" value="3.0" step="0.1" min="0.1" max="20" oninput="piDirty()"></div>
-        <div><label style="font-size:.65rem;color:#64748b;display:block;margin-bottom:.2rem">Ki (Hz/bar·s)</label>
-          <input type="number" id="piKi" value="0.3" step="0.01" min="0" max="5" oninput="piDirty()"></div>
-      </div>
-      <div class="grid grid-cols-2 gap-2 mb-3">
-        <div><label style="font-size:.65rem;color:#64748b;display:block;margin-bottom:.2rem">Min-Freq (Hz)</label>
-          <input type="number" id="piFreqMin" value="35" step="1" min="10" max="50" oninput="piDirty()"></div>
-        <div><label style="font-size:.65rem;color:#64748b;display:block;margin-bottom:.2rem">Max-Freq (Hz)</label>
-          <input type="number" id="piFreqMax" value="50" step="1" min="10" max="50" oninput="piDirty()"></div>
-      </div>
-      <button id="piSaveBtn" class="btn-save" style="background:#2563eb;color:#fff" onclick="piSave()" disabled>Gespeichert</button>
+      </button>
+      <button class="settings-nav-item" data-stab="timeguard" onclick="switchSettingsTab('timeguard')">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="#fbbf24" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        Zeitsperre
+      </button>
+      <button class="settings-nav-item" data-stab="fan" onclick="switchSettingsTab('fan')">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="#22d3ee" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        Lüfter
+      </button>
+      <button class="settings-nav-item" data-stab="presets" onclick="switchSettingsTab('presets')">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="#2dd4bf" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+        Betriebsmodi
+      </button>
+      <button class="settings-nav-item" data-stab="vacation" onclick="switchSettingsTab('vacation')">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="#d97706" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+        Urlaubsmodus
+      </button>
     </div>
 
-    <!-- Zeitsperre -->
-    <div class="settings-card">
-      <div class="settings-card-title">
-        <svg class="w-4 h-4" fill="none" stroke="#fbbf24" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        Zeitsperre
+    <!-- Content Area -->
+    <div class="settings-content">
+
+      <!-- TAB: PI-Regelung -->
+      <div class="settings-panel active" id="stab-pi">
+        <div class="settings-panel-title">
+          <svg class="w-5 h-5" fill="none" stroke="#60a5fa" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+          PI-Druckregelung
+        </div>
+        <div class="flex items-center justify-between mb-4 p-3" style="border-radius:4px;background:var(--surface)">
+          <span style="font-size:.8rem">PI-Regelung aktiv</span>
+          <label class="toggle-wrap">
+            <input type="checkbox" id="piEnabled" onchange="piDirty()">
+            <span class="toggle-track"></span>
+            <span class="toggle-thumb"></span>
+          </label>
+        </div>
+        <div style="font-size:.65rem;font-weight:600;color:var(--hmi-text-dim);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem">Druckschwellen</div>
+        <div class="grid grid-cols-3 gap-3 mb-4">
+          <div><label style="font-size:.7rem;color:#64748b;display:block;margin-bottom:.25rem">EIN (bar)</label>
+            <input type="number" id="piPon" value="2.2" step="0.1" min="0.1" max="6" oninput="piDirty()"></div>
+          <div><label style="font-size:.7rem;color:#64748b;display:block;margin-bottom:.25rem">Sollwert (bar)</label>
+            <input type="number" id="piSpNum" value="3.0" step="0.1" min="0.5" max="6" oninput="piDirty()"></div>
+          <div><label style="font-size:.7rem;color:#64748b;display:block;margin-bottom:.25rem">AUS (bar)</label>
+            <input type="number" id="piPoff" value="4.0" step="0.1" min="1" max="8" oninput="piDirty()"></div>
+        </div>
+        <div style="font-size:.65rem;font-weight:600;color:var(--hmi-text-dim);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem">Regler-Parameter</div>
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          <div><label style="font-size:.7rem;color:#64748b;display:block;margin-bottom:.25rem">Kp (Hz/bar)</label>
+            <input type="number" id="piKp" value="3.0" step="0.1" min="0.1" max="20" oninput="piDirty()"></div>
+          <div><label style="font-size:.7rem;color:#64748b;display:block;margin-bottom:.25rem">Ki (Hz/bar·s)</label>
+            <input type="number" id="piKi" value="0.3" step="0.01" min="0" max="5" oninput="piDirty()"></div>
+        </div>
+        <div style="font-size:.65rem;font-weight:600;color:var(--hmi-text-dim);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem">Frequenzgrenzen</div>
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          <div><label style="font-size:.7rem;color:#64748b;display:block;margin-bottom:.25rem">Min-Freq (Hz)</label>
+            <input type="number" id="piFreqMin" value="35" step="1" min="10" max="50" oninput="piDirty()"></div>
+          <div><label style="font-size:.7rem;color:#64748b;display:block;margin-bottom:.25rem">Max-Freq (Hz)</label>
+            <input type="number" id="piFreqMax" value="50" step="1" min="10" max="50" oninput="piDirty()"></div>
+        </div>
+        <button id="piSaveBtn" class="btn-save" style="background:#2563eb;color:#fff;max-width:280px" onclick="piSave()" disabled>Gespeichert</button>
       </div>
-      <div class="flex items-center justify-between mb-3 p-2" style="border-radius:3px;background:var(--surface)">
-        <span style="font-size:.75rem">Zeitsperre aktiv</span>
-        <label class="toggle-wrap">
-          <input type="checkbox" id="tgEnabled" onchange="tgDirty()">
-          <span class="toggle-track"></span>
-          <span class="toggle-thumb"></span>
-        </label>
-      </div>
-      <div class="grid grid-cols-2 gap-2 mb-3">
-        <div><label style="font-size:.65rem;color:#64748b;display:block;margin-bottom:.2rem">Startzeit</label>
-          <input type="time" id="tgStart" oninput="tgDirty()"></div>
-        <div><label style="font-size:.65rem;color:#64748b;display:block;margin-bottom:.2rem">Endzeit</label>
-          <input type="time" id="tgEnd" oninput="tgDirty()"></div>
-      </div>
-      <div class="mb-3">
-        <label style="font-size:.65rem;color:#64748b;display:block;margin-bottom:.35rem">Wochentage</label>
-        <div class="flex gap-1" id="tgDaysRow">
+
+      <!-- TAB: Zeitsperre -->
+      <div class="settings-panel" id="stab-timeguard">
+        <div class="settings-panel-title">
+          <svg class="w-5 h-5" fill="none" stroke="#fbbf24" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          Zeitsperre
+        </div>
+        <div class="flex items-center justify-between mb-4 p-3" style="border-radius:4px;background:var(--surface)">
+          <span style="font-size:.8rem">Zeitsperre aktiv</span>
+          <label class="toggle-wrap">
+            <input type="checkbox" id="tgEnabled" onchange="tgDirty()">
+            <span class="toggle-track"></span>
+            <span class="toggle-thumb"></span>
+          </label>
+        </div>
+        <div style="font-size:.65rem;font-weight:600;color:var(--hmi-text-dim);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem">Zeitfenster</div>
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          <div><label style="font-size:.7rem;color:#64748b;display:block;margin-bottom:.25rem">Startzeit</label>
+            <input type="time" id="tgStart" oninput="tgDirty()"></div>
+          <div><label style="font-size:.7rem;color:#64748b;display:block;margin-bottom:.25rem">Endzeit</label>
+            <input type="time" id="tgEnd" oninput="tgDirty()"></div>
+        </div>
+        <div style="font-size:.65rem;font-weight:600;color:var(--hmi-text-dim);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem">Wochentage</div>
+        <div class="flex gap-1.5 mb-4" id="tgDaysRow">
           <button class="day-pill active" id="tgD0" onclick="tgToggleDay(0)">Mo</button>
           <button class="day-pill active" id="tgD1" onclick="tgToggleDay(1)">Di</button>
           <button class="day-pill active" id="tgD2" onclick="tgToggleDay(2)">Mi</button>
@@ -566,110 +604,111 @@ html[data-theme="light"] .vacation-banner{background:#92400e!important}
           <button class="day-pill active" id="tgD5" onclick="tgToggleDay(5)">Sa</button>
           <button class="day-pill active" id="tgD6" onclick="tgToggleDay(6)">So</button>
         </div>
+        <button id="tgSaveBtn" class="btn-save" style="background:#d97706;color:#fff;max-width:280px" onclick="tgSave()" disabled>Gespeichert</button>
       </div>
-      <button id="tgSaveBtn" class="btn-save" style="background:#d97706;color:#fff" onclick="tgSave()" disabled>Gespeichert</button>
-    </div>
 
-    <!-- Lüfter -->
-    <div class="settings-card">
-      <div class="settings-card-title">
-        <svg class="w-4 h-4" fill="none" stroke="#22d3ee" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-        Lüfter
-      </div>
-      <div class="flex items-center gap-4 mb-3">
-        <svg id="fanSvg" viewBox="0 0 100 100" class="w-14 h-14 flex-shrink-0" style="color:#22d3ee">
-          <g fill="currentColor" transform="translate(50,50)">
-            <ellipse rx="11" ry="32" transform="rotate(0)" opacity="0.85"/>
-            <ellipse rx="11" ry="32" transform="rotate(120)" opacity="0.85"/>
-            <ellipse rx="11" ry="32" transform="rotate(240)" opacity="0.85"/>
-            <circle r="7"/>
-          </g>
-        </svg>
-        <div>
-          <div style="font-size:1.6rem;font-weight:700;color:#22d3ee;line-height:1"><span id="fanRPM">0</span></div>
-          <div style="font-size:.65rem;color:#64748b">RPM</div>
-          <div style="font-size:.75rem;margin-top:.25rem">PWM: <span id="fanPWM" style="font-family:monospace;font-weight:700">0</span><span style="color:#64748b">/255</span></div>
+      <!-- TAB: Lüfter -->
+      <div class="settings-panel" id="stab-fan">
+        <div class="settings-panel-title">
+          <svg class="w-5 h-5" fill="none" stroke="#22d3ee" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          Lüftersteuerung
         </div>
-      </div>
-      <div class="mb-3">
-        <label style="font-size:.65rem;color:#64748b;display:block;margin-bottom:.35rem">Modus</label>
-        <div class="seg-ctrl">
+        <div class="flex items-center gap-5 mb-4 p-3" style="border-radius:4px;background:var(--surface)">
+          <svg id="fanSvg" viewBox="0 0 100 100" class="w-16 h-16 flex-shrink-0" style="color:#22d3ee">
+            <g fill="currentColor" transform="translate(50,50)">
+              <ellipse rx="11" ry="32" transform="rotate(0)" opacity="0.85"/>
+              <ellipse rx="11" ry="32" transform="rotate(120)" opacity="0.85"/>
+              <ellipse rx="11" ry="32" transform="rotate(240)" opacity="0.85"/>
+              <circle r="7"/>
+            </g>
+          </svg>
+          <div>
+            <div style="font-size:2rem;font-weight:700;color:#22d3ee;line-height:1"><span id="fanRPM">0</span> <span style="font-size:.7rem;color:#64748b">RPM</span></div>
+            <div style="font-size:.8rem;margin-top:.35rem">PWM: <span id="fanPWM" style="font-family:monospace;font-weight:700">0</span><span style="color:#64748b"> / 255</span></div>
+          </div>
+        </div>
+        <div style="font-size:.65rem;font-weight:600;color:var(--hmi-text-dim);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem">Modus</div>
+        <div class="seg-ctrl mb-4" style="max-width:360px">
           <button id="fm0" class="seg-btn active" onclick="setFanMode('Auto')">Auto</button>
           <button id="fm1" class="seg-btn" onclick="setFanMode('LOGO')">LOGO</button>
           <button id="fm2" class="seg-btn" onclick="setFanMode('MQTT')">MQTT</button>
           <button id="fm3" class="seg-btn" onclick="setFanMode('Web')">Web</button>
         </div>
-      </div>
-      <div>
-        <div class="flex justify-between" style="font-size:.65rem;color:#64748b;margin-bottom:.2rem">
-          <span>PWM Override</span><span id="fanPWMVal" style="font-family:monospace;color:#94a3b8">0</span>
+        <div style="font-size:.65rem;font-weight:600;color:var(--hmi-text-dim);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem">PWM Override</div>
+        <div style="max-width:360px">
+          <div class="flex justify-between" style="font-size:.7rem;color:#64748b;margin-bottom:.3rem">
+            <span>Wert</span><span id="fanPWMVal" style="font-family:monospace;color:#94a3b8">0</span>
+          </div>
+          <input id="fanPWMSlider" type="range" min="0" max="255" step="1" value="0"
+                 oninput="fanPWMVal.textContent=this.value"
+                 onchange="api('fan/pwm','POST',{pwm:parseInt(this.value)})">
         </div>
-        <input id="fanPWMSlider" type="range" min="0" max="255" step="1" value="0"
-               oninput="fanPWMVal.textContent=this.value"
-               onchange="api('fan/pwm','POST',{pwm:parseInt(this.value)})">
       </div>
-    </div>
 
-    <!-- Presets -->
-    <div class="settings-card" id="presets-card">
-      <div class="settings-card-title">
-        <svg class="w-4 h-4" fill="none" stroke="#2dd4bf" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
-        Betriebsmodi / Presets
+      <!-- TAB: Presets -->
+      <div class="settings-panel" id="stab-presets">
+        <div class="settings-panel-title">
+          <svg class="w-5 h-5" fill="none" stroke="#2dd4bf" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+          Betriebsmodi / Presets
+        </div>
+        <div style="font-size:.65rem;font-weight:600;color:var(--hmi-text-dim);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem">Preset auswählen</div>
+        <div id="presetButtons" class="grid grid-cols-3 gap-2 mb-5" style="max-width:420px"></div>
+
+        <div style="font-size:.65rem;font-weight:600;color:var(--hmi-text-dim);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem">Presets verwalten</div>
+        <div class="mb-3">
+          <button onclick="togglePresetEditor()" class="flex items-center gap-1.5" style="font-size:.72rem;color:#64748b;background:none;border:none;cursor:pointer">
+            <svg id="presetEditorChev" class="w-3.5 h-3.5 chev collapsed" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            Presets bearbeiten
+          </button>
+        </div>
+        <div id="presetEditorPanel" class="hidden space-y-2" style="max-width:480px">
+          <div id="presetEditList" class="space-y-1.5"></div>
+          <div style="padding:.75rem;border-radius:4px;background:var(--surface)">
+            <div id="npFormTitle" style="font-size:.65rem;font-weight:700;margin-bottom:.6rem;color:#2dd4bf;text-transform:uppercase;letter-spacing:.06em">Neuer Preset</div>
+            <div class="grid grid-cols-2 gap-2 mb-2">
+              <div><label style="font-size:.7rem;color:#64748b;display:block;margin-bottom:.25rem">Name</label>
+                <input type="text" id="npName" maxlength="31" placeholder="z.B. Garten vorn"></div>
+              <div><label style="font-size:.7rem;color:#64748b;display:block;margin-bottom:.25rem">Modus</label>
+                <select id="npMode" onchange="npModeChange()">
+                  <option value="0">Druck (bar)</option>
+                  <option value="1" selected>Durchfluss (L/min)</option>
+                </select></div>
+            </div>
+            <div class="grid grid-cols-2 gap-2 mb-2">
+              <div><label style="font-size:.7rem;color:#64748b;display:block;margin-bottom:.25rem">Sollwert (<span id="npUnit">L/min</span>)</label>
+                <input type="number" id="npSP" value="30" step="0.5" min="0.1" max="85"></div>
+              <div><label style="font-size:.7rem;color:#64748b;display:block;margin-bottom:.25rem">Kp</label>
+                <input type="number" id="npKp" value="0.3" step="0.01" min="0.01" max="20"></div>
+            </div>
+            <div class="grid grid-cols-3 gap-2 mb-3">
+              <div><label style="font-size:.7rem;color:#64748b;display:block;margin-bottom:.25rem">Ki</label>
+                <input type="number" id="npKi" value="0.05" step="0.01" min="0" max="5"></div>
+              <div><label style="font-size:.7rem;color:#64748b;display:block;margin-bottom:.25rem">f-min Hz</label>
+                <input type="number" id="npFmin" value="35" step="1" min="10" max="50"></div>
+              <div><label style="font-size:.7rem;color:#64748b;display:block;margin-bottom:.25rem">f-max Hz</label>
+                <input type="number" id="npFmax" value="50" step="1" min="10" max="50"></div>
+            </div>
+            <button id="npSaveBtn" onclick="saveNewPreset()" class="btn-save" style="background:#0d9488;color:#fff;max-width:280px">Preset hinzufügen</button>
+          </div>
+        </div>
       </div>
-      <div id="presetButtons" class="grid grid-cols-2 gap-1.5 mb-3"></div>
-      <div class="mb-2">
-        <button onclick="togglePresetEditor()" class="flex items-center gap-1.5 text-xs" style="color:#64748b;background:none;border:none;cursor:pointer">
-          <svg id="presetEditorChev" class="w-3.5 h-3.5 chev collapsed" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-          Presets bearbeiten
+
+      <!-- TAB: Urlaubsmodus -->
+      <div class="settings-panel" id="stab-vacation">
+        <div class="settings-panel-title">
+          <svg class="w-5 h-5" fill="none" stroke="#d97706" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+          Urlaubsmodus / Außer-Haus
+        </div>
+        <p style="font-size:.8rem;color:var(--hmi-text-dim);margin-bottom:1rem;line-height:1.5">Sperrt die Pumpe vollständig. Kein automatischer Start durch die PI-Regelung möglich.</p>
+        <button id="vacationBtnSettings" class="btn-vacation" style="background:#d97706;color:#fff;margin-bottom:.75rem;max-width:320px;padding:.6rem 0" onclick="toggleVacation(true)">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+          Urlaubsmodus aktivieren
         </button>
+        <div id="vacationStatusSettings" style="font-size:.8rem;color:#64748b">Status: Inaktiv</div>
       </div>
-      <div id="presetEditorPanel" class="hidden space-y-2">
-        <div id="presetEditList" class="space-y-1.5"></div>
-        <div style="padding:.65rem;border-radius:3px;background:var(--surface)">
-          <div id="npFormTitle" style="font-size:.65rem;font-weight:700;margin-bottom:.5rem;color:#2dd4bf;text-transform:uppercase;letter-spacing:.06em">Neuer Preset</div>
-          <div class="grid grid-cols-2 gap-2 mb-2">
-            <div><label style="font-size:.65rem;color:#64748b;display:block;margin-bottom:.2rem">Name</label>
-              <input type="text" id="npName" maxlength="31" placeholder="z.B. Garten vorn"></div>
-            <div><label style="font-size:.65rem;color:#64748b;display:block;margin-bottom:.2rem">Modus</label>
-              <select id="npMode" onchange="npModeChange()">
-                <option value="0">Druck (bar)</option>
-                <option value="1" selected>Durchfluss (L/min)</option>
-              </select></div>
-          </div>
-          <div class="grid grid-cols-2 gap-2 mb-2">
-            <div><label style="font-size:.65rem;color:#64748b;display:block;margin-bottom:.2rem">Sollwert (<span id="npUnit">L/min</span>)</label>
-              <input type="number" id="npSP" value="30" step="0.5" min="0.1" max="85"></div>
-            <div><label style="font-size:.65rem;color:#64748b;display:block;margin-bottom:.2rem">Kp</label>
-              <input type="number" id="npKp" value="0.3" step="0.01" min="0.01" max="20"></div>
-          </div>
-          <div class="grid grid-cols-3 gap-2 mb-2">
-            <div><label style="font-size:.65rem;color:#64748b;display:block;margin-bottom:.2rem">Ki</label>
-              <input type="number" id="npKi" value="0.05" step="0.01" min="0" max="5"></div>
-            <div><label style="font-size:.65rem;color:#64748b;display:block;margin-bottom:.2rem">f-min Hz</label>
-              <input type="number" id="npFmin" value="35" step="1" min="10" max="50"></div>
-            <div><label style="font-size:.65rem;color:#64748b;display:block;margin-bottom:.2rem">f-max Hz</label>
-              <input type="number" id="npFmax" value="50" step="1" min="10" max="50"></div>
-          </div>
-          <button id="npSaveBtn" onclick="saveNewPreset()" class="btn-save" style="background:#0d9488;color:#fff">Preset hinzufügen</button>
-        </div>
-      </div>
-    </div>
 
-    <!-- Urlaubsmodus -->
-    <div class="settings-card">
-      <div class="settings-card-title">
-        <svg class="w-4 h-4" fill="none" stroke="#d97706" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
-        Urlaubsmodus / Außer-Haus
-      </div>
-      <p style="font-size:.72rem;color:var(--hmi-text-dim);margin-bottom:.75rem">Sperrt die Pumpe vollständig. Kein automatischer Start durch die PI-Regelung möglich.</p>
-      <button id="vacationBtnSettings" class="btn-vacation" style="background:#d97706;color:#fff;margin-bottom:.5rem" onclick="toggleVacation(true)">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
-        Urlaubsmodus aktivieren
-      </button>
-      <div id="vacationStatusSettings" style="font-size:.72rem;color:#64748b">Status: Inaktiv</div>
-    </div>
-
-  </div><!-- /.settings-grid -->
+    </div><!-- /.settings-content -->
+  </div><!-- /.settings-layout -->
 </div><!-- /#page-settings -->
 
 <!-- ── PAGE: LOG ── -->
@@ -697,7 +736,7 @@ html[data-theme="light"] .vacation-banner{background:#92400e!important}
     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
     Einstellungen
   </button>
-  <button class="nav-tab" data-page="settings-presets" onclick="switchPage('settings');document.getElementById('presets-card').scrollIntoView({behavior:'smooth'})">
+  <button class="nav-tab" data-page="presets" onclick="switchPage('settings');switchSettingsTab('presets')">
     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
     Presets
   </button>
@@ -719,15 +758,31 @@ html[data-theme="light"] .vacation-banner{background:#92400e!important}
 // ── Page Switching ──
 function switchPage(name) {
   const pages = ['overview','settings','log'];
-  const pageId = name === 'settings-presets' ? 'settings' : name;
   pages.forEach(p => {
     const el = document.getElementById('page-'+p);
-    if (el) el.style.display = p === pageId ? (p === 'overview' ? 'grid' : 'block') : 'none';
+    if (el) el.style.display = p === name ? (p === 'overview' ? 'grid' : 'block') : 'none';
   });
   document.querySelectorAll('.nav-tab').forEach(t => {
-    t.classList.toggle('active', t.dataset.page === name || (name === 'settings-presets' && t.dataset.page === 'settings'));
+    const dp = t.dataset.page;
+    t.classList.toggle('active', dp === name || (name === 'settings' && dp === 'settings'));
   });
   localStorage.setItem('activePage', name);
+}
+
+// ── Settings Tab Switching ──
+function switchSettingsTab(tabName) {
+  document.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.settings-nav-item').forEach(n => n.classList.remove('active'));
+  const panel = document.getElementById('stab-'+tabName);
+  if (panel) panel.classList.add('active');
+  const navItem = document.querySelector('.settings-nav-item[data-stab="'+tabName+'"]');
+  if (navItem) navItem.classList.add('active');
+  // Highlight correct bottom nav tab
+  document.querySelectorAll('.nav-tab').forEach(t => {
+    if (t.dataset.page === 'presets') t.classList.toggle('active', tabName === 'presets');
+    if (t.dataset.page === 'settings') t.classList.toggle('active', tabName !== 'presets');
+  });
+  localStorage.setItem('activeSettingsTab', tabName);
 }
 
 // ── Toast ──
@@ -1437,6 +1492,8 @@ function updateThemeIcons(theme) {
 document.addEventListener('DOMContentLoaded', () => {
   const saved = localStorage.getItem('activePage') || 'overview';
   switchPage(saved);
+  const savedTab = localStorage.getItem('activeSettingsTab') || 'pi';
+  switchSettingsTab(savedTab);
   initDash();
   gsap.from('#page-overview', {opacity:0, duration:0.4, ease:'power2.out'});
   updateThemeIcons(localStorage.getItem('theme') || 'dark');

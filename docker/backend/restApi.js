@@ -132,6 +132,20 @@ router.post('/preset/apply', (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Urlaubsmodus ──
+router.get('/vacation', (_req, res) => {
+  res.json({ enabled: state.vacation.enabled });
+});
+
+router.post('/vacation', (req, res) => {
+  const { enabled } = req.body || {};
+  if (typeof enabled !== 'boolean') {
+    return res.status(400).json({ error: 'enabled (boolean) required' });
+  }
+  pi.setVacation(enabled);
+  res.json({ ok: true });
+});
+
 // ── Fan ──
 router.post('/fan/pwm', (req, res) => {
   const pwm = parseInt(req.body?.pwm);
@@ -177,6 +191,7 @@ router.get('/status', (_req, res) => {
     },
     active_preset: state.active_preset,
     ctrl_mode: state.ctrl_mode,
+    vacation: { enabled: state.vacation.enabled },
     sys: state.sys,
   });
 });

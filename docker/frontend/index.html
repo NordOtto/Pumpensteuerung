@@ -123,6 +123,14 @@ select option{background:#1e293b}
 .chev{transition:transform .25s}
 .chev.collapsed{transform:rotate(-90deg)}
 
+/* ── Urlaubsmodus Banner ── */
+.vacation-banner{background:#78350f;border-bottom:2px solid #d97706;color:#fef3c7;position:sticky;top:0;z-index:49}
+.vacation-off-btn{background:#d97706;color:#fff;border:none;cursor:pointer;transition:background .15s}
+.vacation-off-btn:hover{background:#b45309}
+.vacation-enable-btn{background:#d97706;border-radius:3px;padding:.5rem 0;font-weight:600;font-size:.75rem;transition:background .15s;display:flex;align-items:center;justify-content:center;gap:.35rem;border:none;color:#fff;cursor:pointer;text-transform:uppercase;letter-spacing:.04em;box-shadow:inset 0 -1px 0 rgba(0,0,0,.2)}
+.vacation-enable-btn:hover{background:#b45309}
+html[data-theme="light"] .vacation-banner{background:#92400e!important;color:#fef3c7!important}
+
 /* ── Light Theme ── */
 html[data-theme="light"] body{background:#e8ecf0!important;color:#0f172a!important}
 html[data-theme="light"] .kpi-bar{background:#dde3ea!important;border-color:#c0c8d4!important}
@@ -175,6 +183,19 @@ html[data-theme="light"] .kpi-box{background:rgba(0,0,0,.04);border-color:#e2e8f
   <button onclick="toggleTheme()" id="themeToggle" class="p-2 rounded transition" style="background:var(--surface)" title="Theme wechseln">
    <svg id="themeIconMoon" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/></svg>
    <svg id="themeIconSun" class="w-4 h-4 hidden" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"/></svg>
+  </button>
+ </div>
+</div>
+
+<!-- ========== URLAUBSMODUS BANNER ========== -->
+<div id="vacationBanner" class="vacation-banner hidden">
+ <div class="flex items-center justify-between px-4 py-2 max-w-6xl mx-auto">
+  <div class="flex items-center gap-2">
+   <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+   <span class="font-semibold text-sm">URLAUBSMODUS AKTIV – Pumpe gesperrt</span>
+  </div>
+  <button onclick="toggleVacation(false)" class="vacation-off-btn text-xs font-semibold px-3 py-1 rounded">
+   Deaktivieren
   </button>
  </div>
 </div>
@@ -238,7 +259,7 @@ html[data-theme="light"] .kpi-box{background:rgba(0,0,0,.04);border-color:#e2e8f
    </svg>
   </div>
   <!-- Controls -->
-  <div class="grid grid-cols-3 gap-2 mb-4">
+  <div class="grid grid-cols-3 gap-2 mb-2">
    <button class="btn-start" onclick="api('v20/start','POST').then(()=>showToast('V20 gestartet','success'))">
     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
     Start
@@ -252,6 +273,11 @@ html[data-theme="light"] .kpi-box{background:rgba(0,0,0,.04);border-color:#e2e8f
     Reset
    </button>
   </div>
+  <!-- Urlaubsmodus Toggle -->
+  <button id="vacationBtn" class="vacation-enable-btn w-full mb-4" onclick="toggleVacation(true)">
+   <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+   Urlaubsmodus / Außer-Haus
+  </button>
   <!-- Freq Slider -->
   <div>
    <div class="flex justify-between text-xs mb-1" style="color:#64748b">
@@ -773,6 +799,8 @@ function updateUI(d){
  if(d.pi)updatePI(d.pi);
  // Presets
  if(d.active_preset!==undefined)updatePresetStatus(d);
+ // Urlaubsmodus
+ if(d.vacation!==undefined)updateVacationUI(d.vacation.enabled);
  // System
  if(d.sys){
   const s=d.sys;
@@ -801,6 +829,26 @@ async function api(ep,method,body){
  if(body)opts.body=JSON.stringify(body);
  return fetch('/api/'+ep,opts);
 }
+
+// ── Urlaubsmodus ──
+async function toggleVacation(enable){
+ await api('vacation','POST',{enabled:enable});
+ updateVacationUI(enable);
+ showToast(enable?'Urlaubsmodus aktiviert – Pumpe gesperrt':'Urlaubsmodus deaktiviert','info');
+}
+function updateVacationUI(enabled){
+ const banner=document.getElementById('vacationBanner');
+ const btn=document.getElementById('vacationBtn');
+ if(enabled){
+  banner.classList.remove('hidden');
+  if(btn){btn.textContent='';btn.innerHTML='<svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Urlaubsmodus AKTIV – Deaktivieren';btn.style.background='#92400e';}
+ } else {
+  banner.classList.add('hidden');
+  if(btn){btn.innerHTML='<svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg> Urlaubsmodus / Außer-Haus';btn.style.background='';btn.onclick=()=>toggleVacation(true);}
+ }
+ if(btn){btn.onclick=enabled?()=>toggleVacation(false):()=>toggleVacation(true);}
+}
+
 function setFreq(hz){
  document.getElementById('freqSlider').value=hz;
  document.getElementById('freqVal').textContent=hz+' Hz';

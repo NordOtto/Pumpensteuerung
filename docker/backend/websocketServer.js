@@ -68,6 +68,7 @@ function buildStatusJson() {
     },
     active_preset: state.active_preset,
     ctrl_mode:     state.ctrl_mode,
+    vacation:      { enabled: state.vacation.enabled },
     sys: {
       ip:            state.sys.ip || 'backend',
       uptime:        state.sys.uptime,

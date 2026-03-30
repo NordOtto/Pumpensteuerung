@@ -65,6 +65,9 @@ async function load() {
     const data = await fs.readFile(DATA_FILE, 'utf8');
     const cfg = JSON.parse(data);
     Object.assign(state.pi, cfg);
+    if (cfg.vacation_enabled !== undefined) {
+      state.vacation.enabled = !!cfg.vacation_enabled;
+    }
     console.log('[PI] Konfiguration geladen aus', DATA_FILE);
   } catch {
     console.log('[PI] Keine Konfigurationsdatei gefunden – Standardwerte genutzt');
@@ -73,14 +76,15 @@ async function load() {
 
 async function save() {
   const cfg = {
-    enabled:  state.pi.enabled,
-    setpoint: state.pi.setpoint,
-    p_on:     state.pi.p_on,
-    p_off:    state.pi.p_off,
-    kp:       state.pi.kp,
-    ki:       state.pi.ki,
-    freq_min: state.pi.freq_min,
-    freq_max: state.pi.freq_max,
+    enabled:          state.pi.enabled,
+    setpoint:         state.pi.setpoint,
+    p_on:             state.pi.p_on,
+    p_off:            state.pi.p_off,
+    kp:               state.pi.kp,
+    ki:               state.pi.ki,
+    freq_min:         state.pi.freq_min,
+    freq_max:         state.pi.freq_max,
+    vacation_enabled: state.vacation.enabled,
   };
   await fs.writeFile(DATA_FILE, JSON.stringify(cfg, null, 2));
 }
@@ -95,6 +99,16 @@ function setConfig(cfg) {
   if (cfg.freq_min !== undefined) state.pi.freq_min = clamp(parseFloat(cfg.freq_min), 10, 50);
   if (cfg.freq_max !== undefined) state.pi.freq_max = clamp(parseFloat(cfg.freq_max), 10, 50);
   if (state.pi.freq_min > state.pi.freq_max) state.pi.freq_min = state.pi.freq_max;
+  save().catch(e => console.error('[PI] save error:', e.message));
+}
+
+function setVacation(enabled) {
+  state.vacation.enabled = !!enabled;
+  if (enabled) {
+    webLog('[PI] Urlaubsmodus aktiviert – Pumpe gesperrt');
+  } else {
+    webLog('[PI] Urlaubsmodus deaktiviert');
+  }
   save().catch(e => console.error('[PI] save error:', e.message));
 }
 
@@ -116,6 +130,16 @@ function resetIntegral() {
 function tick() {
   const now = Date.now();
   const pi  = state.pi;
+
+  // ── Urlaubsmodus (Pumpen-Sperre) ──
+  if (state.vacation.enabled) {
+    if (state.v20.running) {
+      mqtt.sendCmd('v20/stop', '1');
+      webLog('[PI] Urlaubsmodus – Pumpe gestoppt');
+    }
+    resetIntegral();
+    return;
+  }
 
   // Druckwert-Tracking für Timeout-Erkennung
   if (state.pressure_bar !== lastKnownPressure && state.pressure_bar > 0) {
@@ -172,7 +196,8 @@ function tick() {
   }
 
   // ── No-demand Shutdown ──
-  if (effectiveFlow < 1.0 && pressure >= pi.setpoint) {
+  // Echten Sensorwert nutzen – effectiveFlow wäre hier immer >= 1.0 (Schätzung)
+  if (flow < 1.0 && pressure >= pi.setpoint) {
     if (noFlowSince === 0) noFlowSince = now;
     if ((now - noFlowSince) > NO_DEMAND_S * 1000) {
       if (running) {
@@ -183,12 +208,13 @@ function tick() {
       noFlowSince = 0;
       return;
     }
-  } else if (effectiveFlow >= 1.0) {
+  } else if (flow >= 1.0) {
     noFlowSince = 0;
   }
 
   // ── Dry-run Protection ──
-  if (effectiveFlow < 1.0 && running && pressure < pi.setpoint) {
+  // Echten Sensorwert nutzen – effectiveFlow würde Trockenlauf verdecken
+  if (flow < 1.0 && running && pressure < pi.setpoint) {
     if (noFlowSince === 0) noFlowSince = now;
     if ((now - noFlowSince) > DRY_RUN_S * 1000) {
       webLog(`[PI] TROCKENLAUF! ${DRY_RUN_S}s kein Durchfluss → Pumpe STOP + Sperre ${DRY_RUN_LOCK_S/60} min`);
@@ -287,4 +313,4 @@ function tick() {
   state.pi.pump_state = pumpState;
 }
 
-module.exports = { load, save, setConfig, resetDryrun, tick, resetIntegral };
+module.exports = { load, save, setConfig, resetDryrun, setVacation, tick, resetIntegral };

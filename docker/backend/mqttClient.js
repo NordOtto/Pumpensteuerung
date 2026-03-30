@@ -123,6 +123,9 @@ function publishHA() {
   pub('timeguard/enabled/state', state.timeguard.enabled ? 'ON' : 'OFF', true);
   pub('timeguard/allowed',       state.timeguard.allowed ? 'ON' : 'OFF', true);
 
+  // Urlaubsmodus
+  pub('vacation/state', state.vacation.enabled ? 'ON' : 'OFF', true);
+
   // Preset
   pub('preset/state',    state.active_preset, true);
   pub('ctrl_mode/state', state.ctrl_mode === 1 ? 'Durchfluss' : 'Druck', true);
@@ -165,6 +168,7 @@ function connect() {
       BASE + '/fan/pwm/set',
       BASE + '/fan/mode/set',
       BASE + '/dryrun/reset',
+      BASE + '/vacation/set',
     ];
     haSetTopics.forEach(t => client.subscribe(t, { qos: 0 }));
     console.log('[MQTT] Topics abonniert');

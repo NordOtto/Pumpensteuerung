@@ -65,6 +65,9 @@ mqttClient.onCommand((topic, value) => {
   else if (topic === `${BASE}/dryrun/reset`) {
     pi.resetDryrun();
   }
+  else if (topic === `${BASE}/vacation/set`) {
+    pi.setVacation(value === 'ON');
+  }
 });
 
 async function main() {

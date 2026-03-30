@@ -80,6 +80,11 @@ const state = {
     ip:            '',
   },
 
+  // ── Urlaubsmodus (Pumpen-Sperre) ──
+  vacation: {
+    enabled: false,
+  },
+
   // ── Log-Puffer (für WebSocket) ──
   logBuffer: [],
   logSeq:    0,

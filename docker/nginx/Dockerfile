@@ -1,5 +1,5 @@
 FROM nginx:1.27-alpine
-RUN apk add --no-cache openssl librsvg
+RUN apk add --no-cache openssl rsvg-convert
 COPY docker/nginx/nginx.conf /etc/nginx/nginx.conf
 COPY docker/nginx/docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh

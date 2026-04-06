@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html class="dark" lang="de">
+<html class="dark" lang="en">
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
@@ -51,16 +51,18 @@
           <!-- Highlight -->
           <div class="absolute inset-0 opacity-40 mix-blend-overlay pointer-events-none" style="background:radial-gradient(circle at 50% 120%,rgba(255,255,255,0.8) 0%,transparent 60%)"></div>
 
-          <!-- Status Badge top-left -->
-          <div class="absolute top-3 sm:top-4 left-3 sm:left-4 flex gap-2">
+          <!-- Status Pills top-left -->
+          <div class="absolute top-3 sm:top-4 left-3 sm:left-4 flex flex-wrap gap-1.5">
             <div id="statusBadge" class="bg-slate-500 text-white text-[10px] sm:text-xs font-bold px-2.5 sm:px-3 py-1 rounded-full flex items-center gap-1.5 shadow-md transition-all">
               <span class="w-2 h-2 bg-white rounded-full" id="statusBadgeDot"></span>
               <span id="statusBadgeText">Lade...</span>
             </div>
+            <div id="pillTimeguard" class="hidden text-[10px] sm:text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1 shadow-md"></div>
+            <div id="pillPI" class="hidden text-[10px] sm:text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1 shadow-md"></div>
           </div>
 
           <!-- Active Preset top-right -->
-          <div class="absolute top-3 sm:top-4 right-3 sm:right-4 flex gap-1 text-xs font-medium">
+          <div class="absolute top-3 sm:top-4 right-3 sm:right-4 flex gap-1.5 text-xs font-medium">
             <div id="activePresetPill" class="px-3 py-1 bg-blue-900/40 text-blue-200 rounded-full border border-blue-400/30 hidden"></div>
           </div>
 

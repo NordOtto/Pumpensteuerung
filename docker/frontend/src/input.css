@@ -6,6 +6,22 @@
   .material-symbols-outlined {
     font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
   }
+
+  /* Hide number input spinners globally */
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+
+  /* Force custom font on all form elements */
+  input, select, textarea, button {
+    font-family: 'Space Grotesk', 'Manrope', system-ui, sans-serif;
+  }
 }
 
 @layer components {
@@ -98,6 +114,12 @@
   /* ── Sidebar Nav ── */
   .sidebar-nav-btn {
     @apply w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center text-slate-400 hover:bg-white/60 dark:hover:bg-slate-700/50 hover:text-slate-700 dark:hover:text-white transition-all cursor-pointer;
+  }
+  .sidebar-nav-btn[draggable="true"] {
+    cursor: grab;
+  }
+  .sidebar-nav-btn[draggable="true"]:active {
+    cursor: grabbing;
   }
   .sidebar-nav-active {
     @apply bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm;

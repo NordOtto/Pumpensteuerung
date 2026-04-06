@@ -116,8 +116,10 @@ function connectWS() {
       // Backend sends flat state object (no wrapper type)
       if (msg.v20 !== undefined) {
         updateUI(msg);
+        log(`V20: ${msg.v20.frequency?.toFixed(1)}Hz ${msg.v20.running ? 'RUN' : 'STOP'}${msg.v20.fault ? ' FAULT' : ''} | P:${msg.pi?.pressure?.toFixed(2)}bar | MQTT:${msg.sys?.mqtt ? 'OK' : 'ERR'}`);
       }
     } catch (err) {
+      log('WS Parse Error: ' + err.message);
       console.error('Parse Error', err);
     }
   };
@@ -228,9 +230,37 @@ function updateUI(st) {
     els.presetPill.classList.add('hidden');
   }
 
-  // Timeguard live status (only update when drawer closed or tab not focused)
+  // Timeguard live status
   if (st.timeguard) {
     updateTgStatus(st.timeguard);
+    // Timeguard pill on main display
+    const tgPill = $('pillTimeguard');
+    if (st.timeguard.enabled) {
+      tgPill.classList.remove('hidden');
+      if (st.timeguard.allowed) {
+        tgPill.className = 'text-[10px] sm:text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1 shadow-md bg-green-500/20 text-green-300 border border-green-500/30';
+        tgPill.innerHTML = '<span class="material-symbols-outlined text-xs">schedule</span> Erlaubt';
+      } else {
+        tgPill.className = 'text-[10px] sm:text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1 shadow-md bg-red-500/20 text-red-300 border border-red-500/30';
+        tgPill.innerHTML = '<span class="material-symbols-outlined text-xs">schedule</span> Gesperrt';
+      }
+    } else {
+      tgPill.classList.add('hidden');
+    }
+  }
+
+  // PI controller pill on main display
+  if (st.pi) {
+    const piPill = $('pillPI');
+    if (st.pi.enabled) {
+      piPill.classList.remove('hidden');
+      piPill.className = 'text-[10px] sm:text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1 shadow-md bg-blue-500/20 text-blue-300 border border-blue-500/30';
+      piPill.innerHTML = `<span class="material-symbols-outlined text-xs">swap_vert</span> PI ${st.pi.setpoint} bar`;
+    } else {
+      piPill.classList.remove('hidden');
+      piPill.className = 'text-[10px] sm:text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1 shadow-md bg-slate-500/20 text-slate-400 border border-slate-500/30';
+      piPill.innerHTML = '<span class="material-symbols-outlined text-xs">swap_vert</span> PI Aus';
+    }
   }
 
   // PI controller form (only update when drawer is closed)
@@ -284,7 +314,7 @@ const chart = new Chart(chartCtx, {
     scales: {
       x: { display: false },
       y: {
-        min: 0, max: 10,
+        min: 0, max: 6,
         grid: { color: isDark() ? '#1e293b' : '#f1f5f9' },
         ticks: { color: isDark() ? '#64748b' : '#94a3b8', font: { size: 10 } }
       }
@@ -399,22 +429,22 @@ async function loadPresets() {
     presets.forEach(p => {
       const isActive = p.name === activePreset;
       const safeName = p.name.replace(/'/g, "\\'");
+      const safeJson = JSON.stringify(p).replace(/'/g, "&#39;").replace(/"/g, '&quot;');
       lst.innerHTML += `
-      <div class="flex items-center justify-between p-4 ${isActive ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-600/50' : 'bg-slate-50 dark:bg-slate-700/30 border-slate-200 dark:border-slate-600/50'} border rounded-xl">
-        <div>
-          <div class="font-bold text-slate-800 dark:text-white flex items-center gap-2">
+      <div class="flex items-center justify-between p-3 ${isActive ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-600/50' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700/50'} border rounded-xl gap-2">
+        <div class="min-w-0 flex-1">
+          <div class="font-bold text-slate-800 dark:text-white flex items-center gap-2 text-sm">
             ${p.name}
-            ${isActive ? '<span class="text-[9px] bg-blue-500 text-white px-2 py-0.5 rounded-full font-bold uppercase">Aktiv</span>' : ''}
+            ${isActive ? '<span class="text-[8px] bg-blue-500 text-white px-1.5 py-0.5 rounded-full font-bold uppercase shrink-0">Aktiv</span>' : ''}
           </div>
-          <div class="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-widest font-bold mt-0.5">
-            ${p.mode == 1 ? 'Flow' : 'Druck'} | Soll: ${p.setpoint} | Kp: ${p.kp} Ki: ${p.ki} | ${p.freq_min}–${p.freq_max} Hz
+          <div class="text-[9px] text-slate-400 uppercase tracking-wider font-bold mt-0.5 truncate">
+            ${p.mode == 1 ? 'Flow' : 'Druck'} ${p.setpoint} | Kp:${p.kp} Ki:${p.ki} | ${p.freq_min}–${p.freq_max}Hz
           </div>
         </div>
-        <div class="flex gap-2 shrink-0 ml-3">
-          <button onclick="applyP('${safeName}')" class="px-3 py-1.5 ${isActive ? 'bg-blue-500 text-white' : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/40'} rounded-lg font-bold text-xs">${isActive ? 'Aktiv' : 'Aktivieren'}</button>
-          <button onclick="delP('${safeName}')" class="px-2.5 py-1.5 bg-rose-50 dark:bg-rose-900/20 text-rose-500 hover:bg-rose-100 dark:hover:bg-rose-800/30 rounded-lg font-bold">
-            <span class="material-symbols-outlined text-base">delete</span>
-          </button>
+        <div class="flex gap-1 shrink-0">
+          ${!isActive ? `<button onclick="applyP('${safeName}')" class="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-800/40 flex items-center justify-center" title="Aktivieren"><span class="material-symbols-outlined text-base">play_arrow</span></button>` : ''}
+          <button onclick="editP('${safeJson}')" class="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600/50 flex items-center justify-center" title="Bearbeiten"><span class="material-symbols-outlined text-base">edit</span></button>
+          ${!isActive ? `<button onclick="delP('${safeName}')" class="w-8 h-8 rounded-lg bg-rose-50 dark:bg-rose-900/20 text-rose-500 hover:bg-rose-100 dark:hover:bg-rose-800/30 flex items-center justify-center" title="Löschen"><span class="material-symbols-outlined text-base">delete</span></button>` : ''}
         </div>
       </div>`;
     });
@@ -433,7 +463,24 @@ window.applyP = async (name) => {
 window.delP = async (name) => {
   if (!confirm(`Preset "${name}" löschen?`)) return;
   const res = await fetch(`/api/presets/${encodeURIComponent(name)}`, { method: 'DELETE' });
-  if (res.ok) loadPresets();
+  const d = await res.json();
+  if (d.ok) { $toast.show(`"${name}" gelöscht`); loadPresets(); }
+  else $toast.show(d.error || 'Kann nicht gelöscht werden', 'error');
+};
+
+window.editP = (jsonStr) => {
+  const p = JSON.parse(jsonStr);
+  $('presetNewName').value = p.name;
+  $('presetNewMode').value = p.mode;
+  $('presetNewSet').value = p.setpoint;
+  $('presetNewKp').value = p.kp;
+  $('presetNewKi').value = p.ki;
+  $('presetNewFmin').value = p.freq_min;
+  $('presetNewFmax').value = p.freq_max;
+  $('btnCreatePreset').querySelector('span:last-child')?.remove();
+  $('btnCreatePreset').innerHTML = '<span class="material-symbols-outlined text-base">save</span> Speichern';
+  // Scroll to form
+  $('presetNewName').scrollIntoView({ behavior: 'smooth', block: 'center' });
 };
 
 $('btnCreatePreset').onclick = async () => {
@@ -453,8 +500,9 @@ $('btnCreatePreset').onclick = async () => {
   const res = await fetch('/api/presets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const d = await res.json();
   if (d.success || d.ok) {
-    $toast.show('Preset angelegt');
+    $toast.show(name === $('presetNewName').value.trim() ? 'Preset gespeichert' : 'Preset angelegt');
     $('presetNewName').value = '';
+    $('btnCreatePreset').innerHTML = '<span class="material-symbols-outlined text-base">add</span> Erstellen';
     loadPresets();
   } else {
     $toast.show(d.error || 'Fehler', 'error');
@@ -553,6 +601,129 @@ $('saveTG').onclick = async () => {
   if (d.ok) $toast.show('Zeitsperre gespeichert');
   else $toast.show(d.error || 'Fehler', 'error');
 };
+
+// ─── Sidebar Nav Reorder (drag & drop + localStorage) ───
+(function initNavReorder() {
+  const nav = document.querySelector('#drawerContent > nav');
+  if (!nav) return;
+  const STORAGE_KEY = 'sidebarNavOrder';
+
+  // Get draggable buttons (those with data-tab, except logs which stays at bottom)
+  function getDraggables() {
+    return [...nav.querySelectorAll('.sidebar-nav-btn[data-tab]')].filter(b => b.dataset.tab !== 'logs');
+  }
+
+  // Apply saved order
+  function applySavedOrder() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) return;
+    try {
+      const order = JSON.parse(saved);
+      const btns = getDraggables();
+      const map = {};
+      btns.forEach(b => map[b.dataset.tab] = b);
+      const spacer = nav.querySelector('.flex-1');
+      order.forEach(tab => {
+        if (map[tab]) nav.insertBefore(map[tab], spacer);
+      });
+    } catch(e) { /* ignore */ }
+  }
+
+  function saveOrder() {
+    const order = getDraggables().map(b => b.dataset.tab);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(order));
+  }
+
+  // Make buttons draggable
+  let dragEl = null;
+  getDraggables().forEach(btn => {
+    btn.draggable = true;
+    btn.addEventListener('dragstart', (e) => {
+      dragEl = btn;
+      btn.classList.add('opacity-40');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    btn.addEventListener('dragend', () => {
+      btn.classList.remove('opacity-40');
+      nav.querySelectorAll('.sidebar-nav-btn').forEach(b => b.classList.remove('border-t-2', 'border-blue-400'));
+      dragEl = null;
+    });
+    btn.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (btn !== dragEl && btn.dataset.tab !== 'logs') {
+        btn.classList.add('border-t-2', 'border-blue-400');
+      }
+    });
+    btn.addEventListener('dragleave', () => {
+      btn.classList.remove('border-t-2', 'border-blue-400');
+    });
+    btn.addEventListener('drop', (e) => {
+      e.preventDefault();
+      btn.classList.remove('border-t-2', 'border-blue-400');
+      if (!dragEl || dragEl === btn || btn.dataset.tab === 'logs') return;
+      const spacer = nav.querySelector('.flex-1');
+      const rect = btn.getBoundingClientRect();
+      const after = e.clientY > rect.top + rect.height / 2;
+      if (after && btn.nextElementSibling && btn.nextElementSibling !== spacer) {
+        nav.insertBefore(dragEl, btn.nextElementSibling);
+      } else {
+        nav.insertBefore(dragEl, btn);
+      }
+      saveOrder();
+    });
+  });
+
+  // Touch drag support for mobile (long-press to start)
+  let touchDragEl = null, touchClone = null, touchStartY = 0;
+  getDraggables().forEach(btn => {
+    let longPressTimer = null;
+    btn.addEventListener('touchstart', (e) => {
+      longPressTimer = setTimeout(() => {
+        touchDragEl = btn;
+        touchStartY = e.touches[0].clientY;
+        btn.classList.add('opacity-40');
+        touchClone = btn.cloneNode(true);
+        touchClone.style.cssText = 'position:fixed;pointer-events:none;z-index:999;opacity:0.8;';
+        document.body.appendChild(touchClone);
+      }, 400);
+    }, { passive: true });
+    btn.addEventListener('touchmove', (e) => {
+      if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+      if (!touchDragEl) return;
+      e.preventDefault();
+      const y = e.touches[0].clientY;
+      if (touchClone) {
+        touchClone.style.top = y - 20 + 'px';
+        touchClone.style.left = btn.getBoundingClientRect().left + 'px';
+      }
+      const target = document.elementFromPoint(e.touches[0].clientX, y);
+      const navBtn = target?.closest?.('.sidebar-nav-btn[data-tab]');
+      nav.querySelectorAll('.sidebar-nav-btn').forEach(b => b.classList.remove('border-t-2', 'border-blue-400'));
+      if (navBtn && navBtn !== touchDragEl && navBtn.dataset.tab !== 'logs') {
+        navBtn.classList.add('border-t-2', 'border-blue-400');
+      }
+    }, { passive: false });
+    btn.addEventListener('touchend', () => {
+      if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+      if (!touchDragEl) return;
+      touchDragEl.classList.remove('opacity-40');
+      if (touchClone) { touchClone.remove(); touchClone = null; }
+      // Find drop target
+      nav.querySelectorAll('.sidebar-nav-btn').forEach(b => {
+        if (b.classList.contains('border-t-2')) {
+          b.classList.remove('border-t-2', 'border-blue-400');
+          const spacer = nav.querySelector('.flex-1');
+          nav.insertBefore(touchDragEl, b);
+          saveOrder();
+        }
+      });
+      touchDragEl = null;
+    }, { passive: true });
+  });
+
+  applySavedOrder();
+})();
 
 // ─── Start ───
 connectWS();

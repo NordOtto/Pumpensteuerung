@@ -1,37 +1,30 @@
-// ─── Theme Toggle ───
+// ─── Theme ───
 (function initTheme() {
   const saved = localStorage.getItem('theme');
   if (saved === 'light') document.documentElement.classList.remove('dark');
   else document.documentElement.classList.add('dark');
-  updateThemeIcon();
+  updateThemeColor();
 })();
 
-function updateThemeIcon() {
-  const icon = document.getElementById('themeIcon');
-  if (!icon) return;
+function updateThemeColor() {
   const isDark = document.documentElement.classList.contains('dark');
-  icon.textContent = isDark ? 'light_mode' : 'dark_mode';
-  // Update status bar color
   document.querySelectorAll('meta[name="theme-color"]').forEach(m => m.remove());
   const meta = document.createElement('meta');
   meta.name = 'theme-color';
   meta.content = isDark ? '#0f1417' : '#f0f9ff';
   document.head.appendChild(meta);
+  // Sync toggle in Display tab
+  const toggle = document.getElementById('themeToggle');
+  if (toggle) toggle.checked = isDark;
 }
 
-document.getElementById('btnTheme').onclick = () => {
-  document.documentElement.classList.toggle('dark');
-  const isDark = document.documentElement.classList.contains('dark');
-  localStorage.setItem('theme', isDark ? 'dark' : 'light');
-  updateThemeIcon();
-  updateChartTheme();
-};
-
-// ─── Clock ───
-setInterval(() => {
-  document.getElementById('clock').textContent =
-    new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-}, 1000);
+function setTheme(dark) {
+  if (dark) document.documentElement.classList.add('dark');
+  else document.documentElement.classList.remove('dark');
+  localStorage.setItem('theme', dark ? 'dark' : 'light');
+  updateThemeColor();
+  if (typeof updateChartTheme === 'function') updateChartTheme();
+}
 
 // ─── Auth ───
 let authToken = localStorage.getItem('authToken');
@@ -896,6 +889,13 @@ $('saveTG').onclick = async () => {
     applyZoom(100);
     localStorage.setItem('pageZoom', '100');
   };
+})();
+
+// ─── Display: Theme Toggle ───
+(function initDisplayTheme() {
+  const toggle = $('themeToggle');
+  toggle.checked = document.documentElement.classList.contains('dark');
+  toggle.onchange = () => setTheme(toggle.checked);
 })();
 
 // ─── Start ───

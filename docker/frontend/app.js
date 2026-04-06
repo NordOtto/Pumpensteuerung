@@ -129,8 +129,10 @@ function updateUI(st) {
         els.statusIcon.className = `leading-none ${cIcon}`;
         els.statusText.innerText = txt;
         els.statusSub.innerText = txt;
-        document.querySelector('.xl\\:col-span-1.bg-gradient-to-br').className = 
-            `xl:col-span-1 ${bgStyle} rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-lg flex flex-col justify-between min-h-[300px] transition-all duration-1000`;
+        const pumpCard = document.getElementById('pumpStatusCard');
+        if(pumpCard) {
+            pumpCard.className = `xl:col-span-1 ${bgStyle} rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-lg flex flex-col justify-between min-h-[300px] transition-all duration-1000`;
+        }
     }
 
     // Sensors
@@ -209,7 +211,16 @@ els.slider.addEventListener('change', (e) => {
 
 // UI Modals / Tabs
 window.showTab = (tab) => {
-    document.getElementById('drawer').classList.remove('hidden');
+    const drawer = document.getElementById('drawer');
+    const drawerContent = document.getElementById('drawerContent');
+    
+    drawer.classList.remove('hidden');
+    // small timeout to allow display block to apply before animating opacity/transform
+    setTimeout(() => {
+        drawer.classList.remove('opacity-0');
+        drawerContent.classList.remove('translate-y-full');
+    }, 10);
+    
     ['tabSettings', 'tabPresets', 'tabLogs'].forEach(t => document.getElementById(t).classList.add('hidden'));
     
     let title = "Einstellungen";
@@ -220,7 +231,13 @@ window.showTab = (tab) => {
     document.getElementById('drawerTitle').innerText = title;
 };
 
-document.getElementById('closeDrawer').onclick = () => { document.getElementById('drawer').classList.add('hidden'); };
+document.getElementById('closeDrawer').onclick = () => {
+    const drawer = document.getElementById('drawer');
+    const drawerContent = document.getElementById('drawerContent');
+    drawer.classList.add('opacity-0');
+    drawerContent.classList.add('translate-y-full');
+    setTimeout(() => { drawer.classList.add('hidden'); }, 300);
+};
 
 // Presets Logic
 async function loadPresets() {

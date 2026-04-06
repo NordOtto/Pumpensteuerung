@@ -1,334 +1,467 @@
-lucide.createIcons();
+// ─── Theme Toggle ───
+(function initTheme() {
+  const saved = localStorage.getItem('theme');
+  if (saved === 'light') document.documentElement.classList.remove('dark');
+  else document.documentElement.classList.add('dark');
+  updateThemeIcon();
+})();
 
-// Update Time
+function updateThemeIcon() {
+  const icon = document.getElementById('themeIcon');
+  if (!icon) return;
+  icon.textContent = document.documentElement.classList.contains('dark') ? 'light_mode' : 'dark_mode';
+}
+
+document.getElementById('btnTheme').onclick = () => {
+  document.documentElement.classList.toggle('dark');
+  const isDark = document.documentElement.classList.contains('dark');
+  localStorage.setItem('theme', isDark ? 'dark' : 'light');
+  updateThemeIcon();
+  updateChartTheme();
+};
+
+// ─── Clock ───
 setInterval(() => {
-  const now = new Date();
-  document.getElementById('clock').innerText = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 }, 1000);
 
+// ─── Element References ───
 let ws;
-const wsUrl = `ws://${window.location.hostname}:${window.location.port}/ws`;
+const wsUrl = `ws://${location.hostname}:${location.port}/ws`;
+const $ = (id) => document.getElementById(id);
+
 const els = {
-    freq: document.getElementById('vFreq'),
-    pressure: document.getElementById('vPressure'),
-    flow: document.getElementById('vFlow'),
-    voltage: document.getElementById('dVoltage'),
-    current: document.getElementById('dCurrent'),
-    power: document.getElementById('dPower'),
-    waterTemp: document.getElementById('dWaterTemp'),
-    airTemp: document.getElementById('dAirTemp'),
-    fanRpm: document.getElementById('dFan'),
-    statusText: document.getElementById('statusText'),
-    statusIcon: document.getElementById('vStatusIcon'),
-    statusSub: document.getElementById('vStatusSubMini'),
-    freqSet: document.getElementById('vFreqSet'),
-    pressureSet: document.getElementById('vPressureSet'),
-    flowSub: document.getElementById('vFlowSub'),
-    slider: document.getElementById('freqSlider'),
-    sliderVal: document.getElementById('freqSliderVal'),
-    mqtt: document.getElementById('statusMqtt'),
-    modbus: document.getElementById('statusModbus'),
-    piPon: document.getElementById('piPon'),
-    piSetpoint: document.getElementById('piSetpoint'),
-    piPoff: document.getElementById('piPoff'),
-    piKp: document.getElementById('piKp'),
-    piKi: document.getElementById('piKi'),
-    piFmin: document.getElementById('piFmin'),
-    piFmax: document.getElementById('piFmax'),
-    piEnabled: document.getElementById('piEnabled')
+  freq:        $('vFreq'),
+  freqCard:    $('vFreqCard'),
+  freqSet:     $('vFreqSet'),
+  pressure:    $('vPressure'),
+  pressureSet: $('vPressureSet'),
+  flow:        $('vFlow'),
+  flowSub:     $('vFlowSub'),
+  voltage:     $('dVoltage'),
+  current:     $('dCurrent'),
+  power:       $('dPower'),
+  waterTemp:   $('dWaterTemp'),
+  airTemp:     $('dAirTemp'),
+  fan:         $('dFan'),
+  statusText:  $('statusText'),
+  statusSub:   $('vStatusSubMini'),
+  statusBadge: $('statusBadge'),
+  badgeText:   $('statusBadgeText'),
+  badgeDot:    $('statusBadgeDot'),
+  dotMqtt:     $('dotMqtt'),
+  dotModbus:   $('dotModbus'),
+  dotPump:     $('dotPump'),
+  statusMqtt:  $('statusMqtt'),
+  statusModbus:$('statusModbus'),
+  uptime:      $('statusUptime'),
+  slider:      $('freqSlider'),
+  presetPill:  $('activePresetPill'),
+  piPon:       $('piPon'),
+  piSetpoint:  $('piSetpoint'),
+  piPoff:      $('piPoff'),
+  piKp:        $('piKp'),
+  piKi:        $('piKi'),
+  piFmin:      $('piFmin'),
+  piFmax:      $('piFmax'),
+  piEnabled:   $('piEnabled'),
 };
 
-// UI Logger
+// ─── Logger ───
 function log(msg) {
-    const ts = new Date().toISOString().split('T')[1].substring(0,8);
-    const m = `[${ts}] ${msg}`;
-    const box = document.getElementById('logBox');
-    const full = document.getElementById('logBoxFull');
-    if(box) { box.innerText = m + '\n' + box.innerText; box.scrollTop = 0; }
-    if(full) { full.innerText = m + '\n' + full.innerText; }
-    console.log(m);
+  const ts = new Date().toISOString().split('T')[1].substring(0, 8);
+  const m = `[${ts}] ${msg}`;
+  const box = $('logBox');
+  const full = $('logBoxFull');
+  if (box) { box.textContent = m + '\n' + box.textContent; }
+  if (full) { full.textContent = m + '\n' + full.textContent; }
+  console.log(m);
 }
 
-// Toast
+// ─── Toast ───
 window.$toast = {
-    el: document.getElementById('toast'),
-    msg: document.querySelector('#toast .msg'),
-    timer: null,
-    show: (text, type = 'info') => {
-        $toast.msg.innerText = text;
-        $toast.el.className = `fixed top-[100px] left-1/2 -translate-x-1/2 z-[100] transition-all transform max-w-sm w-[90%] px-5 py-4 rounded-2xl shadow-xl flex items-center justify-between text-sm font-semibold pointer-events-none mt-4 ` + 
-            (type === 'error' ? 'bg-rose-500 text-white' : 'bg-emerald-500 text-white');
-        
-        clearTimeout($toast.timer);
-        $toast.el.classList.remove('-translate-y-[200%]', 'opacity-0');
-        
-        $toast.timer = setTimeout(() => { $toast.hide(); }, 4000);
-    },
-    hide: () => {
-        $toast.el.classList.add('-translate-y-[200%]', 'opacity-0');
-    }
+  el: $('toast'),
+  msg: $('toastMsg'),
+  timer: null,
+  show(text, type = 'info') {
+    this.msg.textContent = text;
+    this.el.className = `fixed top-6 left-1/2 -translate-x-1/2 z-[100] transition-all duration-300 max-w-sm w-[90%] px-5 py-4 rounded-2xl shadow-xl flex items-center justify-between text-sm font-semibold text-white pointer-events-none ${type === 'error' ? 'bg-rose-500' : 'bg-emerald-500'}`;
+    clearTimeout(this.timer);
+    this.timer = setTimeout(() => this.hide(), 4000);
+  },
+  hide() {
+    this.el.classList.add('-translate-y-[200%]', 'opacity-0');
+  }
 };
+$('toastClose').onclick = () => $toast.hide();
 
-// WebSocket
+// ─── WebSocket ───
 function connectWS() {
-    ws = new WebSocket(wsUrl);
-    ws.onopen = () => { log("WebSocket verbunden"); };
-    ws.onclose = () => { log("WS getrennt, reconnect..."); setTimeout(connectWS, 3000); setStatusDot('v20', false); setStatusDot('mqtt', false); };
-    ws.onerror = (err) => { log("WS Error"); ws.close(); };
-    ws.onmessage = (e) => {
-        try {
-            const msg = JSON.parse(e.data);
-            if(msg.v20 !== undefined) {
-                updateUI(msg);
-                setStatusDot('mqtt', msg.sys ? msg.sys.mqtt : false);
-                setStatusDot('v20', msg.v20 ? msg.v20.connected : false);
-            }
-        } catch(err) {
-            console.error("Parse Error", err);
-        }
-    };
-}
-
-function setStatusDot(type, connected) {
-    if(type === 'mqtt') {
-        const c = connected ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700';
-        els.mqtt.className = `text-xs font-bold px-3 py-1 rounded-lg ${c}`;
-        els.mqtt.innerText = connected ? 'Verbunden' : 'Getrennt';
-    } else if(type === 'v20') {
-        const c = connected ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500';
-        els.modbus.className = `text-xs font-bold px-3 py-1 rounded-lg ${c}`;
-        els.modbus.innerText = connected ? 'Verbunden' : 'Fehler';
+  ws = new WebSocket(wsUrl);
+  ws.onopen = () => log('WebSocket verbunden');
+  ws.onclose = () => {
+    log('WS getrennt, reconnect...');
+    setTimeout(connectWS, 3000);
+    setDot('dotMqtt', false);
+    setDot('dotModbus', false);
+    setDot('dotPump', false);
+    setStatusBadge('offline', 'Offline');
+  };
+  ws.onerror = () => { log('WS Error'); ws.close(); };
+  ws.onmessage = (e) => {
+    try {
+      const msg = JSON.parse(e.data);
+      // Backend sends flat state object (no wrapper type)
+      if (msg.v20 !== undefined) {
+        updateUI(msg);
+      }
+    } catch (err) {
+      console.error('Parse Error', err);
     }
+  };
 }
 
-// State variables to remember
+// ─── Status Dots ───
+function setDot(id, connected) {
+  const el = $(id);
+  if (!el) return;
+  el.className = `w-3 h-3 rounded-full transition-all ${connected ? 'dot-ok' : 'dot-off'}`;
+}
+
+function setStatusBadge(state, text) {
+  let cls = 'bg-slate-500';
+  if (state === 'running') cls = 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.6)]';
+  else if (state === 'fault') cls = 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.6)]';
+  else if (state === 'ready') cls = 'bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.4)]';
+  else if (state === 'offline') cls = 'bg-slate-500';
+
+  els.statusBadge.className = `${cls} text-white text-[10px] sm:text-xs font-bold px-2.5 sm:px-3 py-1 rounded-full flex items-center gap-1.5 shadow-md transition-all`;
+  els.badgeText.textContent = text;
+  els.badgeDot.className = `w-2 h-2 bg-white rounded-full ${state === 'running' ? 'animate-pulse' : ''}`;
+}
+
+// ─── Main UI update ───
 let lastPiState = {};
 
 function updateUI(st) {
-    // V20 Pump
-    if(st.v20) {
-        els.freq.innerText = (st.v20.frequency || 0).toFixed(1);
-        els.voltage.innerText = (st.v20.voltage || 0).toFixed(1);
-        els.current.innerText = (st.v20.current || 0).toFixed(2);
-        els.power.innerText = (st.v20.power || 0).toFixed(2);
-        
-        let cIcon = 'text-slate-300';
-        let txt = "Bereit";
-        let bgStyle = "bg-gradient-to-br from-[#1A73E8] to-[#4285F4]";
+  // V20 Pump
+  if (st.v20) {
+    const freq = (st.v20.frequency || 0).toFixed(1);
+    els.freq.textContent = freq;
+    els.freqCard.textContent = freq;
+    els.freqSet.textContent = (st.v20.freq_setpoint || 0).toFixed(1);
+    els.voltage.textContent = (st.v20.voltage || 0).toFixed(1);
+    els.current.textContent = (st.v20.current || 0).toFixed(2);
+    els.power.textContent = (st.v20.power || 0).toFixed(2);
 
-        if(st.v20.fault) {
-            cIcon = 'text-rose-500'; txt = `Störung ${st.v20.fault_code||''}`;
-            bgStyle = "bg-gradient-to-br from-rose-500 to-rose-400";
-        } else if(st.v20.running) {
-            cIcon = 'text-emerald-500 text-shadow-glow'; txt = "Läuft";
-            bgStyle = "bg-gradient-to-br from-emerald-500 to-emerald-400 opacity-90";
-        } else if(!st.v20.connected) {
-            txt = "Modbus offline"; bgStyle = "bg-gradient-to-br from-slate-400 to-slate-300";
-        }
-
-        els.statusIcon.className = `leading-none ${cIcon}`;
-        els.statusText.innerText = txt;
-        els.statusSub.innerText = txt;
-        const pumpCard = document.getElementById('pumpStatusCard');
-        if(pumpCard) {
-            pumpCard.className = `xl:col-span-1 ${bgStyle} rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-lg flex flex-col justify-between min-h-[300px] transition-all duration-1000`;
-        }
+    // Status badge + text
+    let badgeState = 'ready', badgeLabel = 'Bereit', statusColor = 'text-blue-500 dark:text-blue-400';
+    if (st.v20.fault) {
+      badgeState = 'fault'; badgeLabel = `Störung ${st.v20.fault_code || ''}`;
+      statusColor = 'text-red-500';
+    } else if (st.v20.running) {
+      badgeState = 'running'; badgeLabel = 'Läuft';
+      statusColor = 'text-green-500 dark:text-green-400';
+    } else if (!st.v20.connected) {
+      badgeState = 'offline'; badgeLabel = 'Offline';
+      statusColor = 'text-slate-400';
     }
+    setStatusBadge(badgeState, badgeLabel);
+    els.statusText.className = `text-xl sm:text-3xl font-bold ${statusColor}`;
+    els.statusText.textContent = badgeLabel;
+    els.statusSub.textContent = st.v20.running ? 'Motor Aktiv' : st.v20.fault ? 'Fehler prüfen' : st.v20.connected ? 'Standby' : 'Keine Verbindung';
 
-    // Sensors
-    if(st.pi) {
-        els.pressure.innerText = (st.pi.pressure || 0).toFixed(2);
-        els.flow.innerText = (st.pi.flow || 0).toFixed(1);
-        els.waterTemp.innerText = (st.pi.water_temp || 0).toFixed(1);
-        pushChart(st.pi.pressure);
-    }
-    if(st.temp !== undefined) els.airTemp.innerText = st.temp;
-    if(st.fan) els.fanRpm.innerText = st.fan.rpm;
+    // Pump dot
+    setDot('dotPump', st.v20.running);
 
-    if(st.sys && st.sys.uptime) {
-        const h = String(Math.floor(st.sys.uptime / 3600)).padStart(2,'0');
-        const m = String(Math.floor((st.sys.uptime % 3600) / 60)).padStart(2,'0');
-        const s = String(Math.floor(st.sys.uptime % 60)).padStart(2,'0');
-        document.getElementById('statusUptime').innerText = `${h}:${m}:${s}`;
-    }
-    
-    // Pi-Controller
-    if(st.pi && document.getElementById('drawer').classList.contains('hidden')) {
-        lastPiState = st.pi;
-        if(document.activeElement.tagName !== "INPUT") {
-            els.piPon.value = st.pi.p_on;
-            els.piPoff.value = st.pi.p_off;
-            els.piSetpoint.value = st.pi.setpoint;
-            els.piKp.value = st.pi.kp;
-            els.piKi.value = st.pi.ki;
-            els.piFmin.value = st.pi.freq_min || 30;
-            els.piFmax.value = st.pi.freq_max || 50;
-            els.piEnabled.checked = st.pi.enabled;
-            
-            // Prefill preset form if not active
-            if(document.activeElement.id !== "presetNewSet" && document.activeElement.id !== "presetNewMode") {
-                document.getElementById('presetNewSet').value = st.pi.setpoint;
-                document.getElementById('presetNewKp').value = st.pi.kp;
-                document.getElementById('presetNewKi').value = st.pi.ki;
-                document.getElementById('presetNewFmin').value = st.pi.freq_min || 30;
-                document.getElementById('presetNewFmax').value = st.pi.freq_max || 50;
-            }
+    // Modbus dot
+    setDot('dotModbus', st.v20.connected);
+    els.statusModbus.textContent = st.v20.connected ? 'Verbunden' : 'Fehler';
+    els.statusModbus.className = `text-[10px] font-bold px-2 py-0.5 rounded-md ${st.v20.connected ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' : 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'}`;
+  }
 
-            els.pressureSet.innerText = st.pi.ctrl_mode === 0 ? st.pi.setpoint + ' b' : 'auto';
-            els.flowSub.innerText = st.pi.ctrl_mode === 1 ? `Soll: ${st.pi.flow_setpoint || st.pi.setpoint} l/m` : 'auto';
-        }
+  // Sensors (inside pi object from backend)
+  if (st.pi) {
+    els.pressure.textContent = (st.pi.pressure || 0).toFixed(2);
+    els.flow.textContent = (st.pi.flow || 0).toFixed(1);
+    els.waterTemp.textContent = st.pi.water_temp !== -127 ? (st.pi.water_temp || 0).toFixed(1) : '--';
+    pushChart(st.pi.pressure);
+
+    // Flow sub-status
+    if (st.pi.flow > 0.5) {
+      els.flowSub.textContent = 'Strömung Ok';
+      els.flowSub.className = 'text-xs text-green-600 dark:text-green-400 font-medium mt-1';
+    } else {
+      els.flowSub.textContent = 'Kein Fluss';
+      els.flowSub.className = 'text-xs text-slate-400 font-medium mt-1';
     }
+  }
+
+  // Air temp
+  if (st.temp !== undefined) els.airTemp.textContent = st.temp !== -127 ? st.temp : '--';
+
+  // Fan
+  if (st.fan) els.fan.textContent = st.fan.rpm;
+
+  // MQTT dot
+  if (st.sys) {
+    setDot('dotMqtt', st.sys.mqtt);
+    els.statusMqtt.textContent = st.sys.mqtt ? 'Verbunden' : 'Getrennt';
+    els.statusMqtt.className = `text-[10px] font-bold px-2 py-0.5 rounded-md ${st.sys.mqtt ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' : 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'}`;
+
+    // Uptime
+    if (st.sys.uptime !== undefined) {
+      const h = String(Math.floor(st.sys.uptime / 3600)).padStart(2, '0');
+      const m = String(Math.floor((st.sys.uptime % 3600) / 60)).padStart(2, '0');
+      const s = String(Math.floor(st.sys.uptime % 60)).padStart(2, '0');
+      els.uptime.textContent = `${h}:${m}:${s}`;
+    }
+  }
+
+  // Active preset pill
+  if (st.active_preset) {
+    els.presetPill.textContent = st.active_preset;
+    els.presetPill.classList.remove('hidden');
+  } else {
+    els.presetPill.classList.add('hidden');
+  }
+
+  // PI controller form (only update when drawer is closed)
+  if (st.pi && $('drawer').classList.contains('hidden')) {
+    lastPiState = st.pi;
+    if (document.activeElement.tagName !== 'INPUT') {
+      els.piPon.value = st.pi.p_on;
+      els.piPoff.value = st.pi.p_off;
+      els.piSetpoint.value = st.pi.setpoint;
+      els.piKp.value = st.pi.kp;
+      els.piKi.value = st.pi.ki;
+      els.piFmin.value = st.pi.freq_min || 30;
+      els.piFmax.value = st.pi.freq_max || 50;
+      els.piEnabled.checked = st.pi.enabled;
+
+      // Prefill preset form
+      if (document.activeElement.id !== 'presetNewSet' && document.activeElement.id !== 'presetNewMode') {
+        $('presetNewSet').value = st.pi.setpoint;
+        $('presetNewKp').value = st.pi.kp;
+        $('presetNewKi').value = st.pi.ki;
+        $('presetNewFmin').value = st.pi.freq_min || 30;
+        $('presetNewFmax').value = st.pi.freq_max || 50;
+      }
+
+      els.pressureSet.textContent = st.pi.ctrl_mode === 0 ? st.pi.setpoint + ' bar' : 'auto';
+    }
+  }
 }
 
-// Chart mapping
-const ctx = document.getElementById('pressureChart').getContext('2d');
-const chart = new Chart(ctx, {
-    type: 'line',
-    data: { labels: Array(30).fill(''), datasets: [{ label: 'Druck (bar)', data: Array(30).fill(null), borderColor: '#3b82f6', tension: 0.4, borderWidth: 3 }] },
-    options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: { x: { display: false }, y: { min: 0, max: 10, grid: { color: '#f1f5f9' } } }
+// ─── Chart ───
+const chartCtx = $('pressureChart').getContext('2d');
+const chart = new Chart(chartCtx, {
+  type: 'line',
+  data: {
+    labels: Array(30).fill(''),
+    datasets: [{
+      label: 'Druck (bar)',
+      data: Array(30).fill(null),
+      borderColor: '#3b82f6',
+      backgroundColor: 'rgba(59,130,246,0.1)',
+      fill: true,
+      tension: 0.4,
+      borderWidth: 2.5,
+      pointRadius: 0,
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { display: false },
+      y: {
+        min: 0, max: 10,
+        grid: { color: isDark() ? '#1e293b' : '#f1f5f9' },
+        ticks: { color: isDark() ? '#64748b' : '#94a3b8', font: { size: 10 } }
+      }
     }
+  }
 });
+
+function isDark() { return document.documentElement.classList.contains('dark'); }
+
+function updateChartTheme() {
+  chart.options.scales.y.grid.color = isDark() ? '#1e293b' : '#f1f5f9';
+  chart.options.scales.y.ticks.color = isDark() ? '#64748b' : '#94a3b8';
+  chart.update('none');
+}
 
 function pushChart(val) {
-    if(val===undefined)return;
-    const data = chart.data.datasets[0].data;
-    data.push(val); data.shift();
-    chart.update('none');
+  if (val === undefined) return;
+  const data = chart.data.datasets[0].data;
+  data.push(val);
+  data.shift();
+  chart.update('none');
 }
 
-// Fixed Bar Buttons
-document.getElementById('btnStart').onclick = () => fetch('/api/v20/start', {method:'POST'});
-document.getElementById('btnStop').onclick = () => fetch('/api/v20/stop', {method:'POST'});
-document.getElementById('btnReset').onclick = () => fetch('/api/v20/reset', {method:'POST'});
+// ─── Buttons ───
+$('btnStart').onclick = () => fetch('/api/v20/start', { method: 'POST' }).then(() => $toast.show('Start gesendet'));
+$('btnStop').onclick = () => fetch('/api/v20/stop', { method: 'POST' }).then(() => $toast.show('Stop gesendet'));
+$('btnReset').onclick = () => fetch('/api/v20/reset', { method: 'POST' }).then(() => $toast.show('Reset gesendet'));
 
-// Slider API mapping (Throttle 500ms)
+// ─── Freq Slider ───
 let slTimer;
-els.slider.addEventListener('input', (e) => { els.sliderVal.innerText = parseFloat(e.target.value).toFixed(1); });
+els.slider.addEventListener('input', (e) => {
+  // Show current slider value somewhere? We just update freq display transiently
+});
 els.slider.addEventListener('change', (e) => {
-    clearTimeout(slTimer);
-    slTimer = setTimeout(() => {
-        fetch('/api/v20/freq', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({freq: parseFloat(e.target.value)})})
-          .then(r=>r.json()).then(o=>{
-              if(o.success) $toast.show(`Frequenz auf ${e.target.value}Hz gesetzt`);
-          });
-    }, 500);
+  clearTimeout(slTimer);
+  slTimer = setTimeout(() => {
+    fetch('/api/v20/freq', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hz: parseFloat(e.target.value) })
+    }).then(r => r.json()).then(o => {
+      if (o.ok) $toast.show(`Frequenz auf ${e.target.value} Hz gesetzt`);
+    });
+  }, 500);
 });
 
-// UI Modals / Tabs
+// ─── Gear Button → Settings ───
+$('btnGear').onclick = () => window.showTab('settings');
+
+// ─── Drawer / Tabs ───
 window.showTab = (tab) => {
-    const drawer = document.getElementById('drawer');
-    const drawerContent = document.getElementById('drawerContent');
-    
-    drawer.classList.remove('hidden');
-    // small timeout to allow display block to apply before animating opacity/transform
-    setTimeout(() => {
-        drawer.classList.remove('opacity-0');
-        drawerContent.classList.remove('translate-y-full');
-    }, 10);
-    
-    ['tabSettings', 'tabPresets', 'tabLogs'].forEach(t => document.getElementById(t).classList.add('hidden'));
-    
-    let title = "Einstellungen";
-    if(tab === 'settings') { document.getElementById('tabSettings').classList.remove('hidden'); title = "Modbus & PI"; }
-    if(tab === 'presets') { document.getElementById('tabPresets').classList.remove('hidden'); title = "Presets Manager"; loadPresets(); }
-    if(tab === 'logs') { document.getElementById('tabLogs').classList.remove('hidden'); title = "System Logs"; }
-    
-    document.getElementById('drawerTitle').innerText = title;
+  const drawer = $('drawer');
+  const content = $('drawerContent');
+  drawer.classList.remove('hidden');
+  setTimeout(() => {
+    drawer.classList.remove('opacity-0');
+    content.classList.remove('translate-y-full');
+  }, 10);
+
+  ['tabSettings', 'tabPresets', 'tabLogs'].forEach(t => $(t).classList.add('hidden'));
+
+  let title = 'Einstellungen';
+  if (tab === 'settings') { $('tabSettings').classList.remove('hidden'); title = 'Einstellungen'; }
+  if (tab === 'presets') { $('tabPresets').classList.remove('hidden'); title = 'Presets Manager'; loadPresets(); }
+  if (tab === 'logs') { $('tabLogs').classList.remove('hidden'); title = 'System Logs'; }
+
+  $('drawerTitle').textContent = title;
 };
 
-document.getElementById('closeDrawer').onclick = () => {
-    const drawer = document.getElementById('drawer');
-    const drawerContent = document.getElementById('drawerContent');
-    drawer.classList.add('opacity-0');
-    drawerContent.classList.add('translate-y-full');
-    setTimeout(() => { drawer.classList.add('hidden'); }, 300);
+$('closeDrawer').onclick = () => {
+  const drawer = $('drawer');
+  const content = $('drawerContent');
+  drawer.classList.add('opacity-0');
+  content.classList.add('translate-y-full');
+  setTimeout(() => drawer.classList.add('hidden'), 300);
 };
 
-// Presets Logic
+// ─── Presets ───
 async function loadPresets() {
-    const res = await fetch('/presets');
+  try {
+    const res = await fetch('/api/presets');
     const presets = await res.json();
-    const lst = document.getElementById('presetList');
+    const lst = $('presetList');
     lst.innerHTML = '';
+    if (!presets.length) {
+      lst.innerHTML = '<div class="text-sm text-slate-400 text-center py-4">Keine Presets vorhanden</div>';
+      return;
+    }
     presets.forEach(p => {
-        lst.innerHTML += `
-        <div class="flex items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-2xl">
-            <div>
-                <div class="font-bold text-slate-800">${p.name}</div>
-                <div class="text-[10px] text-slate-500 uppercase tracking-widest font-bold">MODE: ${p.mode == 1 ? 'Flow' : 'Pressure'} | SOLL: ${p.setpoint}</div>
-            </div>
-            <div class="flex gap-2">
-                <button onclick="applyP('${p.name}')" class="px-4 py-2 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-xl font-bold text-xs">Aktivieren</button>
-                <button onclick="delP('${p.name}')" class="px-3 py-2 bg-rose-50 text-rose-500 hover:bg-rose-100 rounded-xl font-bold"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-            </div>
-        </div>`;
+      lst.innerHTML += `
+      <div class="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/30 border border-slate-200 dark:border-slate-600/50 rounded-xl">
+        <div>
+          <div class="font-bold text-slate-800 dark:text-white">${p.name}</div>
+          <div class="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-widest font-bold">
+            ${p.mode == 1 ? 'Flow' : 'Pressure'} | Soll: ${p.setpoint}
+          </div>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="applyP('${p.name}')" class="px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/40 rounded-lg font-bold text-xs">Aktivieren</button>
+          <button onclick="delP('${p.name}')" class="px-2.5 py-1.5 bg-rose-50 dark:bg-rose-900/20 text-rose-500 hover:bg-rose-100 dark:hover:bg-rose-800/30 rounded-lg font-bold">
+            <span class="material-symbols-outlined text-base">delete</span>
+          </button>
+        </div>
+      </div>`;
     });
-    lucide.createIcons();
+  } catch (err) {
+    log('Presets laden fehlgeschlagen');
+  }
 }
 
 window.applyP = async (name) => {
-    const res = await fetch('/preset/apply', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name})});
-    const d = await res.json();
-    if(d.success) { $toast.show(`Preset ${name} geladen`); document.getElementById('closeDrawer').click(); }
-    else $toast.show(d.error, 'error');
+  const res = await fetch('/api/preset/apply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
+  const d = await res.json();
+  if (d.success || d.ok) { $toast.show(`Preset "${name}" geladen`); $('closeDrawer').click(); }
+  else $toast.show(d.error || 'Fehler', 'error');
 };
 
 window.delP = async (name) => {
-    if(!confirm('Löschen?')) return;
-    const res = await fetch(`/presets/${name}`, {method:'DELETE'});
-    if(res.ok) loadPresets();
+  if (!confirm(`Preset "${name}" löschen?`)) return;
+  const res = await fetch(`/api/presets/${encodeURIComponent(name)}`, { method: 'DELETE' });
+  if (res.ok) loadPresets();
 };
 
-document.getElementById('btnCreatePreset').onclick = async () => {
-    const name = document.getElementById('presetNewName').value.trim();
-    if(!name) return $toast.show('Name erforderlich', 'error');
-    
-    const body = {
-        name,
-        mode: parseInt(document.getElementById('presetNewMode').value),
-        setpoint: parseFloat(document.getElementById('presetNewSet').value),
-        kp: parseFloat(document.getElementById('presetNewKp').value),
-        ki: parseFloat(document.getElementById('presetNewKi').value),
-        freq_min: parseInt(document.getElementById('presetNewFmin').value),
-        freq_max: parseInt(document.getElementById('presetNewFmax').value)
-    };
-    
-    const res = await fetch('/presets', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
-    const d = await res.json();
-    if(d.success) {
-        $toast.show(`Preset angelegt`);
-        document.getElementById('presetNewName').value = '';
-        loadPresets();
-    } else {
-        $toast.show(d.error || 'Fehler', 'error');
-    }
+$('btnCreatePreset').onclick = async () => {
+  const name = $('presetNewName').value.trim();
+  if (!name) return $toast.show('Name erforderlich', 'error');
+
+  const body = {
+    name,
+    mode: parseInt($('presetNewMode').value),
+    setpoint: parseFloat($('presetNewSet').value),
+    kp: parseFloat($('presetNewKp').value),
+    ki: parseFloat($('presetNewKi').value),
+    freq_min: parseInt($('presetNewFmin').value),
+    freq_max: parseInt($('presetNewFmax').value)
+  };
+
+  const res = await fetch('/api/presets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const d = await res.json();
+  if (d.success || d.ok) {
+    $toast.show('Preset angelegt');
+    $('presetNewName').value = '';
+    loadPresets();
+  } else {
+    $toast.show(d.error || 'Fehler', 'error');
+  }
 };
 
-document.getElementById('presetNewMode').onchange = (e) => {
-    document.getElementById('lblPresetSet').innerText = e.target.value == "1" ? "Sollwert (L/Min)" : "Sollwert (bar)";
+$('presetNewMode').onchange = (e) => {
+  $('lblPresetSet').textContent = e.target.value == '1' ? 'Sollwert (L/Min)' : 'Sollwert (bar)';
 };
 
-// Save PI Form
-document.getElementById('savePI').onclick = async () => {
-    const body = {
-        p_on: parseFloat(els.piPon.value),
-        p_off: parseFloat(els.piPoff.value),
-        setpoint: parseFloat(els.piSetpoint.value),
-        kp: parseFloat(els.piKp.value),
-        ki: parseFloat(els.piKi.value),
-        freq_min: parseInt(els.piFmin.value),
-        freq_max: parseInt(els.piFmax.value),
-        enabled: els.piEnabled.checked,
-        ctrl_mode: lastPiState.ctrl_mode || 0 // keep current mode
-    };
-    
-    // Check if endpoint should be /api/pressure if there is no /api/pi
-    const res = await fetch('/api/pressure', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
-    const d = await res.json();
-    if(d.success) $toast.show('Parameter gespeichert');
+// ─── Save PI Form ───
+$('savePI').onclick = async () => {
+  const body = {
+    p_on: parseFloat(els.piPon.value),
+    p_off: parseFloat(els.piPoff.value),
+    setpoint: parseFloat(els.piSetpoint.value),
+    kp: parseFloat(els.piKp.value),
+    ki: parseFloat(els.piKi.value),
+    freq_min: parseInt(els.piFmin.value),
+    freq_max: parseInt(els.piFmax.value),
+    enabled: els.piEnabled.checked,
+    ctrl_mode: lastPiState.ctrl_mode || 0
+  };
+  const res = await fetch('/api/pressure', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const d = await res.json();
+  if (d.success || d.ok) $toast.show('Parameter gespeichert');
+  else $toast.show('Fehler beim Speichern', 'error');
 };
 
+// ─── Save Fan ───
+$('saveFan').onclick = async () => {
+  const mode = $('fanMode').value;
+  const pwm = parseInt($('fanPwm').value);
+  await fetch('/api/fan/mode', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode }) });
+  await fetch('/api/fan/pwm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pwm }) });
+  $toast.show('Lüfter aktualisiert');
+};
+
+$('fanPwm').addEventListener('input', (e) => {
+  $('fanPwmVal').textContent = Math.round(e.target.value / 255 * 100) + '%';
+});
+
+// ─── Start ───
 connectWS();

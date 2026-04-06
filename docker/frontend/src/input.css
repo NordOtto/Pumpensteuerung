@@ -1,113 +1,115 @@
 @import "tailwindcss";
 
 @layer base {
-  body {
-    background-color: #F2F6F9;
-    color: #1e293b;
-    font-family: ui-sans-serif, system-ui, sans-serif;
-    min-height: 100vh;
-    overscroll-behavior: none;
+  .material-symbols-outlined {
+    font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
   }
 }
 
 @layer components {
-  /* Dynamic KPI Cards driven by app.js */
-  .kpi-card {
-    @apply bg-white rounded-[2rem] p-5 flex flex-col justify-between shadow-[0_4px_20px_rgba(0,0,0,0.02)] border border-slate-50 transition-all duration-300;
-  }
-  
-  .kpi-card .icon-box {
-    @apply bg-slate-50 text-slate-400 border border-slate-100;
-  }
-  
-  .kpi-card.ok .icon-box {
-    @apply bg-emerald-50 text-teal-500 border-teal-100;
-  }
-  
-  .kpi-card.warn .icon-box {
-    @apply bg-amber-50 text-amber-500 border-amber-100;
-  }
-  
-  .kpi-card.err .icon-box {
-    @apply bg-rose-50 text-rose-500 border-rose-100;
-  }
-  
-  .kpi-card.idle .icon-box {
-    @apply bg-slate-50 text-slate-400 border-slate-100;
+  /* ── Glass Card ── */
+  .glass-card {
+    @apply bg-white/70 dark:bg-slate-800/60 backdrop-blur-[10px] border border-white/50 dark:border-white/10;
   }
 
-  /* Status Pills */
-  .status-pill {
-    @apply px-4 py-1.5 rounded-xl text-xs font-bold tracking-wide border;
+  /* ── Skeuomorphic Main Display ── */
+  .skeuo-display {
+    background: linear-gradient(180deg, #0284c7 0%, #0369a1 100%);
+    border: 2px solid #38bdf8;
+    box-shadow: inset 0 0 30px rgba(0,0,0,0.3);
   }
-  .status-pill.run {
-    @apply bg-white/20 text-white border-white/20 backdrop-blur-sm shadow-sm;
-  }
-  .status-pill.ready {
-    @apply bg-white/20 text-white border-white/20 backdrop-blur-sm shadow-sm;
-  }
-  .status-pill.err {
-    @apply bg-rose-500/80 text-white border-rose-400/50 backdrop-blur-sm shadow-sm;
-  }
-  .status-pill.warn {
-    @apply bg-amber-400/80 text-white border-amber-300/50 backdrop-blur-sm shadow-sm;
+  :is(.dark .skeuo-display) {
+    background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+    border-color: #334155;
   }
 
-  /* Dynamic Sidebar Status Dots */
-  .sicon {
-    @apply flex items-center justify-center w-10 h-10 rounded-xl transition-colors duration-300 border border-transparent;
+  /* ── Wave Background Pattern ── */
+  .wave-bg {
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 100 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 10 C 20 0, 30 20, 50 10 C 70 0, 80 20, 100 10 L 100 20 L 0 20 Z' fill='rgba(59,130,246,0.15)'/%3E%3C/svg%3E");
+    background-size: cover;
+    background-position: bottom;
+    background-repeat: no-repeat;
   }
-  .sicon i {
-    @apply w-5 h-5;
+  :is(.dark .wave-bg) {
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 100 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 10 C 20 0, 30 20, 50 10 C 70 0, 80 20, 100 10 L 100 20 L 0 20 Z' fill='rgba(14,165,233,0.08)'/%3E%3C/svg%3E");
   }
-  .sicon.idle { @apply bg-slate-100 text-slate-400; }
-  .sicon.ok { @apply bg-emerald-50 text-teal-600 border-teal-100 shadow-sm shadow-teal-500/10; }
-  .sicon.warn { @apply bg-amber-50 text-amber-600 border-amber-100 shadow-sm shadow-amber-500/10; }
-  .sicon.err { @apply bg-rose-50 text-rose-600 border-rose-100 shadow-sm shadow-rose-500/10; }
 
-  /* Tab Navigation */
-  .tab-btn {
-    @apply py-3 px-6 rounded-xl font-bold transition-all text-slate-500 hover:text-slate-800 hover:bg-slate-100 border border-transparent;
+  /* ── 3D Skeuomorphic Buttons ── */
+  .skeuo-btn-green {
+    @apply bg-green-500 hover:bg-green-400 active:bg-green-600 text-white font-bold rounded-xl transition-all active:translate-y-1 active:shadow-none border border-green-400 tracking-wide;
+    box-shadow: 0 4px 0 #166534, 0 5px 10px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.4);
   }
-  .tab-btn.active {
-    @apply bg-white shadow-sm border border-slate-200 text-blue-600;
+  .skeuo-btn-red {
+    @apply bg-red-600 hover:bg-red-500 active:bg-red-700 text-white font-bold rounded-xl transition-all active:translate-y-1 active:shadow-none border border-red-500 tracking-wide;
+    box-shadow: 0 4px 0 #991b1b, 0 5px 10px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.4);
+  }
+
+  /* ── Hardware Detail Rows ── */
+  .hw-row {
+    @apply flex justify-between items-center px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-200/50 dark:border-slate-700/50 hover:bg-white/30 dark:hover:bg-slate-700/20 transition-colors;
+  }
+  .hw-label {
+    @apply flex items-center gap-2 sm:gap-3 text-slate-600 dark:text-slate-300 text-sm font-medium;
+  }
+  .hw-val {
+    @apply font-bold text-slate-800 dark:text-white text-base sm:text-lg;
+  }
+  .hw-unit {
+    @apply font-normal text-slate-400 text-[10px] sm:text-xs ml-1 uppercase;
+  }
+
+  /* ── Status Dot Glow ── */
+  .dot-ok {
+    @apply bg-green-500;
+    box-shadow: 0 0 8px rgba(34,197,94,0.8);
+  }
+  .dot-err {
+    @apply bg-red-500;
+    box-shadow: 0 0 8px rgba(239,68,68,0.8);
+  }
+  .dot-warn {
+    @apply bg-amber-400;
+    box-shadow: 0 0 8px rgba(251,191,36,0.6);
+  }
+  .dot-off {
+    @apply bg-slate-400;
+    box-shadow: none;
+  }
+
+  /* ── Drawer Input Components ── */
+  .drawer-input-wrap {
+    @apply bg-slate-50 dark:bg-slate-700/30 p-3 rounded-xl border border-slate-100 dark:border-slate-600/50;
+  }
+  .drawer-label {
+    @apply block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5;
+  }
+  .drawer-input {
+    @apply w-full bg-white dark:bg-slate-800 rounded-lg px-3 py-2 border border-slate-200 dark:border-slate-600 outline-none focus:ring-2 focus:ring-blue-500/20 font-bold text-slate-800 dark:text-white text-sm;
+  }
+  .drawer-label-dark {
+    @apply block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5;
+  }
+  .preset-input {
+    @apply w-full bg-slate-700/50 text-white rounded-xl px-4 py-3 border border-slate-600 outline-none focus:border-emerald-500 font-semibold placeholder:text-slate-500;
+  }
+
+  /* ── Mobile Nav Button ── */
+  .mob-nav-btn {
+    @apply flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors active:scale-95;
+  }
+
+  /* ── Slider Track ── */
+  .slider-track {
+    @apply appearance-none h-2 rounded-full bg-white/30 dark:bg-slate-600/50 cursor-pointer;
+  }
+  .slider-track::-webkit-slider-thumb {
+    @apply appearance-none w-6 h-6 rounded-full bg-white shadow-md border-2 border-blue-300 cursor-pointer;
+  }
+  .slider-track::-moz-range-thumb {
+    @apply w-6 h-6 rounded-full bg-white shadow-md border-2 border-blue-300 cursor-pointer;
   }
 }
 
-@layer utilities {
-  /* Range Slider */
-  input[type=range].slider-apple {
-    -webkit-appearance: none;
-    appearance: none;
-    @apply bg-transparent;
-  }
-  input[type=range].slider-apple::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    @apply w-6 h-6 rounded-full bg-white shadow-md border-0 cursor-pointer mt-[-10px];
-  }
-  input[type=range].slider-apple::-webkit-slider-runnable-track {
-    @apply w-full h-[6px] rounded-full bg-white/30;
-  }
-  
-  input[type=range].slider-apple:focus {
-    outline: none;
-  }
-
-  /* Drawer Animations */
-  #drawer:not(.hidden) {
-    animation: fadeIn 0.25s ease-out forwards;
-  }
-  #drawer > div {
-    animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  }
-
-  @keyframes fadeIn {
-    from { opacity: 0; backdrop-filter: blur(0px); }
-    to { opacity: 1; backdrop-filter: blur(8px); }
-  }
-  @keyframes slideUp {
-    from { transform: translateY(40px) scale(0.98); opacity: 0; }
-    to { transform: translateY(0) scale(1); opacity: 1; }
-  }
+@theme {
+  --shadow-skeuo-btn: 0 4px 0 #000, 0 5px 10px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.4);
 }

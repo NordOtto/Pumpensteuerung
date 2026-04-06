@@ -521,6 +521,7 @@ const tabMeta = {
   presets:   { title: 'Presets', sub: 'Betriebsmodi verwalten' },
   timeguard: { title: 'Zeitsperre', sub: 'Betriebszeitfenster' },
   logs:      { title: 'System Logs', sub: 'Debug-Ausgabe' },
+  display:   { title: 'Anzeige', sub: 'Zoom & Darstellung' },
 };
 
 window.showTab = (tab) => {
@@ -533,7 +534,7 @@ window.showTab = (tab) => {
   }, 10);
 
   // Hide all tabs
-  ['tabSettings', 'tabFan', 'tabPresets', 'tabTimeguard', 'tabLogs'].forEach(t => $(t).classList.add('hidden'));
+  ['tabSettings', 'tabFan', 'tabPresets', 'tabTimeguard', 'tabLogs', 'tabDisplay'].forEach(t => $(t).classList.add('hidden'));
 
   // Show selected
   const tabId = tab === 'fan' ? 'tabFan' : `tab${tab.charAt(0).toUpperCase() + tab.slice(1)}`;
@@ -873,6 +874,28 @@ $('saveTG').onclick = async () => {
   });
 
   applySavedOrder();
+})();
+
+// ─── Zoom ───
+(function initZoom() {
+  const slider = $('zoomSlider');
+  const label = $('zoomValue');
+  const saved = localStorage.getItem('pageZoom') || '100';
+  function applyZoom(val) {
+    document.documentElement.style.zoom = val / 100;
+    label.textContent = val + '%';
+    slider.value = val;
+  }
+  applyZoom(saved);
+  slider.oninput = () => {
+    const v = slider.value;
+    applyZoom(v);
+    localStorage.setItem('pageZoom', v);
+  };
+  $('btnZoomReset').onclick = () => {
+    applyZoom(100);
+    localStorage.setItem('pageZoom', '100');
+  };
 })();
 
 // ─── Start ───

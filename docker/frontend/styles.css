@@ -10,12 +10,13 @@
   --orange: #ffa000;
   --red:    #ff0000;
 
-  --bg:    #ffffff;
+  --bg:    #f4f6f8;
   --ink:   #0a0f1a;
   --muted: #6b7280;
-  --line:  rgba(10,15,26,.08);
+  --line:  rgba(10,15,26,.10);
   --tile:  #ffffff;
-  --tile-2:#f6f7f9;
+  --tile-2:#eef1f4;
+  --input-bg: #ffffff;
 
   --radius: 20px;
   --pad: clamp(16px, 3vw, 32px);
@@ -23,12 +24,13 @@
 }
 
 [data-theme="dark"] {
-  --bg:    #0a0f1a;
-  --ink:   #ffffff;
+  --bg:    #0b1018;
+  --ink:   #f5f7fa;
   --muted: #8a93a6;
-  --line:  rgba(255,255,255,.08);
-  --tile:  #131826;
-  --tile-2:#0f1421;
+  --line:  rgba(255,255,255,.12);
+  --tile:  #161c28;
+  --tile-2:#1f2533;
+  --input-bg: #2a3142;
 }
 
 * { box-sizing: border-box; }
@@ -328,13 +330,19 @@ input[type=range]::-moz-range-thumb {
 }
 .row > span { color: var(--muted); font-size: .9rem; }
 .row input[type=number], .row input[type=time], .row select {
-  background: var(--bg);
+  background: var(--input-bg);
   border: 1px solid var(--line);
   color: var(--ink);
-  border-radius: 8px;
-  padding: 8px 10px;
-  font-size: .95rem;
-  min-width: 120px;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 1rem;
+  min-width: 140px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.row input:focus, .row select:focus {
+  outline: 2px solid var(--blue);
+  outline-offset: 1px;
 }
 .row input[type=range] { max-width: 220px; }
 .row input[type=checkbox] { width: 22px; height: 22px; accent-color: var(--blue); }

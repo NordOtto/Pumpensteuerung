@@ -47,13 +47,19 @@ async function api(path, body) {
 async function apiGet(path) {
   try {
     const r = await fetch('/api' + path);
+    if (!r.ok) { console.warn('GET', path, r.status); return null; }
     return await r.json();
-  } catch { return null; }
+  } catch (e) { console.warn('GET', path, e); return null; }
+}
+
+function setVal(id, v) {
+  const el = $(id); if (!el) return;
+  el.value = (v == null || Number.isNaN(v)) ? '' : v;
 }
 
 // ---------------- Theme ----------------
 function applyTheme() {
-  const choice = localStorage.getItem('theme') || 'auto';
+  const choice = localStorage.getItem('theme') || 'light';
   let theme = choice;
   if (choice === 'auto') {
     const h = new Date().getHours();
@@ -63,8 +69,8 @@ function applyTheme() {
   document.querySelector('meta[name=theme-color]').setAttribute('content', theme === 'dark' ? '#0a0f1a' : '#ffffff');
 }
 $('themeBtn').addEventListener('click', () => {
-  const cur = localStorage.getItem('theme') || 'auto';
-  const next = cur === 'auto' ? 'light' : cur === 'light' ? 'dark' : 'auto';
+  const cur = localStorage.getItem('theme') || 'light';
+  const next = cur === 'light' ? 'dark' : cur === 'dark' ? 'auto' : 'light';
   localStorage.setItem('theme', next);
   applyTheme();
   toast('Theme: ' + next);
@@ -264,13 +270,23 @@ async function loadSettings() {
   const pi = await apiGet('/pressure');
   if (pi) {
     $('piEnabled').checked = !!pi.enabled;
-    $('piSetpoint').value  = pi.setpoint ?? '';
-    $('piPon').value       = pi.p_on ?? '';
-    $('piPoff').value      = pi.p_off ?? '';
-    $('piKp').value        = pi.kp ?? '';
-    $('piKi').value        = pi.ki ?? '';
-    $('piFmin').value      = pi.freq_min ?? '';
-    $('piFmax').value      = pi.freq_max ?? '';
+    setVal('piSetpoint', pi.setpoint);
+    setVal('piPon',      pi.p_on);
+    setVal('piPoff',     pi.p_off);
+    setVal('piKp',       pi.kp);
+    setVal('piKi',       pi.ki);
+    setVal('piFmin',     pi.freq_min);
+    setVal('piFmax',     pi.freq_max);
+  } else if (lastState?.pi) {
+    const p = lastState.pi;
+    $('piEnabled').checked = !!p.enabled;
+    setVal('piSetpoint', p.setpoint);
+    setVal('piPon',      p.p_on);
+    setVal('piPoff',     p.p_off);
+    setVal('piKp',       p.kp);
+    setVal('piKi',       p.ki);
+    setVal('piFmin',     p.freq_min);
+    setVal('piFmax',     p.freq_max);
   }
   const tg = await apiGet('/timeguard');
   if (tg) {

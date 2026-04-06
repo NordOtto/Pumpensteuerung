@@ -334,32 +334,52 @@ els.slider.addEventListener('change', (e) => {
 // ─── Gear Button → Settings ───
 $('btnGear').onclick = () => window.showTab('settings');
 
-// ─── Drawer / Tabs ───
+// ─── Sidebar / Tabs ───
+const tabMeta = {
+  settings:  { title: 'Regelung (PI)', sub: 'Parameter' },
+  fan:       { title: 'Gehäuse Lüfter', sub: 'Modus & PWM' },
+  presets:   { title: 'Presets', sub: 'Betriebsmodi verwalten' },
+  timeguard: { title: 'Zeitsperre', sub: 'Betriebszeitfenster' },
+  logs:      { title: 'System Logs', sub: 'Debug-Ausgabe' },
+};
+
 window.showTab = (tab) => {
   const drawer = $('drawer');
   const content = $('drawerContent');
   drawer.classList.remove('hidden');
   setTimeout(() => {
     drawer.classList.remove('opacity-0');
-    content.classList.remove('translate-y-full');
+    content.classList.remove('translate-x-full');
   }, 10);
 
-  ['tabSettings', 'tabPresets', 'tabTimeguard', 'tabLogs'].forEach(t => $(t).classList.add('hidden'));
+  // Hide all tabs
+  ['tabSettings', 'tabFan', 'tabPresets', 'tabTimeguard', 'tabLogs'].forEach(t => $(t).classList.add('hidden'));
 
-  let title = 'Einstellungen';
-  if (tab === 'settings') { $('tabSettings').classList.remove('hidden'); title = 'Einstellungen'; }
-  if (tab === 'presets') { $('tabPresets').classList.remove('hidden'); title = 'Presets Manager'; loadPresets(); }
-  if (tab === 'timeguard') { $('tabTimeguard').classList.remove('hidden'); title = 'Zeitsperre'; loadTimeguard(); }
-  if (tab === 'logs') { $('tabLogs').classList.remove('hidden'); title = 'System Logs'; }
+  // Show selected
+  const tabId = tab === 'fan' ? 'tabFan' : `tab${tab.charAt(0).toUpperCase() + tab.slice(1)}`;
+  $(tabId).classList.remove('hidden');
 
-  $('drawerTitle').textContent = title;
+  // Update header
+  const meta = tabMeta[tab] || { title: tab, sub: '' };
+  $('drawerTitle').textContent = meta.title;
+  $('drawerSub').textContent = meta.sub;
+
+  // Update nav active state
+  document.querySelectorAll('.sidebar-nav-btn').forEach(b => {
+    b.classList.remove('sidebar-nav-active');
+    if (b.dataset.tab === tab) b.classList.add('sidebar-nav-active');
+  });
+
+  // Load data
+  if (tab === 'presets') loadPresets();
+  if (tab === 'timeguard') loadTimeguard();
 };
 
 $('closeDrawer').onclick = () => {
   const drawer = $('drawer');
   const content = $('drawerContent');
   drawer.classList.add('opacity-0');
-  content.classList.add('translate-y-full');
+  content.classList.add('translate-x-full');
   setTimeout(() => drawer.classList.add('hidden'), 300);
 };
 

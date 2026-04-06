@@ -95,6 +95,25 @@
     @apply w-full bg-slate-700/50 text-white rounded-xl px-4 py-3 border border-slate-600 outline-none focus:border-emerald-500 font-semibold placeholder:text-slate-500;
   }
 
+  /* ── Sidebar Nav ── */
+  .sidebar-nav-btn {
+    @apply w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center text-slate-400 hover:bg-white/60 dark:hover:bg-slate-700/50 hover:text-slate-700 dark:hover:text-white transition-all cursor-pointer;
+  }
+  .sidebar-nav-active {
+    @apply bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm;
+  }
+
+  /* ── Sidebar Form Fields ── */
+  .sidebar-field {
+    @apply flex flex-col gap-1;
+  }
+  .sidebar-label {
+    @apply text-[10px] font-bold uppercase tracking-widest text-slate-400;
+  }
+  .sidebar-input {
+    @apply w-full bg-white dark:bg-slate-800 rounded-lg px-3 py-2 border border-slate-200 dark:border-slate-700 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 font-bold text-slate-800 dark:text-white text-sm transition-all;
+  }
+
   /* ── Timeguard Day Button ── */
   .tg-day-btn {
     @apply cursor-pointer;

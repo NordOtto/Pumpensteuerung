@@ -78,10 +78,10 @@ function connectWS() {
     ws.onmessage = (e) => {
         try {
             const msg = JSON.parse(e.data);
-            if(msg.type === 'state') updateUI(msg.data);
-            if(msg.type === 'system_update') {
-                if(msg.src === 'mqtt') setStatusDot('mqtt', msg.state);
-                if(msg.src === 'v20') setStatusDot('v20', msg.state);
+            if(msg.v20 !== undefined) {
+                updateUI(msg);
+                setStatusDot('mqtt', msg.sys ? msg.sys.mqtt : false);
+                setStatusDot('v20', msg.v20 ? msg.v20.connected : false);
             }
         } catch(err) {
             console.error("Parse Error", err);
@@ -89,15 +89,15 @@ function connectWS() {
     };
 }
 
-function setStatusDot(type, obj) {
+function setStatusDot(type, connected) {
     if(type === 'mqtt') {
-        const c = obj ? (obj.connected ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700') : 'bg-slate-200 text-slate-500';
+        const c = connected ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700';
         els.mqtt.className = `text-xs font-bold px-3 py-1 rounded-lg ${c}`;
-        els.mqtt.innerText = obj ? (obj.connected ? 'Verbunden' : 'Getrennt') : 'Warte..';
+        els.mqtt.innerText = connected ? 'Verbunden' : 'Getrennt';
     } else if(type === 'v20') {
-        const c = obj ? (obj.connected ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700') : 'bg-slate-200 text-slate-500';
+        const c = connected ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500';
         els.modbus.className = `text-xs font-bold px-3 py-1 rounded-lg ${c}`;
-        els.modbus.innerText = obj ? (obj.connected ? 'Verbunden' : 'Fehler') : 'Warte..';
+        els.modbus.innerText = connected ? 'Verbunden' : 'Fehler';
     }
 }
 
@@ -107,10 +107,10 @@ let lastPiState = {};
 function updateUI(st) {
     // V20 Pump
     if(st.v20) {
-        els.freq.innerText = (st.v20.actual_frequency || 0).toFixed(1);
-        els.voltage.innerText = (st.v20.output_voltage || 0).toFixed(1);
-        els.current.innerText = (st.v20.output_current || 0).toFixed(2);
-        els.power.innerText = (st.v20.power_kW || 0).toFixed(2);
+        els.freq.innerText = (st.v20.frequency || 0).toFixed(1);
+        els.voltage.innerText = (st.v20.voltage || 0).toFixed(1);
+        els.current.innerText = (st.v20.current || 0).toFixed(2);
+        els.power.innerText = (st.v20.power || 0).toFixed(2);
         
         let cIcon = 'text-slate-300';
         let txt = "Bereit";
@@ -136,16 +136,24 @@ function updateUI(st) {
     }
 
     // Sensors
-    if(st.sensors) {
-        els.pressure.innerText = (st.sensors.pressure || 0).toFixed(2);
-        els.flow.innerText = (st.sensors.flow || 0).toFixed(1);
-        els.waterTemp.innerText = (st.sensors.water_temp || 0).toFixed(1);
-        els.airTemp.innerText = (st.sensors.air_temp || 0).toFixed(1);
-        pushChart(st.sensors.pressure);
+    if(st.pi) {
+        els.pressure.innerText = (st.pi.pressure || 0).toFixed(2);
+        els.flow.innerText = (st.pi.flow || 0).toFixed(1);
+        els.waterTemp.innerText = (st.pi.water_temp || 0).toFixed(1);
+        pushChart(st.pi.pressure);
+    }
+    if(st.temp !== undefined) els.airTemp.innerText = st.temp;
+    if(st.fan) els.fanRpm.innerText = st.fan.rpm;
+
+    if(st.sys && st.sys.uptime) {
+        const h = String(Math.floor(st.sys.uptime / 3600)).padStart(2,'0');
+        const m = String(Math.floor((st.sys.uptime % 3600) / 60)).padStart(2,'0');
+        const s = String(Math.floor(st.sys.uptime % 60)).padStart(2,'0');
+        document.getElementById('statusUptime').innerText = `${h}:${m}:${s}`;
     }
     
     // Pi-Controller
-    if(st.pi && !document.getElementById('drawer').classList.contains('hidden') !== true) {
+    if(st.pi && document.getElementById('drawer').classList.contains('hidden')) {
         lastPiState = st.pi;
         if(document.activeElement.tagName !== "INPUT") {
             els.piPon.value = st.pi.p_on;
@@ -166,8 +174,8 @@ function updateUI(st) {
                 document.getElementById('presetNewFmax').value = st.pi.freq_max || 50;
             }
 
-            els.pressureSet.innerText = st.pi.mode === 0 ? st.pi.setpoint + ' b' : 'auto';
-            els.flowSub.innerText = st.pi.mode === 1 ? `Soll: ${st.pi.setpoint} l/m` : 'auto';
+            els.pressureSet.innerText = st.pi.ctrl_mode === 0 ? st.pi.setpoint + ' b' : 'auto';
+            els.flowSub.innerText = st.pi.ctrl_mode === 1 ? `Soll: ${st.pi.flow_setpoint || st.pi.setpoint} l/m` : 'auto';
         }
     }
 }

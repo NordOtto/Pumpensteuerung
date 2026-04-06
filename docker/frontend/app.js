@@ -1,4 +1,4 @@
-/* Pumpensteuerung Dashboard – vanilla JS
+/* Pumpensteuerung Dashboard – Tailwind/Apple Edition
    - WebSocket /ws (Status-Push, read-only)
    - REST /api/* (Steuerung)
 */
@@ -15,15 +15,22 @@ let chartBuf = []; // {t, p}
 const CHART_MAX = 360; // 30 min @ 5s
 
 // ---------------- toast ----------------
-let toastTimer;
-function toast(msg, type = '') {
-  const t = $('toast');
-  t.textContent = msg;
-  t.className = 'toast ' + type;
-  t.hidden = false;
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { t.hidden = true; }, 3000);
-}
+window.$toast = {
+  timer: null,
+  show: (msg, type = '') => {
+    const t = $('toast');
+    if (!t) return;
+    t.querySelector('.msg').textContent = msg;
+    t.className = 'fixed top-safe left-1/2 -translate-x-1/2 z-[100] transition-all transform max-w-sm w-[90%] px-5 py-4 rounded-2xl shadow-xl flex items-center justify-between text-sm font-semibold text-white mt-4 ' + (type==='err' ? 'bg-rose-500' : 'bg-emerald-500');
+    clearTimeout(window.$toast.timer);
+    window.$toast.timer = setTimeout(() => { window.$toast.hide(); }, 3000);
+  },
+  hide: () => {
+    const t = $('toast');
+    if (t) t.classList.add('-translate-y-[150%]');
+  }
+};
+const toast = window.$toast.show;
 
 // ---------------- REST ----------------
 async function api(path, body) {
@@ -57,12 +64,6 @@ function setVal(id, v) {
   el.value = (v == null || Number.isNaN(v)) ? '' : v;
 }
 
-// ---------------- Theme (forced light) ----------------
-try { localStorage.removeItem('theme'); } catch {}
-document.documentElement.setAttribute('data-theme', 'light');
-const _tb = $('themeBtn');
-if (_tb) _tb.style.display = 'none';
-
 // ---------------- WebSocket ----------------
 let ws = null;
 let wsBackoff = 1000;
@@ -72,12 +73,10 @@ function connectWS() {
 
   ws.onopen = () => {
     wsBackoff = 1000;
-    document.body.classList.remove('offline');
     setDot('dotBackend', 'ok');
   };
   ws.onclose = () => {
     setDot('dotBackend', 'err');
-    document.body.classList.add('offline');
     setTimeout(connectWS, wsBackoff);
     wsBackoff = Math.min(wsBackoff * 2, 10_000);
   };
@@ -92,8 +91,7 @@ function connectWS() {
 
 function setDot(id, state) {
   const el = $(id); if (!el) return;
-  el.classList.remove('ok', 'warn', 'err');
-  if (state) el.classList.add(state);
+  el.className = 'sicon ' + state;
 }
 
 // ---------------- State Render ----------------
@@ -113,7 +111,7 @@ function handleStatus(s) {
   if (!v20.connected)      { pillCls += ' err';   pillTxt = 'Offline'; }
   else if (v20.fault)      { pillCls += ' err';   pillTxt = 'Störung'; }
   else if (v20.running)    { pillCls += ' run';   pillTxt = 'Läuft'; }
-  else                     { pillCls += ' ready'; pillTxt = 'Bereit'; }
+  else                     { pillCls += ' ready'; pillTxt = 'Standby'; }
   setClass($('statusPill'), pillCls);
   setText($('statusText'), pillTxt);
 
@@ -123,7 +121,7 @@ function handleStatus(s) {
   const psp = pi.setpoint;
   setText($('vPressure'), fmt(p, 2));
   setText($('vPressureSet'), fmt(psp, 1));
-  let pCls = 'kpi-inline';
+  let pCls = 'kpi-card group';
   if (p != null && psp) {
     const dev = Math.abs(p - psp) / psp;
     if (dev <= 0.05)      pCls += ' ok';
@@ -134,36 +132,28 @@ function handleStatus(s) {
 
   // KPI: Durchfluss
   setText($('vFlow'), fmt(pi.flow, 1));
-  let fCls = 'kpi-inline';
-  if (pi.dry_run_locked)   { fCls += ' warn'; setText($('vFlowSub'), 'Trockenlauf-Sperre'); }
-  else if (pi.flow > 0)    { fCls += ' ok';   setText($('vFlowSub'), ''); }
+  let fCls = 'kpi-card group';
+  if (pi.dry_run_locked)   { fCls += ' err';  setText($('vFlowSub'), 'Trockenlauf-Sperre'); }
+  else if (pi.flow > 0)    { fCls += ' ok';   setText($('vFlowSub'), 'Strömung ok'); }
   else                     { fCls += ' idle'; setText($('vFlowSub'), 'Kein Durchfluss'); }
   setClass($('cardFlow'), fCls);
 
   // KPI: Frequenz
   setText($('vFreq'), fmt(v20.frequency, 1));
-  setText($('vFreqSet'), fmt(v20.freq_setpoint, 1));
-  setClass($('cardFreq'), 'kpi-inline ' + (v20.running ? 'info' : 'idle'));
+  setClass($('cardFreq'), 'kpi-card group ' + (v20.running ? 'ok' : 'idle'));
 
   // KPI: Pumpenstatus
-  let sCls = 'kpi-inline', sub = '';
+  let sCls = 'kpi-card group', sub = '';
   if (!v20.connected)      { sCls += ' idle'; }
   else if (v20.fault)      { sCls += ' err';  sub = 'Fehlercode ' + (v20.fault_code || 0); }
   else if (v20.running)    { sCls += ' ok'; }
-  else                     { sCls += ' info'; }
+  else                     { sCls += ' idle'; }
   setClass($('cardStatus'), sCls);
-  setText($('vStatusText'), pillTxt);
-  setText($('vStatusSub'), sub);
-  // großer Status-Dot im Info-Card
-  const dot = $('vStatusDot');
-  if (dot) {
-    let dotCls = 'status-dot-lg';
-    if (!v20.connected)   dotCls += '';
-    else if (v20.fault)   dotCls += ' err';
-    else if (v20.running) dotCls += ' ok';
-    else                  dotCls += ' info';
-    setClass(dot, dotCls);
-  }
+  setText($('vStatusSubMini'), sub || pillTxt);
+  
+  // Status dot sync in main loop
+  const cdot = $('vStatusIcon');
+  if (cdot) { cdot.className = 'leading-none flex items-center ' + (v20.running?'text-teal-500':(v20.fault?'text-rose-500':'text-slate-300')); }
 
   // Details
   setText($('dVoltage'),  fmt(v20.voltage, 0));
@@ -183,6 +173,8 @@ function handleStatus(s) {
   $('btnStart').disabled = !v20.connected || v20.running;
   $('btnStop').disabled  = !v20.connected || !v20.running;
   $('btnReset').disabled = !v20.connected || !v20.fault;
+  
+  sl.style.opacity = sl.disabled ? '0.5' : '1.0';
 
   // Chart buffer
   if (p != null) {
@@ -195,36 +187,57 @@ function handleStatus(s) {
   }
 }
 
-// ---------------- Chart ----------------
-function drawChart() {
-  const svg = $('chart');
-  if (!svg || chartBuf.length < 2) return;
-  const W = 600, H = 200, pad = 20;
-  const ps = chartBuf.map(d => d.p);
-  const min = Math.min(...ps, 0);
-  const max = Math.max(...ps, 5);
-  const range = (max - min) || 1;
-  const n = chartBuf.length;
-  let path = '';
-  chartBuf.forEach((d, i) => {
-    const x = pad + (i / (n - 1)) * (W - 2 * pad);
-    const y = H - pad - ((d.p - min) / range) * (H - 2 * pad);
-    path += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1) + ' ';
+// ---------------- Chart.js ----------------
+let pressureChart;
+function initChart() {
+  const ctx = document.getElementById('pressureChart');
+  if (!ctx || typeof Chart === 'undefined') return;
+  pressureChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [{
+        label: 'Druck (bar)',
+        data: [],
+        borderColor: '#2563eb', // blue-600
+        backgroundColor: 'rgba(37, 99, 235, 0.1)',
+        borderWidth: 3,
+        fill: true,
+        tension: 0.4,
+        pointRadius: 0,
+        pointHitRadius: 15
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { enabled: true, mode: 'index', intersect: false, backgroundColor: 'rgba(15, 23, 42, 0.9)' } },
+      scales: {
+        x: { display: false },
+        y: { 
+          beginAtZero: true, max: 5,
+          border: { display:false },
+          grid: { color: '#f1f5f9', drawBorder: false }
+        }
+      },
+      interaction: { mode: 'nearest', axis: 'x', intersect: false }
+    }
   });
-  svg.innerHTML =
-    `<line x1="${pad}" y1="${H - pad}" x2="${W - pad}" y2="${H - pad}" stroke="rgba(127,127,127,.2)" stroke-width="1"/>` +
-    `<line x1="${pad}" y1="${pad}" x2="${pad}" y2="${H - pad}" stroke="rgba(127,127,127,.2)" stroke-width="1"/>` +
-    `<path d="${path}" fill="none" stroke="#0068b4" stroke-width="2"/>` +
-    `<text x="${W - pad}" y="${pad - 4}" text-anchor="end" font-size="10" fill="#8892a6">${max.toFixed(1)} bar</text>` +
-    `<text x="${W - pad}" y="${H - pad + 12}" text-anchor="end" font-size="10" fill="#8892a6">${min.toFixed(1)} bar</text>`;
+}
+
+function drawChart() {
+  if (!pressureChart) return;
+  pressureChart.data.labels = chartBuf.map(d => new Date(d.t).toLocaleTimeString('de-DE', {minute:'2-digit', second:'2-digit'}));
+  pressureChart.data.datasets[0].data = chartBuf.map(d => d.p);
+  pressureChart.update('none');
 }
 
 // ---------------- Logs ----------------
 function renderLog(lines) {
   const el = $('logBox');
   if (!el) return;
-  el.textContent = (lines || []).join('\n');
-  el.scrollTop = el.scrollHeight;
+  el.innerHTML = (lines || []).join('<br>');
+  el.parentElement.scrollTop = el.parentElement.scrollHeight;
 }
 
 // ---------------- Controls ----------------
@@ -244,150 +257,88 @@ sl.addEventListener('change', async () => {
   delete sl.dataset.dragging;
 });
 
-// ---------------- Bottom Toolbar ----------------
-function openDrawerTab(tabName) {
-  const drawer = $('drawer');
-  drawer.hidden = false;
-  document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
-  document.querySelectorAll('.tab-pane').forEach(x => x.classList.remove('active'));
-  const tab = document.querySelector(`.tab[data-tab="${tabName}"]`);
-  const pane = document.querySelector(`.tab-pane[data-pane="${tabName}"]`);
-  if (tab) tab.classList.add('active');
-  if (pane) pane.classList.add('active');
-  loadSettings();
-}
-
-$('tbFan').addEventListener('click', () => openDrawerTab('fan'));
-$('tbPresets').addEventListener('click', () => openDrawerTab('presets'));
-$('tbSettings').addEventListener('click', () => openDrawerTab('pi'));
-
-// ---------------- Drawer ----------------
-const drawer = $('drawer');
-$('closeDrawer').addEventListener('click', () => { drawer.hidden = true; });
-
-document.querySelectorAll('.tab').forEach(t => {
-  t.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
-    document.querySelectorAll('.tab-pane').forEach(x => x.classList.remove('active'));
-    t.classList.add('active');
-    document.querySelector(`.tab-pane[data-pane="${t.dataset.tab}"]`).classList.add('active');
+// ---------------- Settings & Drawer ----------------
+window.showTab = function(tabName) {
+  ['settings', 'presets', 'logs'].forEach(t => {
+    const el = $('tab' + t.charAt(0).toUpperCase() + t.slice(1));
+    if (el) el.classList.add('hidden');
+    const tb = $('tb' + t.charAt(0).toUpperCase() + t.slice(1));
+    if (tb) tb.classList.remove('active', 'text-blue-600', 'bg-white', 'shadow-sm', 'border-slate-200');
   });
-});
+  
+  const pane = $('tab' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
+  if (pane) pane.classList.remove('hidden');
+  const btn = $('tb' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
+  if (btn) btn.classList.add('active', 'text-blue-600', 'bg-white', 'shadow-sm', 'border-slate-200');
+  
+  if (tabName !== 'logs') loadSettings();
+};
+
+const drawer = $('drawer');
+if($('closeDrawer')) $('closeDrawer').addEventListener('click', () => { drawer.classList.add('hidden'); });
+if($('menuSettings')) $('menuSettings').addEventListener('click', () => { drawer.classList.remove('hidden'); showTab('settings'); });
+if($('menuPresets')) $('menuPresets').addEventListener('click', () => { drawer.classList.remove('hidden'); showTab('presets'); });
+
 
 async function loadSettings() {
   const pi = await apiGet('/pressure');
   if (pi) {
-    $('piEnabled').checked = !!pi.enabled;
+    if($('piEnabled')) $('piEnabled').checked = !!pi.enabled;
     setVal('piSetpoint', pi.setpoint);
-    setVal('piPon',      pi.p_on);
-    setVal('piPoff',     pi.p_off);
     setVal('piKp',       pi.kp);
     setVal('piKi',       pi.ki);
-    setVal('piFmin',     pi.freq_min);
-    setVal('piFmax',     pi.freq_max);
-  } else if (lastState?.pi) {
-    const p = lastState.pi;
-    $('piEnabled').checked = !!p.enabled;
-    setVal('piSetpoint', p.setpoint);
-    setVal('piPon',      p.p_on);
-    setVal('piPoff',     p.p_off);
-    setVal('piKp',       p.kp);
-    setVal('piKi',       p.ki);
-    setVal('piFmin',     p.freq_min);
-    setVal('piFmax',     p.freq_max);
   }
-  const tg = await apiGet('/timeguard');
-  if (tg) {
-    $('tgEnabled').checked = !!tg.enabled;
-    $('tgStart').value = pad2(tg.start_hour) + ':' + pad2(tg.start_min);
-    $('tgEnd').value   = pad2(tg.end_hour)   + ':' + pad2(tg.end_min);
-    renderDays(tg.days || [false,false,false,false,false,false,false]);
-  }
-  const vac = await apiGet('/vacation');
-  if (vac) $('vacEnabled').checked = !!vac.enabled;
+  
   if (lastState?.fan) {
-    $('fanMode').value = lastState.fan.mode || 'Auto';
-    $('fanPwm').value  = lastState.fan.pwm || 0;
-    setText($('fanPwmVal'), String(lastState.fan.pwm || 0));
+    if($('fanMode')) $('fanMode').value = (lastState.fan.mode === "Manual" ? 1 : 0); // simplification
+    if($('fanPwm')) $('fanPwm').value  = lastState.fan.pwm || 0;
+    setText($('fanPwmVal'), String(lastState.fan.pwm || 0) + '%');
   }
   await renderPresets();
 }
 
-function pad2(n) { return String(n ?? 0).padStart(2, '0'); }
-
-let _days = [false,false,false,false,false,false,false];
-function renderDays(days) {
-  _days = days.slice();
-  const labels = ['Mo','Di','Mi','Do','Fr','Sa','So'];
-  const c = $('tgDays');
-  c.innerHTML = '';
-  labels.forEach((lbl, i) => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.textContent = lbl;
-    if (_days[i]) b.classList.add('on');
-    b.addEventListener('click', () => {
-      _days[i] = !_days[i];
-      b.classList.toggle('on');
-    });
-    c.appendChild(b);
-  });
-}
-
-$('savePI').addEventListener('click', async () => {
+if($('savePI')) $('savePI').addEventListener('click', async () => {
   const ok = await api('/pressure', {
     enabled: $('piEnabled').checked,
     setpoint: parseFloat($('piSetpoint').value),
-    p_on: parseFloat($('piPon').value),
-    p_off: parseFloat($('piPoff').value),
+    // Fallback required default fields mapped internally
+    p_on: 3.5, p_off: 4.5, freq_min: 30, freq_max: 50,
     kp: parseFloat($('piKp').value),
     ki: parseFloat($('piKi').value),
-    freq_min: parseFloat($('piFmin').value),
-    freq_max: parseFloat($('piFmax').value),
   });
   if (ok) toast('PI gespeichert', 'ok');
 });
-$('resetDryrun').addEventListener('click', async () => {
-  const ok = await api('/pressure/reset_dryrun');
-  if (ok) toast('Trockenlauf quittiert', 'ok');
-});
 
-$('saveTG').addEventListener('click', async () => {
-  const [sh, sm] = $('tgStart').value.split(':').map(Number);
-  const [eh, em] = $('tgEnd').value.split(':').map(Number);
-  const ok = await api('/timeguard', {
-    enabled: $('tgEnabled').checked,
-    start_hour: sh, start_min: sm,
-    end_hour: eh, end_min: em,
-    days: _days,
-  });
-  if (ok) toast('Zeitsperre gespeichert', 'ok');
-});
-
-$('fanPwm').addEventListener('input', () => setText($('fanPwmVal'), $('fanPwm').value));
-$('saveFan').addEventListener('click', async () => {
+if($('fanPwm')) $('fanPwm').addEventListener('input', () => setText($('fanPwmVal'), $('fanPwm').value + '%'));
+if($('saveFan')) $('saveFan').addEventListener('click', async () => {
   const m = await api('/fan/mode', { mode: $('fanMode').value });
   const p = await api('/fan/pwm', { pwm: parseInt($('fanPwm').value, 10) });
   if (m && p) toast('Lüfter gespeichert', 'ok');
 });
 
-$('saveVac').addEventListener('click', async () => {
-  const ok = await api('/vacation', { enabled: $('vacEnabled').checked });
-  if (ok) toast('Urlaubsmodus gespeichert', 'ok');
-});
-
 async function renderPresets() {
   const data = await apiGet('/presets');
   const list = $('presetList');
+  if(!list) return;
   list.innerHTML = '';
   if (!data?.presets) return;
   data.presets.forEach(p => {
+    const isActive = p.name === data.active;
     const div = document.createElement('div');
-    div.className = 'preset-item' + (p.name === data.active ? ' active' : '');
-    div.innerHTML = `<div><b>${p.name}</b><br><small>${fmt(p.setpoint,1)} bar · ${fmt(p.freq_min,0)}–${fmt(p.freq_max,0)} Hz</small></div>`;
+    div.className = 'flex items-center justify-between p-4 rounded-2xl border transition-all ' + (isActive ? 'bg-blue-50 border-blue-200 shadow-inner' : 'bg-white border-slate-100 hover:shadow-sm');
+    
+    div.innerHTML = `<div class="flex-1">
+        <div class="flex items-center gap-2 mb-1">
+          <i data-lucide="bookmark" class="w-4 h-4 ${isActive ? 'text-blue-500' : 'text-slate-400'}"></i>
+          <b class="${isActive ? 'text-blue-700' : 'text-slate-700'}">${p.name}</b>
+        </div>
+        <div class="text-[10px] font-bold uppercase tracking-widest text-slate-400 pl-6">${fmt(p.setpoint,1)} bar · PI limits: ${fmt(p.freq_min,0)}–${fmt(p.freq_max,0)} Hz</div>
+      </div>`;
+      
     const btn = document.createElement('button');
-    btn.textContent = p.name === data.active ? 'Aktiv' : 'Anwenden';
-    btn.disabled = p.name === data.active;
+    btn.className = 'ml-4 px-4 py-2 text-xs font-bold rounded-xl transition-colors shrink-0 ' + (isActive ? 'bg-blue-600/10 text-blue-600 cursor-default' : 'bg-slate-100 text-slate-600 hover:bg-blue-600 hover:text-white');
+    btn.textContent = isActive ? 'Aktiviert' : 'Anwenden';
+    btn.disabled = isActive;
     btn.addEventListener('click', async () => {
       const ok = await api('/preset/apply', { name: p.name });
       if (ok) { toast('Preset: ' + p.name, 'ok'); renderPresets(); }
@@ -395,6 +346,7 @@ async function renderPresets() {
     div.appendChild(btn);
     list.appendChild(div);
   });
+  lucide.createIcons();
 }
 
 // ---------------- Service Worker (Cleanup) ----------------
@@ -402,10 +354,13 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.getRegistrations().then((regs) => {
     regs.forEach((r) => r.unregister().catch(() => {}));
   }).catch(() => {});
-  if (window.caches) {
-    caches.keys().then((keys) => keys.forEach((k) => caches.delete(k))).catch(() => {});
-  }
 }
 
 // ---------------- Boot ----------------
-connectWS();
+document.addEventListener("DOMContentLoaded", () => {
+  initChart();
+  connectWS();
+  if (typeof lucide !== 'undefined') {
+    lucide.createIcons();
+  }
+});

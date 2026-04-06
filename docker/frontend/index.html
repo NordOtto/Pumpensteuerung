@@ -2,204 +2,322 @@
 <html lang="de" data-theme="light">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#1a3a5c" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-title" content="Pumpe" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <link rel="manifest" href="/manifest.json" />
+  <title>F025 Brunnenpumpe</title>
   <link rel="stylesheet" href="/styles.css" />
-  <title>Pumpensteuerung</title>
+  <script src="/vendor/chart.js"></script>
+  <script src="/vendor/lucide.js"></script>
 </head>
-<body>
-
-<header class="topbar">
-  <div class="status-icons">
-    <span class="sicon" id="dotBackend" title="Backend">⌬</span>
-    <span class="sicon" id="dotMqtt"    title="MQTT">◈</span>
-    <span class="sicon" id="dotRtu"     title="RTU">≡</span>
+<body class="bg-[#F2F6F9] text-slate-800 font-sans pb-[100px] lg:pb-0 h-screen overflow-hidden">
+  
+  <div id="toast" class="fixed top-safe left-1/2 -translate-x-1/2 z-[100] transition-all transform -translate-y-[150%] max-w-sm w-[90%] px-5 py-4 rounded-2xl shadow-xl flex items-center justify-between text-sm font-semibold text-white pointer-events-none mt-4">
+    <span class="msg"></span>
+    <span class="cls cursor-pointer w-6 h-6 flex items-center justify-center rounded-full bg-white/20 pointer-events-auto" onclick="$toast.hide()"><i data-lucide="x" class="w-4 h-4"></i></span>
   </div>
-  <div class="status-pill" id="statusPill"><span id="statusText">Lade…</span></div>
-  <div class="topbar-right">
-    <span class="clock" id="clock">--:--</span>
-  </div>
-  <!-- hidden, kept for JS compat -->
-  <div class="title-block"><div class="title"></div></div>
-  <button class="icon-btn" id="themeBtn" hidden></button>
-</header>
 
-<main class="main">
+  <div class="flex h-full w-full">
+    <!-- Sidebar Desktop -->
+    <aside class="hidden lg:flex w-72 flex-col bg-white rounded-r-[2.5rem] shadow-[10px_0_40px_rgba(0,0,0,0.02)] p-6 z-10 shrink-0 border-r border-slate-50 h-full overflow-y-auto">
+       <div class="flex items-center justify-center gap-4 text-2xl font-black text-blue-600 mb-10 mt-4">
+         <div class="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center"><i data-lucide="waves" class="w-8 h-8"></i></div>
+         <span class="tracking-wider">F025</span>
+       </div>
+       <nav class="flex flex-col gap-3 font-semibold text-sm">
+         <div class="px-4 text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Navigation</div>
+         <a href="#" class="flex items-center gap-4 px-5 py-3.5 bg-blue-50 text-blue-600 rounded-2xl transition hover:bg-blue-100 shadow-inner"><i data-lucide="layout-dashboard"></i> Overview</a>
+         <a href="javascript:document.getElementById('drawer').classList.remove('hidden')" class="flex items-center gap-4 px-5 py-3.5 text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-2xl transition cursor-pointer"><i data-lucide="sliders-horizontal"></i> Einstellungen</a>
+         <a href="javascript:document.getElementById('drawer').classList.remove('hidden')" class="flex items-center gap-4 px-5 py-3.5 text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-2xl transition cursor-pointer"><i data-lucide="bookmark"></i> Presets</a>
+         
+         <div class="px-4 text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-8 mb-1">State Log</div>
+         <div class="relative flex-1 bg-slate-50 rounded-2xl p-4 overflow-hidden h-40">
+            <div class="absolute inset-0 p-4 overflow-y-auto"><div id="logBox" class="text-[10px] text-slate-400 font-mono tracking-tight leading-relaxed">System ready...</div></div>
+         </div>
+       </nav>
 
-  <section class="hero">
-    <!-- Left panel: Info + KPIs integrated -->
-    <div class="card panel-left">
-      <button class="nav-arrow left" aria-label="Zurück">‹</button>
+       <!-- Context Status Footer -->
+       <div class="mt-auto pt-8 flex justify-around">
+         <div id="dotBackend" class="sicon idle" title="Backend Server"><i data-lucide="server"></i></div>
+         <div id="dotMqtt" class="sicon idle" title="MQTT Broker"><i data-lucide="radio"></i></div>
+         <div id="dotRtu" class="sicon idle" title="Modbus RTU"><i data-lucide="cable"></i></div>
+       </div>
+    </aside>
 
-      <div class="info-block">
-        <div class="info-row">
-          <div class="info-label">Status</div>
-          <div class="info-value status-line">
-            <span class="status-dot-lg" id="vStatusDot"></span>
-            <span id="vStatusText">–</span>
+    <!-- Main Content Flow -->
+    <main class="flex-1 flex flex-col h-full overflow-y-auto p-4 sm:p-6 lg:p-10 lg:pb-10 overscroll-y-none">
+       <!-- Header -->
+       <header class="flex justify-between items-center mb-8">
+         <div class="pl-2 lg:pl-0">
+           <h1 class="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight">Brunnenpumpe</h1>
+           <p class="text-slate-400 text-xs sm:text-sm font-semibold mt-1">Hol dir Live-Daten deiner Hausversorgung.</p>
+         </div>
+         <div class="flex items-center gap-3">
+           <div class="flex items-center px-4 py-2.5 bg-white rounded-2xl shadow-sm border border-slate-100 font-bold text-slate-600 gap-3">
+             <i data-lucide="clock" class="w-4 h-4 text-blue-500"></i>
+             <span id="clock" class="font-mono tracking-tight">--:--</span>
+           </div>
+         </div>
+       </header>
+
+       <!-- Upper Grid: Pump Status & Goals -->
+       <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6">
+         <!-- Cloudcard Pump Status -->
+         <div class="xl:col-span-1 bg-gradient-to-br from-[#1A73E8] to-[#4285F4] rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-[0_20px_40px_-5px_rgba(26,115,232,0.3)] flex flex-col justify-between min-h-[360px]">
+            <div class="absolute -right-20 -top-20 w-80 h-80 bg-white/10 rounded-full blur-[40px] pointer-events-none"></div>
+            <div class="absolute -left-10 -bottom-10 w-40 h-40 bg-white/10 rounded-full blur-3xl pointer-events-none"></div>
+
+            <div class="relative z-10">
+               <div class="flex justify-between items-start mb-6">
+                 <div>
+                   <div class="text-blue-100 font-bold text-xs uppercase tracking-widest mb-1 opacity-90"><i data-lucide="cloud" class="inline w-3 h-3 mr-1 mb-0.5"></i> cloudcontrol</div>
+                   <div class="font-bold text-lg opacity-80 mt-1 tracking-tight">INVT GD20-EU</div>
+                 </div>
+                 <div id="statusPill" class="status-pill text-xs flex items-center shrink-0 ml-4"><span id="statusText">Lade..</span></div>
+               </div>
+
+               <!-- Slider Value -->
+               <div class="flex items-end gap-3 mt-10">
+                  <div class="text-[3.5rem] sm:text-[4rem] font-bold leading-none tracking-tighter shadow-sm"><span id="freqSliderVal">--</span></div>
+                  <div class="text-blue-100 font-semibold pb-3 text-xl uppercase tracking-widest">Hz</div>
+               </div>
+               <div class="text-xs text-blue-100 font-semibold uppercase tracking-widest">Sollwert</div>
+            </div>
+
+            <!-- Controls override -->
+            <div class="relative z-10 w-full mt-auto pt-6">
+               <input type="range" id="freqSlider" min="30" max="50" step="0.5" class="w-full slider-apple mb-8 block transition-opacity" />
+               <div class="flex gap-2">
+                 <button id="btnStart" class="flex-[1.5] py-3.5 bg-white text-blue-600 hover:bg-slate-50 font-bold rounded-2xl shadow-sm transition-all active:scale-95 text-sm uppercase tracking-wider">Start</button>
+                 <button id="btnStop" class="flex-[1] py-3.5 bg-rose-500 hover:bg-rose-400 text-white font-bold rounded-2xl shadow-sm transition-all active:scale-95 text-sm uppercase tracking-wider">Stop</button>
+                 <button id="btnReset" class="flex-[0.5] flex items-center justify-center bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-2xl transition-all border border-white/20 active:scale-95"><i data-lucide="rotate-ccw" class="w-5 h-5 text-white/90"></i></button>
+               </div>
+            </div>
+         </div>
+
+         <!-- KPI Grid ("Goals" / Outcomes) -->
+         <div class="xl:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
+           
+           <div id="cardPressure" class="kpi-card idle group cursor-default">
+             <div class="flex justify-between items-center mb-6">
+               <div class="icon-box w-12 h-12 rounded-2xl flex items-center justify-center group-hover:scale-110 transition"><i data-lucide="gauge"></i></div>
+               <span class="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-2 py-1 bg-slate-50 rounded-lg">Sensor</span>
+             </div>
+             <div>
+               <div class="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-1">Druck</div>
+               <div class="text-[2.2rem] font-bold text-slate-800 leading-none flex items-end gap-1"><span id="vPressure" class="tracking-tight">--</span><span class="text-sm font-semibold text-slate-400 mb-1">bar</span></div>
+               <div class="text-[10px] uppercase font-bold text-slate-400 mt-3 pt-3 border-t border-slate-50">Soll <span id="vPressureSet">--</span></div>
+             </div>
+           </div>
+
+           <div id="cardFlow" class="kpi-card idle group cursor-default">
+             <div class="flex justify-between items-center mb-6">
+               <div class="icon-box w-12 h-12 rounded-2xl flex items-center justify-center group-hover:scale-110 transition"><i data-lucide="waves"></i></div>
+               <span class="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-2 py-1 bg-slate-50 rounded-lg">Sensor</span>
+             </div>
+             <div>
+               <div class="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-1">Fluss</div>
+               <div class="text-[2.2rem] font-bold text-slate-800 leading-none flex items-end gap-1"><span id="vFlow" class="tracking-tight">--</span><span class="text-sm font-semibold text-slate-400 mb-1">l/m</span></div>
+               <div class="flex items-center gap-1 text-[10px] uppercase font-bold text-slate-400 mt-3 pt-3 border-t border-slate-50 truncate"><span id="vFlowSub">&nbsp;</span></div>
+             </div>
+           </div>
+
+           <div id="cardFreq" class="kpi-card idle group cursor-default">
+             <div class="flex justify-between items-center mb-6">
+               <div class="icon-box w-12 h-12 rounded-2xl flex items-center justify-center group-hover:scale-110 transition"><i data-lucide="activity"></i></div>
+               <span class="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-2 py-1 bg-slate-50 rounded-lg">VFD</span>
+             </div>
+             <div>
+               <div class="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-1">Ist-Freq</div>
+               <div class="text-[2.2rem] font-bold text-slate-800 leading-none flex items-end gap-1"><span id="vFreq" class="tracking-tight">--</span><span class="text-sm font-semibold text-slate-400 mb-1">Hz</span></div>
+               <div class="text-[10px] uppercase font-bold text-slate-400 mt-3 pt-3 border-t border-slate-50 truncate">Output Freq</div>
+             </div>
+           </div>
+
+           <div id="cardStatus" class="kpi-card idle group cursor-default">
+             <div class="flex justify-between items-center mb-6">
+               <div class="icon-box w-12 h-12 rounded-2xl flex items-center justify-center group-hover:scale-110 transition"><i data-lucide="power"></i></div>
+               <span class="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-2 py-1 bg-slate-50 rounded-lg">Motor</span>
+             </div>
+             <div>
+               <div class="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-1">Status</div>
+               <div class="text-[2.2rem] font-bold text-slate-800 flex items-center gap-2 mt-[-4px]"><span id="vStatusIcon" class="leading-none flex items-center">●</span></div>
+               <div class="text-[10px] uppercase font-bold text-slate-400 mt-3 pt-3 border-t border-slate-50 truncate" id="vStatusSubMini">&nbsp;</div>
+             </div>
+           </div>
+
+         </div>
+       </div>
+
+       <!-- Bottom Row: Statistics & Transactions -->
+       <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <!-- Chart Card -->
+          <div class="xl:col-span-2 bg-white rounded-[2.5rem] p-6 lg:p-8 shadow-[0_4px_20px_rgba(0,0,0,0.02)] border border-slate-50 flex flex-col">
+            <div class="flex justify-between items-center mb-8">
+              <h2 class="text-xl font-bold text-slate-800 tracking-tight">Outcome Statistics</h2>
+              <span class="text-[10px] font-bold px-3 py-1.5 bg-slate-50 text-slate-500 uppercase tracking-widest rounded-xl">Letzte 30 Min</span>
+            </div>
+            <div class="w-full h-56 flex-1 min-h-[220px]">
+              <canvas id="pressureChart"></canvas>
+            </div>
           </div>
-        </div>
-        <div class="info-sub" id="vStatusSub">&nbsp;</div>
-      </div>
 
-      <div class="kpi-grid">
-        <div class="kpi-inline" id="cardPressure">
-          <div class="kpi-label">Druck</div>
-          <div class="kpi-value"><span id="vPressure">–</span><span class="kpi-unit">bar</span></div>
-        </div>
-        <div class="kpi-inline" id="cardFlow">
-          <div class="kpi-label">Durchfluss</div>
-          <div class="kpi-value"><span id="vFlow">–</span><span class="kpi-unit">L/min</span></div>
-          <div class="kpi-sub" id="vFlowSub">&nbsp;</div>
-        </div>
-        <div class="kpi-inline" id="cardFreq">
-          <div class="kpi-label">Frequenz</div>
-          <div class="kpi-value"><span id="vFreq">–</span><span class="kpi-unit">Hz</span></div>
-          <div class="kpi-sub">Soll <span id="vFreqSet">–</span> Hz</div>
-        </div>
-        <div class="kpi-inline" id="cardStatus">
-          <div class="kpi-label">Pumpe</div>
-          <div class="kpi-value status-value"><span class="status-icon" id="vStatusIcon">●</span></div>
-          <div class="kpi-sub" id="vStatusSubMini">&nbsp;</div>
-        </div>
-      </div>
+          <!-- Details List Card -->
+          <div class="xl:col-span-1 bg-white rounded-[2.5rem] p-6 lg:p-8 shadow-[0_4px_20px_rgba(0,0,0,0.02)] border border-slate-50">
+             <h2 class="text-xl font-bold text-slate-800 tracking-tight mb-8">Hardware Details</h2>
+             <div class="flex flex-col gap-2">
+               
+               <div class="flex justify-between items-center py-2.5 px-3 rounded-2xl hover:bg-slate-50 transition group cursor-default">
+                 <div class="flex items-center gap-4">
+                   <div class="w-10 h-10 rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center transition-transform group-hover:scale-110 shadow-inner">
+                     <i data-lucide="zap" class="w-4 h-4"></i>
+                   </div>
+                   <span class="font-bold text-sm text-slate-600">Spannung</span>
+                 </div>
+                 <div class="font-black text-slate-800 text-lg"><span id="dVoltage">--</span><span class="font-semibold text-xs text-slate-400 ml-1">V</span></div>
+               </div>
 
-      <div class="detail-expand">
-        <details>
-          <summary>Details</summary>
-          <div class="detail-grid">
-            <div><span class="dl">Spannung</span><b id="dVoltage">–</b><span class="du">V</span></div>
-            <div><span class="dl">Strom</span><b id="dCurrent">–</b><span class="du">A</span></div>
-            <div><span class="dl">Leistung</span><b id="dPower">–</b><span class="du">kW</span></div>
-            <div><span class="dl">Wassertemp.</span><b id="dWaterTemp">–</b><span class="du">°C</span></div>
-            <div><span class="dl">Umgebung</span><b id="dAirTemp">–</b><span class="du">°C</span></div>
-            <div><span class="dl">Lüfter</span><b id="dFan">–</b><span class="du">RPM</span></div>
+               <div class="flex justify-between items-center py-2.5 px-3 rounded-2xl hover:bg-slate-50 transition group cursor-default">
+                 <div class="flex items-center gap-4">
+                   <div class="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-500 flex items-center justify-center transition-transform group-hover:scale-110 shadow-inner">
+                     <i data-lucide="plug" class="w-4 h-4"></i>
+                   </div>
+                   <span class="font-bold text-sm text-slate-600">Strom</span>
+                 </div>
+                 <div class="font-black text-slate-800 text-lg"><span id="dCurrent">--</span><span class="font-semibold text-xs text-slate-400 ml-1">A</span></div>
+               </div>
+
+               <div class="flex justify-between items-center py-2.5 px-3 rounded-2xl hover:bg-slate-50 transition group cursor-default">
+                 <div class="flex items-center gap-4">
+                   <div class="w-10 h-10 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center transition-transform group-hover:scale-110 shadow-inner">
+                     <i data-lucide="flame" class="w-4 h-4"></i>
+                   </div>
+                   <span class="font-bold text-sm text-slate-600">Leistung</span>
+                 </div>
+                 <div class="font-black text-slate-800 text-lg"><span id="dPower">--</span><span class="font-semibold text-xs text-slate-400 ml-1">kW</span></div>
+               </div>
+
+               <div class="flex justify-between items-center py-2.5 px-3 rounded-2xl hover:bg-slate-50 transition group cursor-default mt-2 border-t border-slate-50 pt-4">
+                 <div class="flex items-center gap-4">
+                   <div class="w-10 h-10 rounded-2xl bg-teal-50 text-teal-500 flex items-center justify-center transition-transform group-hover:scale-110 shadow-inner">
+                     <i data-lucide="thermometer-snowflake" class="w-4 h-4"></i>
+                   </div>
+                   <span class="font-bold text-sm text-slate-600">Verteiler</span>
+                 </div>
+                 <div class="font-black text-slate-800 text-lg"><span id="dWaterTemp">--</span><span class="font-semibold text-xs text-slate-400 ml-1">°C</span></div>
+               </div>
+
+               <div class="flex justify-between items-center py-2.5 px-3 rounded-2xl hover:bg-slate-50 transition group cursor-default">
+                 <div class="flex items-center gap-4">
+                   <div class="w-10 h-10 rounded-2xl bg-slate-100 text-slate-500 flex items-center justify-center transition-transform group-hover:scale-110 shadow-inner">
+                     <i data-lucide="thermometer" class="w-4 h-4"></i>
+                   </div>
+                   <span class="font-bold text-sm text-slate-600">Luft Temp</span>
+                 </div>
+                 <div class="font-black text-slate-800 text-lg"><span id="dAirTemp">--</span><span class="font-semibold text-xs text-slate-400 ml-1">°C</span></div>
+               </div>
+               
+               <div class="flex justify-between items-center py-2.5 px-3 rounded-2xl hover:bg-slate-50 transition group cursor-default">
+                 <div class="flex items-center gap-4">
+                   <div class="w-10 h-10 rounded-2xl bg-cyan-50 text-cyan-500 flex items-center justify-center transition-transform group-hover:scale-110 shadow-inner">
+                     <i data-lucide="fan" class="w-4 h-4"></i>
+                   </div>
+                   <span class="font-bold text-sm text-slate-600">Lüfter</span>
+                 </div>
+                 <div class="font-black text-slate-800 text-lg"><span id="dFan">--</span><span class="font-semibold text-xs text-slate-400 ml-1">RPM</span></div>
+               </div>
+             </div>
           </div>
-        </details>
-      </div>
-
-      <div class="card-dots">
-        <span class="dot active"></span>
-        <span class="dot"></span>
-      </div>
-      <button class="nav-arrow right" aria-label="Weiter">›</button>
-    </div>
-
-    <!-- Right panel: Chart -->
-    <div class="card panel-right">
-      <div class="card-head">
-        <span class="card-title">Druckverlauf</span>
-        <span class="card-sub">letzte 30 min</span>
-      </div>
-      <div class="chart-wrap">
-        <svg id="chart" viewBox="0 0 600 200" preserveAspectRatio="none"></svg>
-      </div>
-      <div class="chart-legend">
-        <span><i class="lg lg-blue"></i> Druck</span>
-        <span>Soll <b id="vPressureSet">–</b> bar</span>
-      </div>
-      <div class="card-dots">
-        <span class="dot active"></span>
-        <span class="dot"></span>
-      </div>
-    </div>
-  </section>
-
-</main>
-
-<!-- Bottom Toolbar: Controls + Navigation -->
-<nav class="bottom-toolbar">
-  <div class="tb-controls">
-    <button class="btn btn-start" id="btnStart">Start</button>
-    <button class="btn btn-stop"  id="btnStop">Stop</button>
-    <button class="btn btn-reset" id="btnReset">Reset</button>
+       </div>
+    </main>
   </div>
-  <div class="tb-slider">
-    <span class="slider-label">Freq</span>
-    <input type="range" id="freqSlider" min="35" max="50" step="0.5" value="40" />
-    <span class="slider-value"><span id="freqSliderVal">40.0</span> Hz</span>
-  </div>
-  <div class="tb-nav">
-    <button class="toolbar-btn" id="tbFan" title="Lüfter">
-      <span class="tb-icon">⊛</span><span class="tb-text">Lüfter</span>
-    </button>
-    <button class="toolbar-btn" id="tbPresets" title="Presets">
-      <span class="tb-icon">◎</span><span class="tb-text">Presets</span>
-    </button>
-    <button class="toolbar-btn" id="tbSettings" title="Einstellungen">
-      <span class="tb-icon">⚙</span><span class="tb-text">Settings</span>
-    </button>
-  </div>
-</nav>
 
-<!-- Settings Drawer -->
-<div class="drawer" id="drawer" hidden>
-  <div class="drawer-head">
-    <button class="icon-btn" id="closeDrawer" aria-label="Schließen">✕</button>
-    <div class="drawer-tabs" id="drawerTabs">
-      <button class="tab active" data-tab="pi">PI-Regelung</button>
-      <button class="tab" data-tab="tg">Zeitsperre</button>
-      <button class="tab" data-tab="fan">Lüfter</button>
-      <button class="tab" data-tab="presets">Presets</button>
-      <button class="tab" data-tab="vac">Urlaub</button>
-      <button class="tab" data-tab="log">Logs</button>
-    </div>
-  </div>
-  <div class="drawer-body">
-    <div class="tab-pane active" data-pane="pi">
-      <h3>PI-Druckregelung</h3>
-      <label class="row"><span>Aktiv</span><input type="checkbox" id="piEnabled" /></label>
-      <label class="row"><span>Sollwert (bar)</span><input type="number" id="piSetpoint" step="0.1" /></label>
-      <label class="row"><span>Pump-On (bar)</span><input type="number" id="piPon" step="0.1" /></label>
-      <label class="row"><span>Pump-Off (bar)</span><input type="number" id="piPoff" step="0.1" /></label>
-      <label class="row"><span>Kp</span><input type="number" id="piKp" step="0.1" /></label>
-      <label class="row"><span>Ki</span><input type="number" id="piKi" step="0.1" /></label>
-      <label class="row"><span>Frequenz Min (Hz)</span><input type="number" id="piFmin" step="0.5" /></label>
-      <label class="row"><span>Frequenz Max (Hz)</span><input type="number" id="piFmax" step="0.5" /></label>
-      <div class="btn-row">
-        <button class="btn btn-start" id="savePI">Speichern</button>
-        <button class="btn btn-ghost" id="resetDryrun">Trockenlauf quittieren</button>
-      </div>
-    </div>
-    <div class="tab-pane" data-pane="tg">
-      <h3>Zeitsperre</h3>
-      <label class="row"><span>Aktiv</span><input type="checkbox" id="tgEnabled" /></label>
-      <label class="row"><span>Start</span><input type="time" id="tgStart" /></label>
-      <label class="row"><span>Ende</span><input type="time" id="tgEnd" /></label>
-      <div class="day-row" id="tgDays"></div>
-      <button class="btn btn-start" id="saveTG">Speichern</button>
-    </div>
-    <div class="tab-pane" data-pane="fan">
-      <h3>Lüfter</h3>
-      <label class="row"><span>Modus</span>
-        <select id="fanMode">
-          <option>Auto</option><option>LOGO</option><option>MQTT</option><option>Web</option>
-        </select>
-      </label>
-      <label class="row"><span>PWM</span><input type="range" id="fanPwm" min="0" max="255" step="1" /></label>
-      <div class="sub">PWM: <span id="fanPwmVal">0</span></div>
-      <button class="btn btn-start" id="saveFan">Speichern</button>
-    </div>
-    <div class="tab-pane" data-pane="presets">
-      <h3>Presets</h3>
-      <div id="presetList"></div>
-    </div>
-    <div class="tab-pane" data-pane="vac">
-      <h3>Urlaubsmodus</h3>
-      <label class="row"><span>Aktiv</span><input type="checkbox" id="vacEnabled" /></label>
-      <button class="btn btn-start" id="saveVac">Speichern</button>
-    </div>
-    <div class="tab-pane" data-pane="log">
-      <h3>Logs</h3>
-      <pre id="logBox"></pre>
-    </div>
-  </div>
-</div>
+  <!-- Mobile Floating Bottom Navbar -->
+  <nav class="lg:hidden fixed bottom-0 left-4 right-4 z-40 bg-white/95 backdrop-blur-2xl border border-white shadow-[0_15px_40px_rgba(0,0,0,0.06)] px-4 py-4 rounded-[2rem] flex justify-around items-center mb-[calc(24px+env(safe-area-inset-bottom))]">
+    <button class="flex flex-col items-center gap-1.5 text-blue-600 transition-transform active:scale-95"><div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shadow-inner"><i data-lucide="layout-dashboard" class="w-5 h-5"></i></div></button>
+    <button onclick="document.getElementById('drawer').classList.remove('hidden'); window.showTab('settings');" class="flex flex-col items-center gap-1.5 text-slate-400 hover:text-slate-600 transition-transform active:scale-95"><div class="w-10 h-10 rounded-xl bg-transparent flex items-center justify-center"><i data-lucide="sliders-horizontal" class="w-5 h-5"></i></div></button>
+    <button onclick="document.getElementById('drawer').classList.remove('hidden'); window.showTab('presets');" class="flex flex-col items-center gap-1.5 text-slate-400 hover:text-slate-600 transition-transform active:scale-95"><div class="w-10 h-10 rounded-xl bg-transparent flex items-center justify-center"><i data-lucide="bookmark" class="w-5 h-5"></i></div></button>
+    <button onclick="document.getElementById('drawer').classList.remove('hidden'); window.showTab('logs');" class="flex flex-col items-center gap-1.5 text-slate-400 hover:text-slate-600 transition-transform active:scale-95"><div class="w-10 h-10 rounded-xl bg-transparent flex items-center justify-center"><i data-lucide="scroll-text" class="w-5 h-5"></i></div></button>
+  </nav>
 
-<div id="toast" class="toast" hidden></div>
+  <!-- Drawer Modal / Overlay -->
+  <div id="drawer" class="hidden fixed inset-0 z-50 bg-slate-900/20 backdrop-blur-sm flex justify-center items-end sm:items-center p-0 sm:p-6 pb-0">
+     <div class="bg-white w-full max-w-2xl max-h-[90vh] rounded-t-[2.5rem] sm:rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden transition-transform">
+        
+        <!-- Drawer Header -->
+        <div class="flex justify-between items-center p-6 border-b border-slate-50 shrink-0">
+          <div class="flex bg-slate-50/80 p-1.5 rounded-2xl gap-1">
+             <button id="tbSettings" onclick="window.showTab('settings')" class="tab-btn active text-xs sm:text-sm shadow-sm">Parameter</button>
+             <button id="tbPresets" onclick="window.showTab('presets')" class="tab-btn text-xs sm:text-sm">Presets</button>
+             <!-- log tab shown if accessed via mobile nav -->
+          </div>
+          <button id="closeDrawer" class="w-11 h-11 rounded-2xl bg-white border border-slate-100 shadow-sm text-slate-400 hover:bg-rose-50 hover:text-rose-500 hover:border-rose-100 flex items-center justify-center transition-all active:scale-95"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
 
-<script src="/app.js" defer></script>
+        <div class="p-6 overflow-y-auto flex-1 custom-scrollbar w-full pb-32 sm:pb-6">
+           
+           <!-- Tab: Settings -->
+           <div id="tabSettings" class="block space-y-8">
+              
+              <!-- PI section -->
+              <section class="bg-[#F2F6F9] rounded-[2rem] p-6 shadow-inner border border-slate-100">
+                <div class="flex justify-between items-center mb-6">
+                  <div class="flex items-center gap-3 text-slate-800 font-bold"><div class="w-8 h-8 rounded-xl bg-blue-500 text-white flex items-center justify-center shadow-[0_4px_10px_rgba(59,130,246,0.3)]"><i data-lucide="arrow-up-down" class="w-4 h-4"></i></div>PI Regler</div>
+                  <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="piEnabled" class="sr-only peer">
+                    <div class="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500 shadow-inner"></div>
+                  </label>
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm font-semibold">
+                   <div>
+                     <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5 ml-1">Soll Druck</label>
+                     <input type="number" id="piSetpoint" step="0.1" class="w-full bg-white rounded-xl px-4 py-2.5 border-0 outline-none shadow-sm text-slate-700 focus:ring-2 focus:ring-blue-500/20 transition-all font-bold">
+                   </div>
+                   <div>
+                     <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5 ml-1">Kp</label>
+                     <input type="number" id="piKp" step="0.1" class="w-full bg-white rounded-xl px-4 py-2.5 border-0 outline-none shadow-sm text-slate-700 focus:ring-2 focus:ring-blue-500/20 transition-all font-bold">
+                   </div>
+                   <div>
+                     <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5 ml-1">Ki</label>
+                     <input type="number" id="piKi" step="0.1" class="w-full bg-white rounded-xl px-4 py-2.5 border-0 outline-none shadow-sm text-slate-700 focus:ring-2 focus:ring-blue-500/20 transition-all font-bold">
+                   </div>
+                   <div class="hidden">
+                     <!-- Other unused DOM inputs mapped by script: piPon, piPoff, piFmin, piFmax -->
+                     <input type="number" id="piPon"><input type="number" id="piPoff"><input type="number" id="piFmin"><input type="number" id="piFmax">
+                     <input type="checkbox" id="vacEnabled"><button id="saveVac"></button>
+                     <input type="checkbox" id="tgEnabled"><input type="number" id="tgDays"><input type="time" id="tgStart"><input type="time" id="tgEnd"><button id="saveTG"></button>
+                     <button id="resetDryrun"></button>
+                   </div>
+                   <!-- Button uses flex to stretch fully if desired, put at end or custom -->
+                </div>
+                <button id="savePI" class="w-full mt-6 py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl shadow-lg shadow-blue-500/20 transition-colors uppercase tracking-widest text-xs"><i data-lucide="save" class="w-4 h-4 inline-block mb-0.5 mr-2"></i> Parameter Speichern</button>
+              </section>
+
+              <!-- Fan section -->
+              <section class="bg-[#F2F6F9] rounded-[2rem] p-6 shadow-inner border border-slate-100">
+                 <div class="flex items-center gap-3 text-slate-800 font-bold mb-6"><div class="w-8 h-8 rounded-xl bg-cyan-500 text-white flex items-center justify-center shadow-[0_4px_10px_rgba(6,182,212,0.3)]"><i data-lucide="fan" class="w-4 h-4"></i></div>Gehäuse Lüfter</div>
+                 
+                 <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5 ml-1">Modus</label>
+                 <select id="fanMode" class="w-full bg-white rounded-xl px-4 py-3 mb-6 shadow-sm border-0 font-bold text-slate-700 focus:ring-2 focus:ring-cyan-500/20 transition-all">
+                   <option value="0">Automatik Temp-Regelung</option>
+                   <option value="1">Manuell Override</option>
+                 </select>
+                 
+                 <div class="flex justify-between font-bold text-slate-600 mb-3 ml-1"><span class="text-[10px] uppercase text-slate-400 tracking-widest">Leistung (PWM)</span><span id="fanPwmVal" class="text-sm">100%</span></div>
+                 <input type="range" id="fanPwm" min="0" max="100" class="w-full slider-apple mb-8 bg-cyan-200/50 block">
+                 
+                 <button id="saveFan" class="w-full py-4 bg-white text-slate-700 hover:bg-slate-50 rounded-2xl shadow-sm border border-slate-100 font-bold uppercase tracking-widest text-xs transition-colors"><i data-lucide="upload-cloud" class="w-4 h-4 inline-block mr-2 mb-0.5 text-cyan-500"></i> Lüfter Setzen</button>
+              </section>
+
+           </div>
+           
+           <!-- Tab: Presets -->
+           <div id="tabPresets" class="hidden space-y-4">
+               <div id="presetList" class="flex flex-col gap-3"></div>
+           </div>
+        </div>
+     </div>
+  </div>
+
+  <script src="/app.js"></script>
 </body>
 </html>

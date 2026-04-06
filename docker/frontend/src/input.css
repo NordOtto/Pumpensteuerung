@@ -1,0 +1,113 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    background-color: #F2F6F9;
+    color: #1e293b;
+    font-family: ui-sans-serif, system-ui, sans-serif;
+    min-height: 100vh;
+    overscroll-behavior: none;
+  }
+}
+
+@layer components {
+  /* Dynamic KPI Cards driven by app.js */
+  .kpi-card {
+    @apply bg-white rounded-[2rem] p-5 flex flex-col justify-between shadow-[0_4px_20px_rgba(0,0,0,0.02)] border border-slate-50 transition-all duration-300;
+  }
+  
+  .kpi-card .icon-box {
+    @apply bg-slate-50 text-slate-400 border border-slate-100;
+  }
+  
+  .kpi-card.ok .icon-box {
+    @apply bg-emerald-50 text-teal-500 border-teal-100;
+  }
+  
+  .kpi-card.warn .icon-box {
+    @apply bg-amber-50 text-amber-500 border-amber-100;
+  }
+  
+  .kpi-card.err .icon-box {
+    @apply bg-rose-50 text-rose-500 border-rose-100;
+  }
+  
+  .kpi-card.idle .icon-box {
+    @apply bg-slate-50 text-slate-400 border-slate-100;
+  }
+
+  /* Status Pills */
+  .status-pill {
+    @apply px-4 py-1.5 rounded-xl text-xs font-bold tracking-wide border;
+  }
+  .status-pill.run {
+    @apply bg-white/20 text-white border-white/20 backdrop-blur-sm shadow-sm;
+  }
+  .status-pill.ready {
+    @apply bg-white/20 text-white border-white/20 backdrop-blur-sm shadow-sm;
+  }
+  .status-pill.err {
+    @apply bg-rose-500/80 text-white border-rose-400/50 backdrop-blur-sm shadow-sm;
+  }
+  .status-pill.warn {
+    @apply bg-amber-400/80 text-white border-amber-300/50 backdrop-blur-sm shadow-sm;
+  }
+
+  /* Dynamic Sidebar Status Dots */
+  .sicon {
+    @apply flex items-center justify-center w-10 h-10 rounded-xl transition-colors duration-300 border border-transparent;
+  }
+  .sicon i {
+    @apply w-5 h-5;
+  }
+  .sicon.idle { @apply bg-slate-100 text-slate-400; }
+  .sicon.ok { @apply bg-emerald-50 text-teal-600 border-teal-100 shadow-sm shadow-teal-500/10; }
+  .sicon.warn { @apply bg-amber-50 text-amber-600 border-amber-100 shadow-sm shadow-amber-500/10; }
+  .sicon.err { @apply bg-rose-50 text-rose-600 border-rose-100 shadow-sm shadow-rose-500/10; }
+
+  /* Tab Navigation */
+  .tab-btn {
+    @apply py-3 px-6 rounded-xl font-bold transition-all text-slate-500 hover:text-slate-800 hover:bg-slate-100 border border-transparent;
+  }
+  .tab-btn.active {
+    @apply bg-white shadow-sm border border-slate-200 text-blue-600;
+  }
+}
+
+@layer utilities {
+  /* Range Slider */
+  input[type=range].slider-apple {
+    -webkit-appearance: none;
+    appearance: none;
+    @apply bg-transparent;
+  }
+  input[type=range].slider-apple::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    @apply w-6 h-6 rounded-full bg-white shadow-md border-0 cursor-pointer mt-[-10px];
+  }
+  input[type=range].slider-apple::-webkit-slider-runnable-track {
+    @apply w-full h-[6px] rounded-full bg-white/30;
+  }
+  
+  input[type=range].slider-apple:focus {
+    outline: none;
+  }
+
+  /* Drawer Animations */
+  #drawer:not(.hidden) {
+    animation: fadeIn 0.25s ease-out forwards;
+  }
+  #drawer > div {
+    animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; backdrop-filter: blur(0px); }
+    to { opacity: 1; backdrop-filter: blur(8px); }
+  }
+  @keyframes slideUp {
+    from { transform: translateY(40px) scale(0.98); opacity: 0; }
+    to { transform: translateY(0) scale(1); opacity: 1; }
+  }
+}

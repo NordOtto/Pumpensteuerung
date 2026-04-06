@@ -14,7 +14,6 @@ services:
       - TZ=${TZ:-Europe/Berlin}
       - DATA_DIR=/data
       - AUTH_USER=${AUTH_USER:-admin}
-      - AUTH_PASS=${AUTH_PASS:-pumpe}
     volumes:
       - app-data:/data
     networks:

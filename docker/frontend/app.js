@@ -51,13 +51,23 @@ async function tryAutoLogin() {
 
 function showLogin() {
   $('loginOverlay').classList.remove('hidden');
+  $('changePwOverlay').classList.add('hidden');
   $('mainApp').classList.add('hidden');
   $('mobileNav').classList.add('hidden');
   $('loginUser').focus();
 }
 
+function showChangePw() {
+  $('loginOverlay').classList.add('hidden');
+  $('changePwOverlay').classList.remove('hidden');
+  $('mainApp').classList.add('hidden');
+  $('mobileNav').classList.add('hidden');
+  $('cpOldPass').focus();
+}
+
 function showApp() {
   $('loginOverlay').classList.add('hidden');
+  $('changePwOverlay').classList.add('hidden');
   $('mainApp').classList.remove('hidden');
   $('mobileNav').classList.remove('hidden');
 }
@@ -78,10 +88,46 @@ async function doLogin() {
       authToken = data.token;
       localStorage.setItem('authToken', authToken);
       errEl.classList.add('hidden');
-      showApp();
-      connectWS();
+      if (data.mustChangePass) {
+        $('cpOldPass').value = pass;
+        showChangePw();
+      } else {
+        showApp();
+        connectWS();
+      }
     } else {
       errEl.textContent = 'Falscher Benutzer oder Passwort';
+      errEl.classList.remove('hidden');
+    }
+  } catch {
+    errEl.textContent = 'Verbindungsfehler';
+    errEl.classList.remove('hidden');
+  }
+}
+
+async function doChangePw() {
+  const oldPass = $('cpOldPass').value;
+  const newPass = $('cpNewPass').value;
+  const newPass2 = $('cpNewPass2').value;
+  const errEl = $('cpError');
+  if (!oldPass || !newPass) { errEl.textContent = 'Bitte ausfüllen'; errEl.classList.remove('hidden'); return; }
+  if (newPass !== newPass2) { errEl.textContent = 'Passwörter stimmen nicht überein'; errEl.classList.remove('hidden'); return; }
+  if (newPass.length < 4) { errEl.textContent = 'Min. 4 Zeichen'; errEl.classList.remove('hidden'); return; }
+  try {
+    const r = await authFetch('/api/auth/change-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ oldPass, newPass })
+    });
+    if (r.ok) {
+      errEl.classList.add('hidden');
+      $('cpOldPass').value = ''; $('cpNewPass').value = ''; $('cpNewPass2').value = '';
+      showApp();
+      connectWS();
+      $toast.show('Passwort geändert');
+    } else {
+      const data = await r.json();
+      errEl.textContent = data.error || 'Fehler';
       errEl.classList.remove('hidden');
     }
   } catch {
@@ -100,6 +146,8 @@ function doLogout() {
 $('btnLogin').onclick = doLogin;
 $('loginPass').addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
 $('loginUser').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('loginPass').focus(); });
+$('btnChangePw').onclick = doChangePw;
+$('cpNewPass2').addEventListener('keydown', (e) => { if (e.key === 'Enter') doChangePw(); });
 $('btnLogout').onclick = doLogout;
 
 const els = {

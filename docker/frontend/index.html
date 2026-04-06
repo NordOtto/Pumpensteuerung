@@ -44,6 +44,40 @@
     </div>
   </div>
 
+  <!-- Password Change Overlay -->
+  <div id="changePwOverlay" class="hidden fixed inset-0 z-[200] bg-sky-50 dark:bg-[#0f1417] flex items-center justify-center p-4 transition-opacity duration-300">
+    <div class="w-full max-w-sm">
+      <div class="glass-card rounded-[1.5rem] p-8 shadow-2xl border border-white/40 dark:border-slate-700/50 relative overflow-hidden">
+        <div class="absolute inset-0 bg-gradient-to-br from-amber-300/20 to-orange-500/10 dark:from-amber-900/20 dark:to-slate-900/50 pointer-events-none"></div>
+        <div class="relative z-10 space-y-6">
+          <div class="text-center">
+            <span class="material-symbols-outlined text-5xl text-amber-500 mb-2 block">lock_reset</span>
+            <h1 class="text-2xl font-bold text-slate-800 dark:text-white">Passwort ändern</h1>
+            <p class="text-sm text-slate-400 mt-1">Bitte wähle ein neues Passwort</p>
+          </div>
+          <div class="space-y-3">
+            <div class="sidebar-field">
+              <label class="sidebar-label">Altes Passwort</label>
+              <input type="password" id="cpOldPass" autocomplete="current-password" class="sidebar-input" placeholder="••••••">
+            </div>
+            <div class="sidebar-field">
+              <label class="sidebar-label">Neues Passwort</label>
+              <input type="password" id="cpNewPass" autocomplete="new-password" class="sidebar-input" placeholder="Min. 4 Zeichen">
+            </div>
+            <div class="sidebar-field">
+              <label class="sidebar-label">Neues Passwort bestätigen</label>
+              <input type="password" id="cpNewPass2" autocomplete="new-password" class="sidebar-input" placeholder="Wiederholen">
+            </div>
+          </div>
+          <div id="cpError" class="hidden text-sm text-red-500 font-bold text-center"></div>
+          <button id="btnChangePw" class="w-full py-3 bg-gradient-to-b from-amber-500 to-amber-700 hover:from-amber-400 hover:to-amber-600 text-white font-bold rounded-2xl shadow-lg text-sm uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:translate-y-0.5">
+            <span class="material-symbols-outlined text-lg">check</span> Passwort speichern
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast -->
   <div id="toast" class="fixed top-6 left-1/2 -translate-x-1/2 z-[100] transition-all duration-300 -translate-y-[200%] opacity-0 max-w-sm w-[90%] px-5 py-4 rounded-2xl shadow-xl flex items-center justify-between text-sm font-semibold text-white pointer-events-none">
     <span id="toastMsg"></span>

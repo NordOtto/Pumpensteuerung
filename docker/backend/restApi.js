@@ -18,9 +18,17 @@ const router = express.Router();
 // ── Auth ──
 router.post('/auth/login', (req, res) => {
   const { user, pass } = req.body || {};
-  const token = auth.login(user, pass);
-  if (token) return res.json({ ok: true, token });
+  const result = auth.login(user, pass);
+  if (result) return res.json({ ok: true, token: result.token, mustChangePass: result.mustChangePass });
   res.status(401).json({ error: 'Benutzername oder Passwort falsch' });
+});
+
+router.post('/auth/change-password', (req, res) => {
+  const token = auth.extractToken(req);
+  const { oldPass, newPass } = req.body || {};
+  const result = auth.changePassword(token, oldPass, newPass);
+  if (result.ok) return res.json({ ok: true });
+  res.status(400).json({ error: result.error });
 });
 
 // ── V20 Steuerbefehle ──

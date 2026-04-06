@@ -49,8 +49,6 @@ const els = {
   current:     $('dCurrent'),
   power:       $('dPower'),
   dcBus:       $('dDcBus'),
-  freqOut:     $('dFreqOut'),
-  freqSetHw:   $('dFreqSet'),
   statusBadge: $('statusBadge'),
   badgeText:   $('statusBadgeText'),
   badgeDot:    $('statusBadgeDot'),
@@ -96,6 +94,19 @@ window.$toast = {
   }
 };
 $('toastClose').onclick = () => $toast.hide();
+
+// ─── Force dot decimal in all number inputs ───
+document.addEventListener('keydown', (e) => {
+  if (e.target.type === 'number' && e.key === ',') {
+    e.preventDefault();
+    const inp = e.target;
+    const start = inp.selectionStart;
+    const val = inp.value;
+    inp.value = val.slice(0, start) + '.' + val.slice(inp.selectionEnd);
+    inp.setSelectionRange(start + 1, start + 1);
+    inp.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+});
 
 // ─── WebSocket ───
 function connectWS() {
@@ -152,10 +163,8 @@ function updateUI(st) {
     els.freqSet.textContent = (st.v20.freq_setpoint || 0).toFixed(1);
     els.voltage.textContent = (st.v20.voltage || 0).toFixed(1);
     els.current.textContent = (st.v20.current || 0).toFixed(2);
-    els.power.textContent = (st.v20.power || 0).toFixed(2);
+    els.power.textContent = Math.round((st.v20.power || 0) * 1000);
     els.dcBus.textContent = (st.v20.dc_bus || 0).toFixed(0);
-    els.freqOut.textContent = freq;
-    els.freqSetHw.textContent = (st.v20.freq_setpoint || 0).toFixed(1);
 
     // Status badge
     let badgeState = 'ready', badgeLabel = 'Bereit';

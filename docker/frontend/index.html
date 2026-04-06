@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html class="dark" lang="en">
+<html class="dark" lang="en-US">
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
@@ -192,27 +192,19 @@
               <div class="hw-label"><span class="material-symbols-outlined">bolt</span><span>Spannung</span></div>
               <span class="hw-val"><span id="dVoltage">--</span> <span class="hw-unit">V</span></span>
             </div>
-            <div class="hw-row">
+            <div class="hw-row !border-b-0 md:!border-b-0">
               <div class="hw-label"><span class="material-symbols-outlined">electrical_services</span><span>Strom</span></div>
               <span class="hw-val"><span id="dCurrent">--</span> <span class="hw-unit">A</span></span>
-            </div>
-            <div class="hw-row !border-b-0 md:!border-b-0">
-              <div class="hw-label"><span class="material-symbols-outlined">speed</span><span>Leistung</span></div>
-              <span class="hw-val"><span id="dPower">--</span> <span class="hw-unit">kW</span></span>
             </div>
           </div>
           <div>
             <div class="hw-row">
-              <div class="hw-label"><span class="material-symbols-outlined">dynamic_form</span><span>DC Zwischenkreis</span></div>
-              <span class="hw-val"><span id="dDcBus">--</span> <span class="hw-unit">V</span></span>
-            </div>
-            <div class="hw-row">
-              <div class="hw-label"><span class="material-symbols-outlined">straighten</span><span>Ist-Frequenz</span></div>
-              <span class="hw-val"><span id="dFreqOut">--</span> <span class="hw-unit">Hz</span></span>
+              <div class="hw-label"><span class="material-symbols-outlined">speed</span><span>Leistung</span></div>
+              <span class="hw-val"><span id="dPower">--</span> <span class="hw-unit">W</span></span>
             </div>
             <div class="hw-row !border-b-0">
-              <div class="hw-label"><span class="material-symbols-outlined">tune</span><span>Sollfrequenz</span></div>
-              <span class="hw-val"><span id="dFreqSet">--</span> <span class="hw-unit">Hz</span></span>
+              <div class="hw-label"><span class="material-symbols-outlined">dynamic_form</span><span>DC Zwischenkreis</span></div>
+              <span class="hw-val"><span id="dDcBus">--</span> <span class="hw-unit">V</span></span>
             </div>
           </div>
         </div>
@@ -287,9 +279,9 @@
   </nav>
 
   <!-- ===== SIDEBAR ===== -->
-  <div id="drawer" class="hidden fixed inset-0 z-[60] transition-opacity duration-300 opacity-0" onclick="if(event.target===this)document.getElementById('closeDrawer').click()">
-    <!-- Backdrop -->
-    <div class="absolute inset-0 bg-slate-900/40 dark:bg-black/50 backdrop-blur-sm"></div>
+  <div id="drawer" class="hidden fixed inset-0 z-[60] transition-opacity duration-300 opacity-0">
+    <!-- Backdrop (click to close) -->
+    <div class="absolute inset-0 bg-slate-900/40 dark:bg-black/50 backdrop-blur-sm cursor-pointer" onclick="document.getElementById('closeDrawer').click()"></div>
 
     <!-- Sidebar Panel (right) -->
     <div id="drawerContent" class="absolute top-0 right-0 h-full w-full sm:w-[480px] bg-white dark:bg-[#0d1117] border-l border-slate-200 dark:border-slate-700/50 shadow-2xl flex transition-transform duration-300 ease-out translate-x-full">

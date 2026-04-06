@@ -169,6 +169,16 @@ function handleStatus(s) {
   setClass($('cardStatus'), sCls);
   setText($('vStatusText'), pillTxt);
   setText($('vStatusSub'), sub);
+  // großer Status-Dot im Info-Card
+  const dot = $('vStatusDot');
+  if (dot) {
+    let dotCls = 'status-dot-lg';
+    if (!v20.connected)   dotCls += '';
+    else if (v20.fault)   dotCls += ' err';
+    else if (v20.running) dotCls += ' ok';
+    else                  dotCls += ' info';
+    setClass(dot, dotCls);
+  }
 
   // Details
   setText($('dVoltage'),  fmt(v20.voltage, 0));

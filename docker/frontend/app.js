@@ -200,9 +200,9 @@ function pushChart(val) {
 }
 
 // Fixed Bar Buttons
-document.getElementById('btnStart').onclick = () => fetch('/api/pump', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({cmd:'start'})});
-document.getElementById('btnStop').onclick = () => fetch('/api/pump', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({cmd:'stop'})});
-document.getElementById('btnReset').onclick = () => fetch('/api/pump', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({cmd:'reset'})});
+document.getElementById('btnStart').onclick = () => fetch('/api/v20/start', {method:'POST'});
+document.getElementById('btnStop').onclick = () => fetch('/api/v20/stop', {method:'POST'});
+document.getElementById('btnReset').onclick = () => fetch('/api/v20/reset', {method:'POST'});
 
 // Slider API mapping (Throttle 500ms)
 let slTimer;
@@ -210,7 +210,7 @@ els.slider.addEventListener('input', (e) => { els.sliderVal.innerText = parseFlo
 els.slider.addEventListener('change', (e) => {
     clearTimeout(slTimer);
     slTimer = setTimeout(() => {
-        fetch('/api/pump', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({cmd:'set_freq', freq: parseFloat(e.target.value)})})
+        fetch('/api/v20/freq', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({freq: parseFloat(e.target.value)})})
           .then(r=>r.json()).then(o=>{
               if(o.success) $toast.show(`Frequenz auf ${e.target.value}Hz gesetzt`);
           });
@@ -322,10 +322,11 @@ document.getElementById('savePI').onclick = async () => {
         freq_min: parseInt(els.piFmin.value),
         freq_max: parseInt(els.piFmax.value),
         enabled: els.piEnabled.checked,
-        mode: lastPiState.mode || 0 // keep current mode
+        ctrl_mode: lastPiState.ctrl_mode || 0 // keep current mode
     };
     
-    const res = await fetch('/api/pi', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    // Check if endpoint should be /api/pressure if there is no /api/pi
+    const res = await fetch('/api/pressure', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
     const d = await res.json();
     if(d.success) $toast.show('Parameter gespeichert');
 };

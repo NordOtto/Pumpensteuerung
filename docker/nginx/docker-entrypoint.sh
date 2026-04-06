@@ -10,11 +10,10 @@ KEY=$SSL_DIR/key.pem
 # ── Detect all local IPs for SAN ──
 get_san_entries() {
     SANS="DNS:pumpe.local,DNS:localhost,IP:127.0.0.1"
-    # Add all non-loopback IPv4 addresses
-    for ip in $(ip -4 addr show | grep -oP 'inet \K[\d.]+' | grep -v '^127\.'); do
+    # Add all non-loopback IPv4 addresses (busybox-compatible)
+    for ip in $(ip -4 addr show | sed -n 's/.*inet \([0-9.]*\).*/\1/p' | grep -v '^127\.'); do
         SANS="${SANS},IP:${ip}"
     done
-    # Add hostname
     SANS="${SANS},DNS:$(hostname)"
     echo "$SANS"
 }
@@ -27,6 +26,8 @@ if [ ! -f "$CA_CERT" ] || [ ! -f "$CA_KEY" ]; then
         -out "$CA_CERT" \
         -subj "/C=DE/ST=Local/L=Home/O=Pumpensteuerung CA/CN=Pumpensteuerung Root CA"
     echo "[nginx-entrypoint] CA erstellt: $CA_CERT"
+    # Force re-creation of server cert when CA changes
+    rm -f "$CERT" "$KEY"
 fi
 
 if [ ! -f "$CERT" ] || [ ! -f "$KEY" ]; then
@@ -39,6 +40,14 @@ if [ ! -f "$CERT" ] || [ ! -f "$KEY" ]; then
         -out "$SSL_DIR/server.csr" \
         -subj "/C=DE/ST=Local/L=Home/O=Pumpensteuerung/CN=pumpe.local"
 
+    # Write extension file (no bash process substitution needed)
+    cat > "$SSL_DIR/ext.cnf" <<EOF
+subjectAltName=$SAN
+basicConstraints=CA:FALSE
+keyUsage=digitalSignature,keyEncipherment
+extendedKeyUsage=serverAuth
+EOF
+
     # Sign with our CA
     openssl x509 -req -days 3650 \
         -in "$SSL_DIR/server.csr" \
@@ -46,9 +55,9 @@ if [ ! -f "$CERT" ] || [ ! -f "$KEY" ]; then
         -CAkey "$CA_KEY" \
         -CAcreateserial \
         -out "$CERT" \
-        -extfile <(printf "subjectAltName=%s\nbasicConstraints=CA:FALSE\nkeyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth" "$SAN")
+        -extfile "$SSL_DIR/ext.cnf"
 
-    rm -f "$SSL_DIR/server.csr" "$SSL_DIR/ca.srl"
+    rm -f "$SSL_DIR/server.csr" "$SSL_DIR/ca.srl" "$SSL_DIR/ext.cnf"
     echo "[nginx-entrypoint] Server-Zertifikat erstellt und von CA signiert."
 else
     echo "[nginx-entrypoint] SSL-Zertifikate bereits vorhanden."

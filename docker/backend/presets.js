@@ -76,7 +76,6 @@ function addOrUpdate(preset) {
 }
 
 function deletePreset(name) {
-  if (name === 'Normal') return false;
   if (state.active_preset === name) return false;
   const idx = presets.findIndex(p => p.name === name);
   if (idx < 0) return false;

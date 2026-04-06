@@ -337,15 +337,15 @@
               </label>
             </div>
             <div class="grid grid-cols-3 gap-3">
-              <div class="sidebar-field"><label class="sidebar-label">Ein (bar)</label><input type="number" id="piPon" step="0.1" class="sidebar-input"></div>
-              <div class="sidebar-field"><label class="sidebar-label text-blue-500">Sollwert</label><input type="number" id="piSetpoint" step="0.1" class="sidebar-input !border-blue-400/50 !ring-blue-500/20"></div>
-              <div class="sidebar-field"><label class="sidebar-label">Aus (bar)</label><input type="number" id="piPoff" step="0.1" class="sidebar-input"></div>
+              <div class="sidebar-field"><label class="sidebar-label">Ein (bar)</label><input type="number" id="piPon" step="0.1" inputmode="decimal" class="sidebar-input"></div>
+              <div class="sidebar-field"><label class="sidebar-label text-blue-500">Sollwert</label><input type="number" id="piSetpoint" step="0.1" inputmode="decimal" class="sidebar-input !border-blue-400/50 !ring-blue-500/20"></div>
+              <div class="sidebar-field"><label class="sidebar-label">Aus (bar)</label><input type="number" id="piPoff" step="0.1" inputmode="decimal" class="sidebar-input"></div>
             </div>
             <div class="grid grid-cols-4 gap-3">
-              <div class="sidebar-field"><label class="sidebar-label">Kp</label><input type="number" id="piKp" step="0.1" class="sidebar-input"></div>
-              <div class="sidebar-field"><label class="sidebar-label">Ki</label><input type="number" id="piKi" step="0.01" class="sidebar-input"></div>
-              <div class="sidebar-field"><label class="sidebar-label">f‑min</label><input type="number" id="piFmin" step="1" class="sidebar-input"></div>
-              <div class="sidebar-field"><label class="sidebar-label">f‑max</label><input type="number" id="piFmax" step="1" class="sidebar-input"></div>
+              <div class="sidebar-field"><label class="sidebar-label">Kp</label><input type="number" id="piKp" step="0.1" inputmode="decimal" class="sidebar-input"></div>
+              <div class="sidebar-field"><label class="sidebar-label">Ki</label><input type="number" id="piKi" step="0.01" inputmode="decimal" class="sidebar-input"></div>
+              <div class="sidebar-field"><label class="sidebar-label">f‑min</label><input type="number" id="piFmin" step="1" inputmode="numeric" class="sidebar-input"></div>
+              <div class="sidebar-field"><label class="sidebar-label">f‑max</label><input type="number" id="piFmax" step="1" inputmode="numeric" class="sidebar-input"></div>
             </div>
             <button id="savePI" class="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-md text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-colors">
               <span class="material-symbols-outlined text-base">check_circle</span> Speichern
@@ -385,16 +385,14 @@
             </div>
 
             <div class="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700/50 space-y-3">
-              <div class="grid grid-cols-2 gap-3">
-                <div class="sidebar-field"><label class="sidebar-label">Name</label><input type="text" id="presetNewName" placeholder="z.B. Garten" class="sidebar-input"></div>
-                <div class="sidebar-field"><label class="sidebar-label">Modus</label><select id="presetNewMode" class="sidebar-input"><option value="0">Druck</option><option value="1">Durchfluss</option></select></div>
-              </div>
               <div class="grid grid-cols-5 gap-2">
-                <div class="sidebar-field col-span-1"><label id="lblPresetSet" class="sidebar-label">Soll</label><input type="number" id="presetNewSet" step="0.1" class="sidebar-input"></div>
-                <div class="sidebar-field"><label class="sidebar-label">Kp</label><input type="number" id="presetNewKp" step="0.1" class="sidebar-input"></div>
-                <div class="sidebar-field"><label class="sidebar-label">Ki</label><input type="number" id="presetNewKi" step="0.01" class="sidebar-input"></div>
-                <div class="sidebar-field"><label class="sidebar-label">f‑min</label><input type="number" id="presetNewFmin" step="1" class="sidebar-input"></div>
-                <div class="sidebar-field"><label class="sidebar-label">f‑max</label><input type="number" id="presetNewFmax" step="1" class="sidebar-input"></div>
+                <div class="sidebar-field col-span-2"><label class="sidebar-label">Name</label><input type="text" id="presetNewName" placeholder="z.B. Garten" class="sidebar-input"></div>
+                <div class="sidebar-field col-span-2"><label class="sidebar-label">Modus</label><select id="presetNewMode" class="sidebar-input"><option value="0">Druck (bar)</option><option value="1">Durchfluss (l/m)</option></select></div>
+                <div class="sidebar-field col-span-1"><label id="lblPresetSet" class="sidebar-label">Soll</label><input type="number" id="presetNewSet" step="0.1" inputmode="decimal" class="sidebar-input"></div>
+                <div class="sidebar-field"><label class="sidebar-label">Kp</label><input type="number" id="presetNewKp" step="0.1" inputmode="decimal" class="sidebar-input"></div>
+                <div class="sidebar-field"><label class="sidebar-label">Ki</label><input type="number" id="presetNewKi" step="0.01" inputmode="decimal" class="sidebar-input"></div>
+                <div class="sidebar-field"><label class="sidebar-label">f‑min</label><input type="number" id="presetNewFmin" step="1" inputmode="numeric" class="sidebar-input"></div>
+                <div class="sidebar-field"><label class="sidebar-label">f‑max</label><input type="number" id="presetNewFmax" step="1" inputmode="numeric" class="sidebar-input"></div>
               </div>
               <button id="btnCreatePreset" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-md text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-colors">
                 <span class="material-symbols-outlined text-base">add</span> Erstellen

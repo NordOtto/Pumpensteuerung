@@ -116,9 +116,9 @@ router.delete('/presets/:name', (req, res) => {
   const ok = presets.deletePreset(name);
   if (!ok) {
     if (state.active_preset === name) {
-      return res.status(409).json({ error: 'cannot delete active preset' });
+      return res.status(409).json({ error: 'Aktives Preset kann nicht gelöscht werden' });
     }
-    return res.status(404).json({ error: 'not found' });
+    return res.status(404).json({ error: 'Preset nicht gefunden' });
   }
   res.json({ ok: true });
 });

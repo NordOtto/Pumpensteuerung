@@ -123,7 +123,7 @@ function handleStatus(s) {
   const psp = pi.setpoint;
   setText($('vPressure'), fmt(p, 2));
   setText($('vPressureSet'), fmt(psp, 1));
-  let pCls = 'card';
+  let pCls = 'kpi-inline';
   if (p != null && psp) {
     const dev = Math.abs(p - psp) / psp;
     if (dev <= 0.05)      pCls += ' ok';
@@ -134,7 +134,7 @@ function handleStatus(s) {
 
   // KPI: Durchfluss
   setText($('vFlow'), fmt(pi.flow, 1));
-  let fCls = 'card';
+  let fCls = 'kpi-inline';
   if (pi.dry_run_locked)   { fCls += ' warn'; setText($('vFlowSub'), 'Trockenlauf-Sperre'); }
   else if (pi.flow > 0)    { fCls += ' ok';   setText($('vFlowSub'), ''); }
   else                     { fCls += ' idle'; setText($('vFlowSub'), 'Kein Durchfluss'); }
@@ -143,10 +143,10 @@ function handleStatus(s) {
   // KPI: Frequenz
   setText($('vFreq'), fmt(v20.frequency, 1));
   setText($('vFreqSet'), fmt(v20.freq_setpoint, 1));
-  setClass($('cardFreq'), 'card ' + (v20.running ? 'info' : 'idle'));
+  setClass($('cardFreq'), 'kpi-inline ' + (v20.running ? 'info' : 'idle'));
 
   // KPI: Pumpenstatus
-  let sCls = 'card', sub = '';
+  let sCls = 'kpi-inline', sub = '';
   if (!v20.connected)      { sCls += ' idle'; }
   else if (v20.fault)      { sCls += ' err';  sub = 'Fehlercode ' + (v20.fault_code || 0); }
   else if (v20.running)    { sCls += ' ok'; }
@@ -212,11 +212,11 @@ function drawChart() {
     path += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1) + ' ';
   });
   svg.innerHTML =
-    `<line x1="${pad}" y1="${H - pad}" x2="${W - pad}" y2="${H - pad}" stroke="rgba(127,127,127,.25)" stroke-width="1"/>` +
-    `<line x1="${pad}" y1="${pad}" x2="${pad}" y2="${H - pad}" stroke="rgba(127,127,127,.25)" stroke-width="1"/>` +
-    `<path d="${path}" fill="none" stroke="#2588eb" stroke-width="2"/>` +
-    `<text x="${W - pad}" y="${pad - 4}" text-anchor="end" font-size="10" fill="#888">${max.toFixed(1)} bar</text>` +
-    `<text x="${W - pad}" y="${H - pad + 12}" text-anchor="end" font-size="10" fill="#888">${min.toFixed(1)} bar</text>`;
+    `<line x1="${pad}" y1="${H - pad}" x2="${W - pad}" y2="${H - pad}" stroke="rgba(127,127,127,.2)" stroke-width="1"/>` +
+    `<line x1="${pad}" y1="${pad}" x2="${pad}" y2="${H - pad}" stroke="rgba(127,127,127,.2)" stroke-width="1"/>` +
+    `<path d="${path}" fill="none" stroke="#0068b4" stroke-width="2"/>` +
+    `<text x="${W - pad}" y="${pad - 4}" text-anchor="end" font-size="10" fill="#8892a6">${max.toFixed(1)} bar</text>` +
+    `<text x="${W - pad}" y="${H - pad + 12}" text-anchor="end" font-size="10" fill="#8892a6">${min.toFixed(1)} bar</text>`;
 }
 
 // ---------------- Logs ----------------
@@ -244,12 +244,25 @@ sl.addEventListener('change', async () => {
   delete sl.dataset.dragging;
 });
 
+// ---------------- Bottom Toolbar ----------------
+function openDrawerTab(tabName) {
+  const drawer = $('drawer');
+  drawer.hidden = false;
+  document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(x => x.classList.remove('active'));
+  const tab = document.querySelector(`.tab[data-tab="${tabName}"]`);
+  const pane = document.querySelector(`.tab-pane[data-pane="${tabName}"]`);
+  if (tab) tab.classList.add('active');
+  if (pane) pane.classList.add('active');
+  loadSettings();
+}
+
+$('tbFan').addEventListener('click', () => openDrawerTab('fan'));
+$('tbPresets').addEventListener('click', () => openDrawerTab('presets'));
+$('tbSettings').addEventListener('click', () => openDrawerTab('pi'));
+
 // ---------------- Drawer ----------------
 const drawer = $('drawer');
-$('openSettings').addEventListener('click', async () => {
-  drawer.hidden = false;
-  await loadSettings();
-});
 $('closeDrawer').addEventListener('click', () => { drawer.hidden = true; });
 
 document.querySelectorAll('.tab').forEach(t => {
@@ -385,8 +398,6 @@ async function renderPresets() {
 }
 
 // ---------------- Service Worker (Cleanup) ----------------
-// Alte SW-Versionen haben veraltetes Markup ausgeliefert.
-// Wir deregistrieren jeden vorhandenen SW und löschen alle Caches.
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.getRegistrations().then((regs) => {
     regs.forEach((r) => r.unregister().catch(() => {}));

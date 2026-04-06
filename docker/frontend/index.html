@@ -3,12 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#ffffff" />
+  <meta name="theme-color" content="#1a3a5c" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Pumpe" />
-  <link rel="manifest" href="/manifest.json" />
-  <link rel="icon" type="image/svg+xml" href="/icon.svg" />
-  <link rel="apple-touch-icon" href="/icon.svg" />
   <link rel="stylesheet" href="/styles.css" />
   <title>Pumpensteuerung</title>
 </head>
@@ -20,45 +17,78 @@
     <span class="sicon" id="dotMqtt"    title="MQTT">◈</span>
     <span class="sicon" id="dotRtu"     title="RTU">≡</span>
   </div>
-  <div class="title-block">
-    <div class="status-pill" id="statusPill"><span id="statusText">Lade…</span></div>
-    <div class="title">F025 — Brunnenpumpe</div>
-  </div>
+  <div class="status-pill" id="statusPill"><span id="statusText">Lade…</span></div>
   <div class="topbar-right">
-    <span class="operator">Operator</span>
-    <span class="sep">|</span>
     <span class="clock" id="clock">--:--</span>
-    <button class="icon-btn" id="themeBtn" aria-label="Theme umschalten">◐</button>
   </div>
+  <!-- hidden, kept for JS compat -->
+  <div class="title-block"><div class="title"></div></div>
+  <button class="icon-btn" id="themeBtn" hidden></button>
 </header>
 
 <main class="main">
 
   <section class="hero">
-    <div class="card info-card">
-      <div class="info-row">
-        <div class="info-label">Bezeichnung</div>
-        <div class="info-value" id="vStatusText2">Brunnenpumpe</div>
+    <!-- Left panel: Info + KPIs integrated -->
+    <div class="card panel-left">
+      <button class="nav-arrow left" aria-label="Zurück">‹</button>
+
+      <div class="info-block">
+        <div class="info-row">
+          <div class="info-label">Status</div>
+          <div class="info-value status-line">
+            <span class="status-dot-lg" id="vStatusDot"></span>
+            <span id="vStatusText">–</span>
+          </div>
+        </div>
+        <div class="info-sub" id="vStatusSub">&nbsp;</div>
       </div>
-      <div class="info-row">
-        <div class="info-label">Artikelnummer</div>
-        <div class="info-value">MUGA_259</div>
-      </div>
-      <div class="info-row">
-        <div class="info-label">Aufstellort</div>
-        <div class="info-value">Hauswasserwerk</div>
-      </div>
-      <div class="info-row">
-        <div class="info-label">Status</div>
-        <div class="info-value status-line">
-          <span class="status-dot-lg" id="vStatusDot"></span>
-          <span id="vStatusText">–</span>
+
+      <div class="kpi-grid">
+        <div class="kpi-inline" id="cardPressure">
+          <div class="kpi-label">Druck</div>
+          <div class="kpi-value"><span id="vPressure">–</span><span class="kpi-unit">bar</span></div>
+        </div>
+        <div class="kpi-inline" id="cardFlow">
+          <div class="kpi-label">Durchfluss</div>
+          <div class="kpi-value"><span id="vFlow">–</span><span class="kpi-unit">L/min</span></div>
+          <div class="kpi-sub" id="vFlowSub">&nbsp;</div>
+        </div>
+        <div class="kpi-inline" id="cardFreq">
+          <div class="kpi-label">Frequenz</div>
+          <div class="kpi-value"><span id="vFreq">–</span><span class="kpi-unit">Hz</span></div>
+          <div class="kpi-sub">Soll <span id="vFreqSet">–</span> Hz</div>
+        </div>
+        <div class="kpi-inline" id="cardStatus">
+          <div class="kpi-label">Pumpe</div>
+          <div class="kpi-value status-value"><span class="status-icon" id="vStatusIcon">●</span></div>
+          <div class="kpi-sub" id="vStatusSubMini">&nbsp;</div>
         </div>
       </div>
-      <div class="info-sub" id="vStatusSub">&nbsp;</div>
+
+      <div class="detail-expand">
+        <details>
+          <summary>Details</summary>
+          <div class="detail-grid">
+            <div><span class="dl">Spannung</span><b id="dVoltage">–</b><span class="du">V</span></div>
+            <div><span class="dl">Strom</span><b id="dCurrent">–</b><span class="du">A</span></div>
+            <div><span class="dl">Leistung</span><b id="dPower">–</b><span class="du">kW</span></div>
+            <div><span class="dl">Wassertemp.</span><b id="dWaterTemp">–</b><span class="du">°C</span></div>
+            <div><span class="dl">Umgebung</span><b id="dAirTemp">–</b><span class="du">°C</span></div>
+            <div><span class="dl">Lüfter</span><b id="dFan">–</b><span class="du">RPM</span></div>
+          </div>
+        </details>
+      </div>
+
+      <div class="card-dots">
+        <span class="dot active"></span>
+        <span class="dot"></span>
+      </div>
+      <button class="nav-arrow right" aria-label="Weiter">›</button>
     </div>
 
-    <div class="card chart-card">
+    <!-- Right panel: Chart -->
+    <div class="card panel-right">
       <div class="card-head">
         <span class="card-title">Druckverlauf</span>
         <span class="card-sub">letzte 30 min</span>
@@ -70,66 +100,39 @@
         <span><i class="lg lg-blue"></i> Druck</span>
         <span>Soll <b id="vPressureSet">–</b> bar</span>
       </div>
+      <div class="card-dots">
+        <span class="dot active"></span>
+        <span class="dot"></span>
+      </div>
     </div>
   </section>
 
-  <section class="kpis">
-    <div class="kpi" id="cardPressure">
-      <div class="kpi-label">Druck</div>
-      <div class="kpi-value"><span id="vPressure">–</span><span class="kpi-unit">bar</span></div>
-    </div>
-    <div class="kpi" id="cardFlow">
-      <div class="kpi-label">Durchfluss</div>
-      <div class="kpi-value"><span id="vFlow">–</span><span class="kpi-unit">L/min</span></div>
-      <div class="kpi-sub" id="vFlowSub">&nbsp;</div>
-    </div>
-    <div class="kpi" id="cardFreq">
-      <div class="kpi-label">Frequenz</div>
-      <div class="kpi-value"><span id="vFreq">–</span><span class="kpi-unit">Hz</span></div>
-      <div class="kpi-sub">Soll <span id="vFreqSet">–</span> Hz</div>
-    </div>
-    <div class="kpi" id="cardStatus">
-      <div class="kpi-label">Pumpe</div>
-      <div class="kpi-value status-value">
-        <span class="status-icon" id="vStatusIcon">●</span>
-      </div>
-      <div class="kpi-sub" id="vStatusSubMini">&nbsp;</div>
-    </div>
-  </section>
-
-  <section class="controls">
-    <div class="btn-row">
-      <button class="btn btn-start" id="btnStart">Start</button>
-      <button class="btn btn-stop"  id="btnStop">Stop</button>
-      <button class="btn btn-reset" id="btnReset">Reset</button>
-    </div>
-    <div class="slider-block">
-      <div class="slider-head">
-        <span class="slider-label">Frequenz-Sollwert</span>
-        <span class="slider-value"><span id="freqSliderVal">40.0</span> Hz</span>
-      </div>
-      <input type="range" id="freqSlider" min="35" max="50" step="0.5" value="40" />
-    </div>
-  </section>
-
-  <section class="accordion">
-    <details>
-      <summary>Details</summary>
-      <div class="detail-grid">
-        <div><span class="dl">Spannung</span><b id="dVoltage">–</b><span class="du">V</span></div>
-        <div><span class="dl">Strom</span><b id="dCurrent">–</b><span class="du">A</span></div>
-        <div><span class="dl">Leistung</span><b id="dPower">–</b><span class="du">kW</span></div>
-        <div><span class="dl">Wassertemp.</span><b id="dWaterTemp">–</b><span class="du">°C</span></div>
-        <div><span class="dl">Umgebung</span><b id="dAirTemp">–</b><span class="du">°C</span></div>
-        <div><span class="dl">Lüfter</span><b id="dFan">–</b><span class="du">RPM</span></div>
-      </div>
-    </details>
-    <details>
-      <summary>Einstellungen &amp; Logs</summary>
-      <button class="btn btn-ghost" id="openSettings">Öffnen</button>
-    </details>
-  </section>
 </main>
+
+<!-- Bottom Toolbar: Controls + Navigation -->
+<nav class="bottom-toolbar">
+  <div class="tb-controls">
+    <button class="btn btn-start" id="btnStart">Start</button>
+    <button class="btn btn-stop"  id="btnStop">Stop</button>
+    <button class="btn btn-reset" id="btnReset">Reset</button>
+  </div>
+  <div class="tb-slider">
+    <span class="slider-label">Freq</span>
+    <input type="range" id="freqSlider" min="35" max="50" step="0.5" value="40" />
+    <span class="slider-value"><span id="freqSliderVal">40.0</span> Hz</span>
+  </div>
+  <div class="tb-nav">
+    <button class="toolbar-btn" id="tbFan" title="Lüfter">
+      <span class="tb-icon">⊛</span><span class="tb-text">Lüfter</span>
+    </button>
+    <button class="toolbar-btn" id="tbPresets" title="Presets">
+      <span class="tb-icon">◎</span><span class="tb-text">Presets</span>
+    </button>
+    <button class="toolbar-btn" id="tbSettings" title="Einstellungen">
+      <span class="tb-icon">⚙</span><span class="tb-text">Settings</span>
+    </button>
+  </div>
+</nav>
 
 <!-- Settings Drawer -->
 <div class="drawer" id="drawer" hidden>

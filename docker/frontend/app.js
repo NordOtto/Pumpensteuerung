@@ -260,7 +260,7 @@ function setDot(id, connected) {
 
 function setStatusBadge(state, text) {
   let cls = 'bg-slate-500';
-  if (state === 'running') cls = 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.6)]';
+  if (state === 'running') cls = 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.6)] badge-pulse';
   else if (state === 'fault') cls = 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.6)]';
   else if (state === 'ready') cls = 'bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.4)]';
   else if (state === 'offline') cls = 'bg-slate-500';
@@ -272,16 +272,39 @@ function setStatusBadge(state, text) {
 
 // ─── Main UI update ───
 let lastPiState = {};
+const _prevValues = {};
+
+function animateValue(el, newVal, decimals) {
+  const key = el.id || el;
+  const prev = _prevValues[key];
+  const target = parseFloat(newVal);
+  if (isNaN(target)) { el.textContent = newVal; return; }
+  if (prev === undefined || Math.abs(prev - target) < 0.001) {
+    _prevValues[key] = target;
+    el.textContent = target.toFixed(decimals);
+    return;
+  }
+  _prevValues[key] = target;
+  const start = prev;
+  const duration = 250;
+  const t0 = performance.now();
+  function tick(now) {
+    const p = Math.min((now - t0) / duration, 1);
+    const ease = 1 - Math.pow(1 - p, 3); // easeOutCubic
+    el.textContent = (start + (target - start) * ease).toFixed(decimals);
+    if (p < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
 
 function updateUI(st) {
   // V20 Pump
   if (st.v20) {
-    const freq = (st.v20.frequency || 0).toFixed(1);
-    els.freq.textContent = freq;
+    animateValue(els.freq, st.v20.frequency || 0, 1);
     els.freqSet.textContent = (st.v20.freq_setpoint || 0).toFixed(1);
-    els.voltage.textContent = (st.v20.voltage || 0).toFixed(1);
-    els.current.textContent = (st.v20.current || 0).toFixed(2);
-    els.power.textContent = Math.round((st.v20.power || 0) * 1000);
+    animateValue(els.voltage, st.v20.voltage || 0, 1);
+    animateValue(els.current, st.v20.current || 0, 2);
+    animateValue(els.power, (st.v20.power || 0) * 1000, 0);
     els.dcBus.textContent = (st.v20.dc_bus || 0).toFixed(0);
 
     // Status badge
@@ -302,8 +325,8 @@ function updateUI(st) {
 
   // Sensors (inside pi object from backend)
   if (st.pi) {
-    els.pressure.textContent = (st.pi.pressure || 0).toFixed(2);
-    els.flow.textContent = (st.pi.flow || 0).toFixed(1);
+    animateValue(els.pressure, st.pi.pressure || 0, 2);
+    animateValue(els.flow, st.pi.flow || 0, 1);
     pushChart(st.pi.pressure);
 
     // Water temp KPI card

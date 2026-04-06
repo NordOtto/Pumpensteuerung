@@ -7,3 +7,7 @@
 # Private Credentials (nicht einchecken!)
 src/secrets.h
 .env
+
+# Frontend Build Tools
+docker/frontend/tailwindcss.exe
+docker/frontend/node_modules/

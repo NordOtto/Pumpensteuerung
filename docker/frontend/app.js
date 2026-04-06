@@ -228,6 +228,11 @@ function updateUI(st) {
     els.presetPill.classList.add('hidden');
   }
 
+  // Timeguard live status (only update when drawer closed or tab not focused)
+  if (st.timeguard) {
+    updateTgStatus(st.timeguard);
+  }
+
   // PI controller form (only update when drawer is closed)
   if (st.pi && $('drawer').classList.contains('hidden')) {
     lastPiState = st.pi;
@@ -339,11 +344,12 @@ window.showTab = (tab) => {
     content.classList.remove('translate-y-full');
   }, 10);
 
-  ['tabSettings', 'tabPresets', 'tabLogs'].forEach(t => $(t).classList.add('hidden'));
+  ['tabSettings', 'tabPresets', 'tabTimeguard', 'tabLogs'].forEach(t => $(t).classList.add('hidden'));
 
   let title = 'Einstellungen';
   if (tab === 'settings') { $('tabSettings').classList.remove('hidden'); title = 'Einstellungen'; }
   if (tab === 'presets') { $('tabPresets').classList.remove('hidden'); title = 'Presets Manager'; loadPresets(); }
+  if (tab === 'timeguard') { $('tabTimeguard').classList.remove('hidden'); title = 'Zeitsperre'; loadTimeguard(); }
   if (tab === 'logs') { $('tabLogs').classList.remove('hidden'); title = 'System Logs'; }
 
   $('drawerTitle').textContent = title;
@@ -361,7 +367,9 @@ $('closeDrawer').onclick = () => {
 async function loadPresets() {
   try {
     const res = await fetch('/api/presets');
-    const presets = await res.json();
+    const data = await res.json();
+    const activePreset = data.active || '';
+    const presets = data.presets || data;
     const lst = $('presetList');
     lst.innerHTML = '';
     if (!presets.length) {
@@ -369,24 +377,29 @@ async function loadPresets() {
       return;
     }
     presets.forEach(p => {
+      const isActive = p.name === activePreset;
+      const safeName = p.name.replace(/'/g, "\\'");
       lst.innerHTML += `
-      <div class="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/30 border border-slate-200 dark:border-slate-600/50 rounded-xl">
+      <div class="flex items-center justify-between p-4 ${isActive ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-600/50' : 'bg-slate-50 dark:bg-slate-700/30 border-slate-200 dark:border-slate-600/50'} border rounded-xl">
         <div>
-          <div class="font-bold text-slate-800 dark:text-white">${p.name}</div>
-          <div class="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-widest font-bold">
-            ${p.mode == 1 ? 'Flow' : 'Pressure'} | Soll: ${p.setpoint}
+          <div class="font-bold text-slate-800 dark:text-white flex items-center gap-2">
+            ${p.name}
+            ${isActive ? '<span class="text-[9px] bg-blue-500 text-white px-2 py-0.5 rounded-full font-bold uppercase">Aktiv</span>' : ''}
+          </div>
+          <div class="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-widest font-bold mt-0.5">
+            ${p.mode == 1 ? 'Flow' : 'Druck'} | Soll: ${p.setpoint} | Kp: ${p.kp} Ki: ${p.ki} | ${p.freq_min}–${p.freq_max} Hz
           </div>
         </div>
-        <div class="flex gap-2">
-          <button onclick="applyP('${p.name}')" class="px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/40 rounded-lg font-bold text-xs">Aktivieren</button>
-          <button onclick="delP('${p.name}')" class="px-2.5 py-1.5 bg-rose-50 dark:bg-rose-900/20 text-rose-500 hover:bg-rose-100 dark:hover:bg-rose-800/30 rounded-lg font-bold">
+        <div class="flex gap-2 shrink-0 ml-3">
+          <button onclick="applyP('${safeName}')" class="px-3 py-1.5 ${isActive ? 'bg-blue-500 text-white' : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/40'} rounded-lg font-bold text-xs">${isActive ? 'Aktiv' : 'Aktivieren'}</button>
+          <button onclick="delP('${safeName}')" class="px-2.5 py-1.5 bg-rose-50 dark:bg-rose-900/20 text-rose-500 hover:bg-rose-100 dark:hover:bg-rose-800/30 rounded-lg font-bold">
             <span class="material-symbols-outlined text-base">delete</span>
           </button>
         </div>
       </div>`;
     });
   } catch (err) {
-    log('Presets laden fehlgeschlagen');
+    log('Presets laden fehlgeschlagen: ' + err);
   }
 }
 
@@ -463,6 +476,63 @@ $('saveFan').onclick = async () => {
 $('fanPwm').addEventListener('input', (e) => {
   $('fanPwmVal').textContent = Math.round(e.target.value / 255 * 100) + '%';
 });
+
+// ─── Timeguard ───
+async function loadTimeguard() {
+  try {
+    const res = await fetch('/api/timeguard');
+    const tg = await res.json();
+    $('tgEnabled').checked = tg.enabled;
+    $('tgStartH').value = tg.start_hour;
+    $('tgStartM').value = tg.start_min;
+    $('tgEndH').value = tg.end_hour;
+    $('tgEndM').value = tg.end_min;
+    if (tg.days) {
+      tg.days.forEach((d, i) => { $('tgDay' + i).checked = d; });
+    }
+    updateTgStatus(tg);
+  } catch (err) {
+    log('Timeguard laden fehlgeschlagen: ' + err);
+  }
+}
+
+function updateTgStatus(tg) {
+  const dot = $('tgStatusDot');
+  const txt = $('tgStatusText');
+  const time = $('tgTime');
+  if (!dot) return;
+  if (tg.time) time.textContent = tg.time;
+  if (!tg.enabled) {
+    dot.className = 'w-3 h-3 rounded-full bg-slate-400 transition-all';
+    txt.textContent = 'Deaktiviert';
+    txt.className = 'text-sm font-bold text-slate-400';
+  } else if (tg.allowed) {
+    dot.className = 'w-3 h-3 rounded-full dot-ok transition-all';
+    txt.textContent = 'Betrieb erlaubt';
+    txt.className = 'text-sm font-bold text-green-600 dark:text-green-400';
+  } else {
+    dot.className = 'w-3 h-3 rounded-full dot-err transition-all';
+    txt.textContent = 'Gesperrt';
+    txt.className = 'text-sm font-bold text-red-500';
+  }
+}
+
+$('saveTG').onclick = async () => {
+  const days = [];
+  for (let i = 0; i < 7; i++) days.push($('tgDay' + i).checked);
+  const body = {
+    enabled: $('tgEnabled').checked,
+    start_hour: parseInt($('tgStartH').value) || 0,
+    start_min: parseInt($('tgStartM').value) || 0,
+    end_hour: parseInt($('tgEndH').value) || 0,
+    end_min: parseInt($('tgEndM').value) || 0,
+    days
+  };
+  const res = await fetch('/api/timeguard', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const d = await res.json();
+  if (d.ok) $toast.show('Zeitsperre gespeichert');
+  else $toast.show(d.error || 'Fehler', 'error');
+};
 
 // ─── Start ───
 connectWS();

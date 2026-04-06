@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @layer base {
   .material-symbols-outlined {
     font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
@@ -91,6 +93,18 @@
   }
   .preset-input {
     @apply w-full bg-slate-700/50 text-white rounded-xl px-4 py-3 border border-slate-600 outline-none focus:border-emerald-500 font-semibold placeholder:text-slate-500;
+  }
+
+  /* ── Timeguard Day Button ── */
+  .tg-day-btn {
+    @apply cursor-pointer;
+  }
+  .tg-day-label {
+    @apply text-center py-2.5 px-1 rounded-xl text-xs font-bold uppercase border transition-all select-none
+      bg-slate-100 dark:bg-slate-700/30 text-slate-400 border-slate-200 dark:border-slate-600/50;
+  }
+  .peer:checked ~ .tg-day-label {
+    @apply bg-amber-500 text-white border-amber-400 shadow-md;
   }
 
   /* ── Mobile Nav Button ── */

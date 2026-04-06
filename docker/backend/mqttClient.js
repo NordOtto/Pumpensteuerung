@@ -88,35 +88,38 @@ function publishHA() {
   const pub = (suffix, val, retain = false) =>
     client.publish(BASE + '/' + suffix, String(val), { retain });
 
+  const f = (v, d = 1) => (v == null || Number.isNaN(v) ? null : Number(v).toFixed(d));
+  const safe = (v, fn) => (v == null ? null : fn(v));
+
   // V20
-  pub('v20/frequency',      state.v20.frequency.toFixed(2));
-  pub('v20/current',        state.v20.current.toFixed(2));
-  pub('v20/voltage',        state.v20.voltage.toFixed(1));
-  pub('v20/power',          Math.round(state.v20.power));
+  if (f(state.v20.frequency, 2) != null) pub('v20/frequency', f(state.v20.frequency, 2));
+  if (f(state.v20.current, 2)   != null) pub('v20/current',   f(state.v20.current, 2));
+  if (f(state.v20.voltage, 1)   != null) pub('v20/voltage',   f(state.v20.voltage, 1));
+  if (state.v20.power != null)           pub('v20/power',     Math.round(state.v20.power));
   pub('v20/fault',          state.v20.fault ? 'ON' : 'OFF');
-  pub('v20/fault_code',     state.v20.fault_code);
+  pub('v20/fault_code',     state.v20.fault_code ?? 0);
   pub('v20/connected',      state.v20.connected ? 'ON' : 'OFF');
-  pub('v20/status',         state.v20.status);
+  pub('v20/status',         state.v20.status ?? '');
   pub('v20/running/state',  state.v20.running ? 'ON' : 'OFF');
-  pub('v20/freq_set/state', state.v20.freq_setpoint.toFixed(1));
+  if (f(state.v20.freq_setpoint, 1) != null) pub('v20/freq_set/state', f(state.v20.freq_setpoint, 1));
 
   // Sensoren
-  pub('pressure/state',      state.pressure_bar.toFixed(2),  true);
-  pub('pressure/setpoint/state', state.pi.setpoint.toFixed(2), true);
-  pub('flow/state',          state.flow_rate.toFixed(1));
-  if (state.water_temp !== null) pub('water_temp', state.water_temp.toFixed(1));
-  if (state.temperature !== null) pub('temperature', state.temperature.toFixed(1));
+  if (f(state.pressure_bar, 2) != null) pub('pressure/state',          f(state.pressure_bar, 2), true);
+  if (f(state.pi.setpoint, 2)  != null) pub('pressure/setpoint/state', f(state.pi.setpoint, 2),  true);
+  if (f(state.flow_rate, 1)    != null) pub('flow/state',              f(state.flow_rate, 1));
+  if (state.water_temp !== null && state.water_temp != null)  pub('water_temp', f(state.water_temp, 1));
+  if (state.temperature !== null && state.temperature != null) pub('temperature', f(state.temperature, 1));
 
   // Lüfter
-  pub('fan/rpm',        state.fan.rpm);
-  pub('fan/pwm/state',  state.fan.pwm);
-  pub('fan/mode/state', state.fan.mode);
+  pub('fan/rpm',        state.fan?.rpm ?? 0);
+  pub('fan/pwm/state',  state.fan?.pwm ?? 0);
+  pub('fan/mode/state', state.fan?.mode ?? 'Auto');
 
   // PI
   pub('pi/enabled/state',    state.pi.enabled  ? 'ON' : 'OFF', true);
   pub('pi/active/state',     state.pi.active   ? 'AKTIV' : 'INAKTIV', true);
-  pub('pi/freq_min/state',   state.pi.freq_min.toFixed(1), true);
-  pub('pi/freq_max/state',   state.pi.freq_max.toFixed(1), true);
+  if (f(state.pi.freq_min, 1) != null) pub('pi/freq_min/state', f(state.pi.freq_min, 1), true);
+  if (f(state.pi.freq_max, 1) != null) pub('pi/freq_max/state', f(state.pi.freq_max, 1), true);
   pub('dryrun/locked',       state.pi.dry_run_locked ? 'ON' : 'OFF', true);
 
   // Zeitsperre

@@ -16,7 +16,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
   <script src="/vendor/chart.js"></script>
 </head>
-<body class="bg-sky-50 dark:bg-[#0f1417] text-slate-800 dark:text-slate-100 min-h-screen flex items-center justify-center px-[max(0.5rem,env(safe-area-inset-left))] pr-[max(0.5rem,env(safe-area-inset-right))] pt-[max(0.5rem,env(safe-area-inset-top))] pb-[max(0.5rem,env(safe-area-inset-bottom))] lg:p-8 antialiased transition-colors duration-300 font-[Space_Grotesk]">
+<body class="bg-sky-50 dark:bg-[#0f1417] text-slate-800 dark:text-slate-100 min-h-screen flex items-center justify-center px-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] pt-[max(0.5rem,env(safe-area-inset-top))] pb-[max(0.5rem,env(safe-area-inset-bottom))] lg:p-8 antialiased transition-colors duration-300 font-[Space_Grotesk]">
 
   <!-- Login Overlay -->
   <div id="loginOverlay" class="fixed inset-0 z-[200] bg-sky-50 dark:bg-[#0f1417] flex items-center justify-center p-4 transition-opacity duration-300">
@@ -123,18 +123,15 @@
           <div class="absolute inset-0 opacity-40 mix-blend-overlay pointer-events-none" style="background:radial-gradient(circle at 50% 120%,rgba(255,255,255,0.8) 0%,transparent 60%)"></div>
 
           <!-- Status Pills top-left -->
-          <div class="absolute top-3 sm:top-4 left-3 sm:left-4 flex flex-wrap gap-1.5">
-            <div id="statusBadge" class="bg-slate-500 text-white text-[10px] sm:text-xs font-bold px-2.5 sm:px-3 py-1 rounded-full flex items-center gap-1.5 shadow-md transition-all">
+          <div class="absolute top-2 sm:top-4 left-2 sm:left-4 right-2 sm:right-4 flex flex-wrap gap-1 sm:gap-1.5 items-start">
+            <div id="statusBadge" class="bg-slate-500 text-white text-[10px] sm:text-xs font-bold px-2 sm:px-3 py-1 rounded-full flex items-center gap-1 sm:gap-1.5 shadow-md transition-all">
               <span class="w-2 h-2 bg-white rounded-full" id="statusBadgeDot"></span>
               <span id="statusBadgeText">Lade...</span>
             </div>
-            <div id="pillTimeguard" class="hidden text-[10px] sm:text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1 shadow-md"></div>
-            <div id="pillPI" class="hidden text-[10px] sm:text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1 shadow-md"></div>
-          </div>
-
-          <!-- Active Preset top-right -->
-          <div class="absolute top-3 sm:top-4 right-3 sm:right-4 flex gap-1.5 text-xs font-medium">
-            <div id="activePresetPill" class="px-3 py-1 bg-blue-900/40 text-blue-200 rounded-full border border-blue-400/30 hidden"></div>
+            <div id="pillTimeguard" class="hidden text-[10px] sm:text-xs font-bold px-2 sm:px-2.5 py-1 rounded-full flex items-center gap-1 shadow-md"></div>
+            <div id="pillPI" class="hidden text-[10px] sm:text-xs font-bold px-2 sm:px-2.5 py-1 rounded-full flex items-center gap-1 shadow-md"></div>
+            <div class="flex-1"></div>
+            <div id="activePresetPill" class="px-2 sm:px-3 py-1 bg-blue-900/40 text-blue-200 text-[10px] sm:text-xs font-medium rounded-full border border-blue-400/30 hidden"></div>
           </div>
 
           <!-- Frequency Display -->

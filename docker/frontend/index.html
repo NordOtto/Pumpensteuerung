@@ -1,1531 +1,184 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="de" data-theme="light">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#0d1117">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Pumpe">
-<link rel="manifest" href="/manifest.json">
-<script>document.documentElement.setAttribute('data-theme',localStorage.getItem('theme')||'dark');</script>
-<link rel="icon" href="/icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="/icon.svg">
-<title>Pumpensteuerung</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
-<style>
-*{box-sizing:border-box}
-:root{
-  --accent:#00b4ff;--accent2:#0ea5e9;
-  --ok:#22c55e;--warn:#f59e0b;--danger:#ef4444;--info:#3b82f6;
-  --card-bg:#161b22;--card-border:#30363d;
-  --surface:#1c2128;--surface2:#21262d;
-  --hmi-bg:#0d1117;--hmi-panel:#161b22;--hmi-panel-border:#30363d;
-  --hmi-bar:#0d1117;--hmi-text-dim:#8b949e;
-  --pipe-run:#38bdf8;--pipe-idle:#2d3748;
-}
-
-/* ── Base ── */
-body{font-family:system-ui,-apple-system,sans-serif;background:var(--hmi-bg);color:#e2e8f0;margin:0}
-
-/* ── HMI Layout (grid with auto banner row) ── */
-.hmi-layout{display:grid;grid-template-rows:48px auto 1fr 48px;height:100vh;overflow:hidden}
-
-/* Stack all pages in the same grid row */
-#page-overview,#page-settings,#page-log{grid-row:3;grid-column:1}
-.hmi-bottomnav{grid-row:4;grid-column:1}
-
-/* ── Top Bar ── */
-.hmi-topbar{display:flex;align-items:center;gap:.75rem;padding:0 .75rem;background:var(--hmi-bar);border-bottom:1px solid var(--hmi-panel-border);overflow:hidden}
-.hmi-mode-badge{font-size:.65rem;font-weight:700;letter-spacing:.08em;padding:.2rem .55rem;border-radius:2px;border:1px solid;white-space:nowrap;flex-shrink:0}
-.hmi-mode-run{background:rgba(63,185,80,.15);border-color:#3fb950;color:#3fb950}
-.hmi-mode-stop{background:rgba(139,148,158,.1);border-color:#8b949e;color:#8b949e}
-.hmi-mode-fault{background:rgba(248,81,73,.15);border-color:#f85149;color:#f85149}
-.hmi-badge{font-size:.62rem;font-weight:600;padding:.15rem .45rem;border-radius:2px;border:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:.3rem;white-space:nowrap;flex-shrink:0}
-.hmi-title{font-size:.8rem;font-weight:700;white-space:nowrap}
-.hmi-clock{font-size:.75rem;font-family:monospace;color:var(--hmi-text-dim);white-space:nowrap}
-
-/* ── 3-Column Overview ── */
-.hmi-overview{display:grid;grid-template-columns:30% 1fr 260px;height:100%;overflow:hidden;min-width:1024px}
-.hmi-panel{background:var(--hmi-panel);border-right:1px solid var(--hmi-panel-border);display:flex;flex-direction:column;overflow:hidden;min-height:0}
-.hmi-panel:last-child{border-right:none}
-.hmi-panel-title{font-size:.58rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--hmi-text-dim);padding:.4rem .6rem;border-bottom:1px solid var(--hmi-panel-border);flex-shrink:0}
-
-/* ── KPI Right Column ── */
-.kpi-section{padding:.55rem .65rem;border-bottom:1px solid var(--hmi-panel-border)}
-.kpi-section-title{font-size:.55rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--hmi-text-dim);margin-bottom:.4rem}
-.kpi-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.18rem}
-.kpi-big{font-size:1.7rem;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
-.kpi-med{font-size:.95rem;font-weight:700;font-variant-numeric:tabular-nums}
-.kpi-sml{font-size:.75rem;font-weight:600;font-variant-numeric:tabular-nums}
-.kpi-lbl{font-size:.6rem;color:var(--hmi-text-dim)}
-.kpi-unit{font-size:.58rem;color:var(--hmi-text-dim);margin-left:.15rem}
-.status-badge{font-size:.62rem;font-weight:700;padding:.18rem .45rem;border-radius:2px;letter-spacing:.05em;display:inline-block}
-.status-run{background:rgba(63,185,80,.2);color:#3fb950}
-.status-stop{background:rgba(139,148,158,.1);color:#8b949e}
-.status-fault{background:rgba(248,81,73,.2);color:#f85149}
-.status-warn{background:rgba(245,158,11,.2);color:#f59e0b}
-
-/* ── Bottom Nav ── */
-.hmi-bottomnav{display:flex;background:var(--hmi-bar);border-top:1px solid var(--hmi-panel-border)}
-.nav-tab{flex:1;display:flex;align-items:center;justify-content:center;gap:.35rem;font-size:.68rem;font-weight:600;letter-spacing:.04em;cursor:pointer;border:none;background:none;color:var(--hmi-text-dim);transition:color .15s,background .15s;border-top:2px solid transparent;text-transform:uppercase}
-.nav-tab.active{color:var(--accent2);border-top-color:var(--accent2);background:rgba(14,165,233,.06)}
-
-/* ── Pages ── */
-#page-overview{display:grid;min-height:0;overflow:hidden}
-#page-settings{display:none;min-height:0;overflow:auto;background:var(--hmi-bg)}
-#page-log{display:none;min-height:0;overflow-y:auto;background:var(--hmi-bg);padding:1rem}
-
-/* ── Settings Layout: Sidebar + Content ── */
-.settings-layout{display:grid;grid-template-columns:200px 1fr;height:100%;overflow:hidden}
-.settings-sidebar{background:var(--hmi-panel);border-right:1px solid var(--hmi-panel-border);display:flex;flex-direction:column;overflow-y:auto}
-.settings-sidebar-title{font-size:.55rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--hmi-text-dim);padding:.6rem .75rem;border-bottom:1px solid var(--hmi-panel-border)}
-.settings-nav-item{display:flex;align-items:center;gap:.5rem;padding:.55rem .75rem;font-size:.72rem;font-weight:600;cursor:pointer;border:none;background:none;color:#8b949e;text-align:left;width:100%;transition:background .12s,color .12s;border-left:2px solid transparent}
-.settings-nav-item:hover{background:rgba(255,255,255,.03);color:#c9d1d9}
-.settings-nav-item.active{background:rgba(14,165,233,.06);color:var(--accent2);border-left-color:var(--accent2)}
-.settings-content{overflow-y:auto;padding:1.25rem;display:flex;flex-direction:column}
-.settings-panel{display:none;max-width:540px}
-.settings-panel.active{display:block}
-.settings-panel-title{font-size:.75rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#c9d1d9;margin-bottom:1rem;display:flex;align-items:center;gap:.5rem;padding-bottom:.6rem;border-bottom:1px solid var(--hmi-panel-border)}
-
-/* ── Schematic Panel ── */
-#panel-schematic{flex:1;overflow:hidden;display:flex;flex-direction:column}
-#pump-svg{flex:1;width:100%;height:100%;overflow:visible}
-.sch-ctrl{display:flex;flex-direction:column;gap:.4rem;padding:.5rem;border-top:1px solid var(--hmi-panel-border);flex-shrink:0}
-.sch-ctrl-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.35rem}
-.sch-label{font-family:system-ui,sans-serif;fill:#8b949e}
-.sch-val{font-family:system-ui,sans-serif;font-weight:700}
-@keyframes flow-dash{to{stroke-dashoffset:-20}}
-.pipe-flow{stroke-dasharray:6 4;animation:flow-dash .6s linear infinite}
-
-/* ── Chart Panel ── */
-#panel-chart{flex:1;display:flex;flex-direction:column;overflow:hidden}
-.chart-legend{display:flex;align-items:center;gap:.5rem;padding:.35rem .6rem;border-bottom:1px solid var(--hmi-panel-border);flex-shrink:0;flex-wrap:wrap}
-.chart-legend-badge{font-size:.62rem;font-weight:600;padding:.12rem .4rem;border-radius:2px;font-variant-numeric:tabular-nums}
-#chart-svg{flex:1;width:100%;display:block;overflow:visible}
-
-/* ── Dot ── */
-.dot{width:10px;height:10px;border-radius:2px;display:inline-block;flex-shrink:0}
-.dot-green{background:#3fb950}.dot-red{background:#f85149}
-.dot-yellow{background:#d29922}.dot-gray{background:#475569}
-@keyframes pulse-green{0%,100%{box-shadow:0 0 0 0 rgba(63,185,80,.4)}50%{box-shadow:0 0 0 4px rgba(63,185,80,0)}}
-.dot-pulse{animation:pulse-green 1.8s infinite}
-
-/* ── Buttons ── */
-.btn-start{background:#1a7f37;border-radius:3px;padding:.4rem 0;font-weight:600;font-size:.7rem;transition:background .15s;display:flex;align-items:center;justify-content:center;gap:.3rem;border:none;color:#fff;cursor:pointer;text-transform:uppercase;letter-spacing:.04em}
-.btn-start:hover{background:#116329}
-.btn-stop{background:#b91c1c;border-radius:3px;padding:.4rem 0;font-weight:600;font-size:.7rem;transition:background .15s;display:flex;align-items:center;justify-content:center;gap:.3rem;border:none;color:#fff;cursor:pointer;text-transform:uppercase;letter-spacing:.04em}
-.btn-stop:hover{background:#991b1b}
-.btn-reset{background:#92400e;border-radius:3px;padding:.4rem 0;font-weight:600;font-size:.7rem;transition:background .15s;display:flex;align-items:center;justify-content:center;gap:.3rem;border:none;color:#fff;cursor:pointer;text-transform:uppercase;letter-spacing:.04em}
-.btn-reset:hover{background:#78350f}
-.btn-save{width:100%;border-radius:3px;padding:.45rem 0;font-weight:600;font-size:.72rem;transition:background .15s,opacity .15s;border:none;cursor:pointer;text-transform:uppercase;letter-spacing:.04em}
-.btn-save:disabled{opacity:.4;cursor:not-allowed}
-.btn-vacation{width:100%;border-radius:3px;padding:.45rem 0;font-weight:600;font-size:.7rem;display:flex;align-items:center;justify-content:center;gap:.35rem;border:none;cursor:pointer;text-transform:uppercase;letter-spacing:.04em;transition:background .15s}
-
-/* ── Toggle ── */
-.toggle-wrap{position:relative;display:inline-flex;align-items:center;cursor:pointer}
-.toggle-wrap input{position:absolute;opacity:0;width:0;height:0}
-.toggle-track{width:38px;height:22px;border-radius:11px;background:#334155;transition:background .2s;display:block}
-.toggle-thumb{position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .2s;pointer-events:none}
-.toggle-wrap input:checked~.toggle-track{background:var(--accent2)}
-.toggle-wrap input:checked~.toggle-thumb{transform:translateX(16px)}
-
-/* ── Segmented Control ── */
-.seg-ctrl{display:flex;background:var(--surface);border:1px solid var(--card-border);border-radius:3px;padding:2px;gap:2px}
-.seg-btn{flex:1;padding:.3rem .2rem;border-radius:2px;font-size:.67rem;font-weight:600;text-align:center;cursor:pointer;transition:background .15s,color .15s;background:transparent;color:#64748b;border:none}
-.seg-btn.active{background:var(--accent2);color:#fff}
-
-/* ── Day Pills ── */
-.day-pill{flex:1;padding:.35rem .2rem;border-radius:3px;font-size:.67rem;font-weight:600;text-align:center;cursor:pointer;transition:background .15s,color .15s;border:none;background:var(--surface);color:#64748b}
-.day-pill.active{background:#d97706;color:#fff}
-
-/* ── Chip ── */
-.chip{padding:.25rem .6rem;border-radius:3px;font-size:.67rem;font-weight:600;background:var(--surface2);border:1px solid var(--card-border);color:#94a3b8;cursor:pointer;transition:background .15s,color .15s;white-space:nowrap}
-.chip:hover{background:rgba(14,165,233,.2);color:var(--accent)}
-
-/* ── Inputs ── */
-input[type=range]{accent-color:#3b82f6;width:100%}
-input[type=number],input[type=text],input[type=time],select{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:3px;padding:.35rem .55rem;font-size:.75rem;color:#e2e8f0;outline:none;width:100%}
-input[type=number]:focus,input[type=text]:focus,input[type=time]:focus,select:focus{border-color:var(--accent2);box-shadow:0 0 0 2px rgba(14,165,233,.2)}
-select option{background:#1e293b}
-
-/* ── Toast ── */
-#toast-container{position:fixed;bottom:1.25rem;right:1.25rem;z-index:9999;display:flex;flex-direction:column;gap:.5rem;pointer-events:none}
-.toast{background:#1e293b;border:1px solid rgba(255,255,255,.1);border-radius:4px;padding:.55rem .9rem;font-size:.78rem;color:#e2e8f0;box-shadow:0 4px 20px rgba(0,0,0,.5);pointer-events:auto;animation:toast-in .25s ease}
-.toast.success{border-left:3px solid #22c55e}
-.toast.error{border-left:3px solid #ef4444}
-.toast.info{border-left:3px solid #3b82f6}
-@keyframes toast-in{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
-
-/* ── Vacation Banner ── */
-.vacation-banner{background:#78350f;border-bottom:2px solid #d97706;color:#fef3c7;position:relative;z-index:49;flex-shrink:0}
-.vacation-banner-inner{display:flex;align-items:center;justify-content:space-between;padding:.35rem .75rem;gap:.5rem;flex-wrap:wrap}
-.vacation-banner-inner button{flex-shrink:0}
-
-/* ── Dry-run alert ── */
-.dryrun-alert{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.28);border-radius:3px;padding:.4rem .6rem;font-size:.72rem;color:#fca5a5;display:flex;align-items:center;justify-content:space-between;gap:.5rem}
-
-/* ── Log box ── */
-#logBox{font-family:monospace;font-size:.75rem;background:#010409;color:#3fb950;border:1px solid #21262d;border-radius:3px;padding:.65rem;height:100%;overflow-y:auto;white-space:pre-wrap}
-
-/* ── Chevron ── */
-.chev{transition:transform .25s}
-.chev.collapsed{transform:rotate(-90deg)}
-
-/* ── Light Theme ── */
-html[data-theme="light"]{
-  --hmi-bg:#f0f4f8;--hmi-panel:#fff;--hmi-panel-border:#d0d7de;--hmi-bar:#eaeef2;
-  --surface:rgba(0,0,0,.04);--surface2:rgba(0,0,0,.06);--card-border:rgba(0,0,0,.08);
-  --card-bg:#fff;--hmi-text-dim:#57606a;--pipe-idle:#94a3b8;
-}
-html[data-theme="light"] body{color:#1f2328}
-html[data-theme="light"] input[type=number],html[data-theme="light"] input[type=text],html[data-theme="light"] input[type=time],html[data-theme="light"] select{background:#fff;border-color:#d0d7de;color:#1f2328}
-html[data-theme="light"] .toggle-track{background:#d0d7de}
-html[data-theme="light"] .seg-ctrl{background:#eaeef2}
-html[data-theme="light"] #logBox{background:#fff;color:#1a7f37}
-html[data-theme="light"] .vacation-banner{background:#92400e!important}
-
-/* ── Responsive: Mobile ── */
-@media(max-width:768px){
-  .hmi-topbar{gap:.4rem;padding:0 .5rem}
-  .hmi-topbar .hmi-badge{display:none}
-  .hmi-title{font-size:.7rem}
-  .hmi-overview{grid-template-columns:1fr!important;min-width:0!important;overflow-y:auto}
-  .hmi-overview .hmi-panel{min-height:auto;border-right:none;border-bottom:1px solid var(--hmi-panel-border)}
-  .hmi-overview .hmi-panel:last-child{border-bottom:none}
-  .settings-layout{grid-template-columns:1fr!important}
-  .settings-sidebar{max-height:none;border-right:none;border-bottom:1px solid var(--hmi-panel-border)}
-  .nav-tab{font-size:.55rem;gap:.2rem;padding:0 .15rem}
-  .nav-tab svg{width:14px;height:14px}
-}
-@media(max-width:480px){
-  .hmi-topbar{padding:0 .35rem}
-  .hmi-title{display:none}
-  .hmi-clock{font-size:.65rem}
-  .nav-tab span{display:none}
-  .nav-tab svg{width:16px;height:16px}
-}
-</style>
-<script>tailwind.config={darkMode:'class',theme:{extend:{}}}</script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#ffffff" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Pumpe" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+  <link rel="apple-touch-icon" href="/icon.svg" />
+  <link rel="stylesheet" href="/styles.css" />
+  <title>Pumpensteuerung</title>
 </head>
 <body>
-<div class="hmi-layout">
 
-<!-- ========== ROW 1: TOP BAR ========== -->
-<div class="hmi-topbar">
-  <span id="hmi-mode-badge" class="hmi-mode-badge hmi-mode-stop">OFFLINE ■</span>
-  <img src="/icon.svg" class="w-5 h-5 rounded flex-shrink-0" alt="">
-  <span class="hmi-title">Pumpensteuerung</span>
-  <span id="hdrIP" class="hmi-badge" style="color:var(--hmi-text-dim)">–</span>
-  <div class="flex items-center gap-1.5 ml-1">
-    <span class="hmi-badge"><span id="rtuDot" class="dot dot-gray"></span><span id="rtuSt" style="color:var(--hmi-text-dim)">RTU</span></span>
-    <span class="hmi-badge"><span id="mqttDot" class="dot dot-gray"></span><span id="mqttSt" style="color:var(--hmi-text-dim)">MQTT</span></span>
-    <span class="hmi-badge"><span id="wsDot" class="dot dot-gray"></span><span style="color:var(--hmi-text-dim)">WS</span></span>
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-name">Pumpe</span>
+    <div class="conn">
+      <span class="conn-item"><span class="dot" id="dotBackend"></span>Backend</span>
+      <span class="conn-item"><span class="dot" id="dotMqtt"></span>MQTT</span>
+      <span class="conn-item"><span class="dot" id="dotRtu"></span>RTU</span>
+    </div>
   </div>
-  <span id="tgClock" class="hmi-clock ml-auto">--:--</span>
-  <button onclick="toggleTheme()" id="themeToggle" class="p-1.5 rounded ml-2 flex-shrink-0" style="background:var(--surface);border:none;cursor:pointer;color:inherit" title="Theme">
-    <svg id="themeIconMoon" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/></svg>
-    <svg id="themeIconSun" class="w-4 h-4 hidden" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"/></svg>
-  </button>
+  <div class="status-pill" id="statusPill">
+    <span id="statusText">Lade…</span>
+  </div>
+  <div class="header-right">
+    <span class="clock" id="clock">--:--</span>
+    <button class="icon-btn" id="themeBtn" aria-label="Theme umschalten">◐</button>
+  </div>
+</header>
+
+<main class="main">
+
+  <section class="kpis">
+    <div class="card" id="cardPressure">
+      <div class="label">Druck</div>
+      <div class="value"><span id="vPressure">–</span><span class="unit">bar</span></div>
+      <div class="sub">Soll <span id="vPressureSet">–</span> bar</div>
+    </div>
+
+    <div class="card" id="cardFlow">
+      <div class="label">Durchfluss</div>
+      <div class="value"><span id="vFlow">–</span><span class="unit">L/min</span></div>
+      <div class="sub" id="vFlowSub">&nbsp;</div>
+    </div>
+
+    <div class="card" id="cardFreq">
+      <div class="label">Frequenz</div>
+      <div class="value"><span id="vFreq">–</span><span class="unit">Hz</span></div>
+      <div class="sub">Soll <span id="vFreqSet">–</span> Hz</div>
+    </div>
+
+    <div class="card" id="cardStatus">
+      <div class="label">Pumpenstatus</div>
+      <div class="value status-value">
+        <span class="status-icon" id="vStatusIcon">●</span>
+        <span id="vStatusText">–</span>
+      </div>
+      <div class="sub" id="vStatusSub">&nbsp;</div>
+    </div>
+  </section>
+
+  <section class="controls">
+    <div class="btn-row">
+      <button class="btn btn-start" id="btnStart">Start</button>
+      <button class="btn btn-stop" id="btnStop">Stop</button>
+      <button class="btn btn-reset" id="btnReset">Reset</button>
+    </div>
+    <div class="slider-block">
+      <div class="slider-head">
+        <span class="label">Frequenz-Sollwert</span>
+        <span class="slider-value"><span id="freqSliderVal">40.0</span> Hz</span>
+      </div>
+      <input type="range" id="freqSlider" min="35" max="50" step="0.5" value="40" />
+    </div>
+  </section>
+
+  <section class="accordion">
+    <details>
+      <summary>Details</summary>
+      <div class="detail-grid">
+        <div><span class="label">Spannung</span><b id="dVoltage">–</b> V</div>
+        <div><span class="label">Strom</span><b id="dCurrent">–</b> A</div>
+        <div><span class="label">Leistung</span><b id="dPower">–</b> kW</div>
+        <div><span class="label">Wassertemp.</span><b id="dWaterTemp">–</b> °C</div>
+        <div><span class="label">Umgebung</span><b id="dAirTemp">–</b> °C</div>
+        <div><span class="label">Lüfter</span><b id="dFan">–</b> RPM</div>
+      </div>
+    </details>
+
+    <details>
+      <summary>Verlauf (30 min) – Druck</summary>
+      <div class="chart-wrap">
+        <svg id="chart" viewBox="0 0 600 200" preserveAspectRatio="none"></svg>
+      </div>
+    </details>
+
+    <details>
+      <summary>Einstellungen &amp; Logs</summary>
+      <button class="btn btn-ghost" id="openSettings">Öffnen</button>
+    </details>
+  </section>
+</main>
+
+<!-- Settings Drawer -->
+<div class="drawer" id="drawer" hidden>
+  <div class="drawer-head">
+    <button class="icon-btn" id="closeDrawer" aria-label="Schließen">✕</button>
+    <div class="drawer-tabs" id="drawerTabs">
+      <button class="tab active" data-tab="pi">PI-Regelung</button>
+      <button class="tab" data-tab="tg">Zeitsperre</button>
+      <button class="tab" data-tab="fan">Lüfter</button>
+      <button class="tab" data-tab="presets">Presets</button>
+      <button class="tab" data-tab="vac">Urlaub</button>
+      <button class="tab" data-tab="log">Logs</button>
+    </div>
+  </div>
+  <div class="drawer-body">
+
+    <div class="tab-pane active" data-pane="pi">
+      <h3>PI-Druckregelung</h3>
+      <label class="row"><span>Aktiv</span><input type="checkbox" id="piEnabled" /></label>
+      <label class="row"><span>Sollwert (bar)</span><input type="number" id="piSetpoint" step="0.1" /></label>
+      <label class="row"><span>Pump-On (bar)</span><input type="number" id="piPon" step="0.1" /></label>
+      <label class="row"><span>Pump-Off (bar)</span><input type="number" id="piPoff" step="0.1" /></label>
+      <label class="row"><span>Kp</span><input type="number" id="piKp" step="0.1" /></label>
+      <label class="row"><span>Ki</span><input type="number" id="piKi" step="0.1" /></label>
+      <label class="row"><span>Frequenz Min (Hz)</span><input type="number" id="piFmin" step="0.5" /></label>
+      <label class="row"><span>Frequenz Max (Hz)</span><input type="number" id="piFmax" step="0.5" /></label>
+      <div class="btn-row">
+        <button class="btn btn-start" id="savePI">Speichern</button>
+        <button class="btn btn-ghost" id="resetDryrun">Trockenlauf quittieren</button>
+      </div>
+    </div>
+
+    <div class="tab-pane" data-pane="tg">
+      <h3>Zeitsperre</h3>
+      <label class="row"><span>Aktiv</span><input type="checkbox" id="tgEnabled" /></label>
+      <label class="row"><span>Start</span><input type="time" id="tgStart" /></label>
+      <label class="row"><span>Ende</span><input type="time" id="tgEnd" /></label>
+      <div class="day-row" id="tgDays"></div>
+      <button class="btn btn-start" id="saveTG">Speichern</button>
+    </div>
+
+    <div class="tab-pane" data-pane="fan">
+      <h3>Lüfter</h3>
+      <label class="row"><span>Modus</span>
+        <select id="fanMode">
+          <option>Auto</option><option>LOGO</option><option>MQTT</option><option>Web</option>
+        </select>
+      </label>
+      <label class="row"><span>PWM</span><input type="range" id="fanPwm" min="0" max="255" step="1" /></label>
+      <div class="sub">PWM: <span id="fanPwmVal">0</span></div>
+      <button class="btn btn-start" id="saveFan">Speichern</button>
+    </div>
+
+    <div class="tab-pane" data-pane="presets">
+      <h3>Presets</h3>
+      <div id="presetList"></div>
+    </div>
+
+    <div class="tab-pane" data-pane="vac">
+      <h3>Urlaubsmodus</h3>
+      <label class="row"><span>Aktiv</span><input type="checkbox" id="vacEnabled" /></label>
+      <button class="btn btn-start" id="saveVac">Speichern</button>
+    </div>
+
+    <div class="tab-pane" data-pane="log">
+      <h3>Logs</h3>
+      <pre id="logBox"></pre>
+    </div>
+
+  </div>
 </div>
 
-<!-- ========== VACATION BANNER (between top-bar and page) ========== -->
-<div id="vacationBanner" class="vacation-banner" style="display:none">
-  <div class="vacation-banner-inner">
-    <div style="display:flex;align-items:center;gap:.5rem;min-width:0">
-      <svg style="width:16px;height:16px;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
-      <span style="font-size:.75rem;font-weight:600">URLAUBSMODUS AKTIV – Pumpe gesperrt</span>
-    </div>
-    <button onclick="toggleVacation(false)" style="font-size:.75rem;font-weight:700;padding:.3rem .75rem;border-radius:3px;background:#d97706;border:none;color:#fff;cursor:pointer;white-space:nowrap">Deaktivieren</button>
-  </div>
-</div>
+<div id="toast" class="toast" hidden></div>
 
-<!-- ========== ROW 2: PAGES ========== -->
-
-<!-- ── PAGE: OVERVIEW ── -->
-<div id="page-overview" class="hmi-overview">
-
-  <!-- LEFT: Schematic -->
-  <div class="hmi-panel" id="panel-schematic">
-    <div class="hmi-panel-title">PROZESSSCHEMA</div>
-    <div style="flex:1;overflow:hidden;position:relative">
-      <svg id="pump-svg" viewBox="0 0 300 490" preserveAspectRatio="xMidYMid meet" style="width:100%;height:100%">
-        <defs>
-          <pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse">
-            <line x1="0" y1="8" x2="8" y2="0" stroke="#2d3748" stroke-width="1"/>
-          </pattern>
-        </defs>
-
-        <!-- DRUCKNETZ (top distribution rail) -->
-        <line x1="60" y1="52" x2="240" y2="52" stroke="#2d3748" stroke-width="5" stroke-linecap="round"/>
-        <text x="150" y="42" text-anchor="middle" font-size="8" class="sch-label">DRUCKNETZ</text>
-        <!-- Outlet indicators -->
-        <line x1="80" y1="52" x2="80" y2="40" stroke="#2d3748" stroke-width="3"/>
-        <line x1="150" y1="52" x2="150" y2="40" stroke="#2d3748" stroke-width="3"/>
-        <line x1="220" y1="52" x2="220" y2="40" stroke="#2d3748" stroke-width="3"/>
-
-        <!-- RISER PIPE -->
-        <line id="sch-riser" x1="150" y1="52" x2="150" y2="115" class="sch-pipe-main" stroke-width="5" stroke-linecap="round" stroke="#2d3748"/>
-
-        <!-- EXPANSION VESSEL branch -->
-        <line x1="150" y1="115" x2="215" y2="115" stroke="#2d3748" stroke-width="4" stroke-linecap="round"/>
-        <!-- Vessel body -->
-        <rect x="210" y="90" width="40" height="34" rx="3" fill="rgba(148,163,184,.07)" stroke="#475569" stroke-width="1.5"/>
-        <line x1="210" y1="107" x2="250" y2="107" stroke="#475569" stroke-width="1" stroke-dasharray="2 2" opacity=".5"/>
-        <text x="230" y="83" text-anchor="middle" font-size="7" class="sch-label">Ausd.</text>
-
-        <!-- WATER TEMP sensor (diamond on pipe) -->
-        <polygon points="150,106 159,115 150,124 141,115" fill="var(--hmi-panel)" stroke="#2dd4bf" stroke-width="1.5"/>
-        <text x="150" y="118" text-anchor="middle" font-size="7" font-weight="700" fill="#2dd4bf">T</text>
-        <text id="sch-wtemp-val" x="168" y="112" font-size="8" class="sch-val" fill="#2dd4bf">--°C</text>
-
-        <!-- DISCHARGE PIPE 2 (T-junction area → flow sensor) -->
-        <line id="sch-discharge-2" x1="150" y1="124" x2="150" y2="163" class="sch-pipe-main" stroke-width="5" stroke-linecap="round" stroke="#2d3748"/>
-
-        <!-- PRESSURE SENSOR -->
-        <circle cx="150" cy="163" r="12" fill="var(--hmi-panel)" stroke="#60a5fa" stroke-width="1.5"/>
-        <text x="150" y="167" text-anchor="middle" font-size="9" font-weight="700" fill="#60a5fa">P</text>
-        <text id="sch-pressure-val" x="169" y="160" font-size="8" class="sch-val" fill="#60a5fa">-.-- bar</text>
-        <!-- SP dotted line -->
-        <line x1="162" y1="166" x2="200" y2="166" stroke="#f59e0b" stroke-width="1" stroke-dasharray="3 2" opacity=".55"/>
-        <text x="202" y="169" font-size="7" fill="#f59e0b">SP</text>
-
-        <!-- DISCHARGE PIPE 1 (pressure sensor → check valve) -->
-        <line id="sch-discharge-1" x1="150" y1="175" x2="150" y2="208" class="sch-pipe-main" stroke-width="5" stroke-linecap="round" stroke="#2d3748"/>
-
-        <!-- CHECK VALVE -->
-        <polygon points="142,214 158,214 150,204" fill="#2d3748" stroke="#94a3b8" stroke-width="1.5"/>
-        <line x1="142" y1="214" x2="158" y2="214" stroke="#94a3b8" stroke-width="2"/>
-
-        <!-- FLOW SENSOR -->
-        <line id="sch-flow-pipe" x1="150" y1="214" x2="150" y2="234" class="sch-pipe-main" stroke-width="5" stroke-linecap="round" stroke="#2d3748"/>
-        <ellipse cx="150" cy="244" rx="16" ry="11" fill="var(--hmi-panel)" stroke="#f97316" stroke-width="1.5"/>
-        <text x="150" y="248" text-anchor="middle" font-size="9" font-weight="700" fill="#f97316">Q</text>
-        <text id="sch-flow-val" x="172" y="241" font-size="8" class="sch-val" fill="#f97316">-- L/min</text>
-
-        <!-- SUCTION PIPE (flow sensor → motor) -->
-        <line id="sch-suction" x1="150" y1="255" x2="150" y2="300" class="sch-pipe-main" stroke-width="5" stroke-linecap="round" stroke="#2d3748"/>
-
-        <!-- PUMP MOTOR SYMBOL -->
-        <circle id="sch-motor" cx="150" cy="320" r="22" fill="rgba(139,148,158,.1)" stroke="#8b949e" stroke-width="2"/>
-        <text x="150" y="325" text-anchor="middle" font-size="13" font-weight="700" fill="#e2e8f0">M</text>
-
-        <!-- VFD BOX (right of motor) -->
-        <rect id="sch-vfd" x="188" y="305" width="60" height="32" rx="3" fill="rgba(139,148,158,.08)" stroke="#8b949e" stroke-width="1.5"/>
-        <text x="218" y="317" text-anchor="middle" font-size="8" fill="#8b949e">VFD V20</text>
-        <text id="sch-freq-val" x="218" y="330" text-anchor="middle" font-size="9" font-weight="700" fill="#3fb950">-- Hz</text>
-        <line x1="172" y1="316" x2="188" y2="316" stroke="#334155" stroke-width="1.5" stroke-dasharray="3 2"/>
-
-        <!-- WELL / SOURCE -->
-        <rect x="90" y="360" width="120" height="40" fill="url(#hatch)" stroke="#334155" stroke-width="1.5" rx="2"/>
-        <rect x="115" y="342" width="70" height="24" fill="rgba(14,165,233,.15)" rx="2"/>
-        <text x="150" y="394" text-anchor="middle" font-size="8" class="sch-label">Quelle / Brunnen</text>
-        <line x1="150" y1="342" x2="150" y2="342" stroke="none"/>
-        <!-- suction from well -->
-        <line x1="150" y1="342" x2="150" y2="342" stroke="#2d3748" stroke-width="5"/>
-
-        <!-- FAN unit (bottom left) -->
-        <g transform="translate(22,350)">
-          <circle cx="26" cy="26" r="22" fill="rgba(34,211,238,.06)" stroke="#22d3ee" stroke-width="1.5"/>
-          <g id="sch-fan-blades" fill="#22d3ee" opacity=".55" transform="translate(26,26)">
-            <ellipse rx="7" ry="18" transform="rotate(0)"/>
-            <ellipse rx="7" ry="18" transform="rotate(120)"/>
-            <ellipse rx="7" ry="18" transform="rotate(240)"/>
-          </g>
-          <circle cx="26" cy="26" r="4" fill="var(--hmi-bg)"/>
-          <text x="26" y="57" text-anchor="middle" font-size="7" fill="#22d3ee">LÜFTER</text>
-          <text id="sch-fanrpm-val" x="26" y="67" text-anchor="middle" font-size="8" font-weight="700" fill="#22d3ee">-- RPM</text>
-        </g>
-
-        <!-- AIR TEMP sensor (bottom left) -->
-        <g transform="translate(16,430)">
-          <rect x="0" y="0" width="56" height="28" rx="3" fill="rgba(251,146,60,.07)" stroke="#fb923c" stroke-width="1.5"/>
-          <text x="28" y="11" text-anchor="middle" font-size="7" fill="#8b949e">Lufttemp.</text>
-          <text id="sch-airtemp-val" x="28" y="23" text-anchor="middle" font-size="11" font-weight="700" fill="#fb923c">--°C</text>
-        </g>
-      </svg>
-    </div>
-
-    <!-- Control strip below schematic -->
-    <div class="sch-ctrl">
-      <div class="sch-ctrl-row">
-        <button class="btn-start" onclick="api('v20/start','POST').then(()=>showToast('V20 gestartet','success'))">
-          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/></svg>
-          Start
-        </button>
-        <button class="btn-stop" onclick="api('v20/stop','POST').then(()=>showToast('V20 gestoppt','info'))">
-          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0zM9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/></svg>
-          Stop
-        </button>
-        <button class="btn-reset" onclick="api('v20/reset','POST').then(()=>showToast('Reset','info'))">
-          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-          Reset
-        </button>
-      </div>
-      <div>
-        <div class="flex justify-between" style="font-size:.65rem;color:#64748b;margin-bottom:.2rem">
-          <span>Frequenz Soll</span><span id="freqVal" style="color:#94a3b8;font-family:monospace">0.0 Hz</span>
-        </div>
-        <input id="freqSlider" type="range" min="35" max="50" step="0.5" value="35"
-               oninput="freqVal.textContent=this.value+' Hz'"
-               onchange="api('v20/freq','POST',{hz:parseFloat(this.value)})">
-        <div class="flex gap-1 mt-1">
-          <button class="chip" style="font-size:.62rem;padding:.2rem .5rem" onclick="setFreq(35)">35 Hz</button>
-          <button class="chip" style="font-size:.62rem;padding:.2rem .5rem" onclick="setFreq(42)">42 Hz</button>
-          <button class="chip" style="font-size:.62rem;padding:.2rem .5rem" onclick="setFreq(50)">50 Hz</button>
-        </div>
-      </div>
-      <button id="vacationBtn" class="btn-vacation" style="background:#d97706;color:#fff" onclick="toggleVacation(true)">
-        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
-        Urlaubsmodus
-      </button>
-    </div>
-  </div>
-
-  <!-- CENTER: Chart -->
-  <div class="hmi-panel" id="panel-chart">
-    <div class="hmi-panel-title">PROZESS-KURVEN (30 MIN)</div>
-    <div class="chart-legend">
-      <span class="chart-legend-badge" style="background:rgba(96,165,250,.18);color:#60a5fa">P <span id="chart-cur-pressure">-.--</span> bar</span>
-      <span class="chart-legend-badge" style="background:rgba(52,211,153,.18);color:#34d399">f <span id="chart-cur-freq">0.0</span> Hz</span>
-      <span class="chart-legend-badge" style="background:rgba(251,146,60,.18);color:#fb923c">Q <span id="chart-cur-flow">--</span> L/min</span>
-      <span style="margin-left:auto;font-size:.6rem;color:var(--hmi-text-dim)" id="chart-sp-label">SP: -- bar</span>
-    </div>
-    <svg id="chart-svg" preserveAspectRatio="none">
-      <g id="chart-grid"></g>
-      <g id="chart-xaxis"></g>
-      <g id="chart-yaxis-l"></g>
-      <g id="chart-yaxis-r"></g>
-      <path id="chart-sp-line" stroke="#f59e0b" stroke-width="1" stroke-dasharray="4 3" fill="none" opacity=".55"/>
-      <polyline id="chart-line-pressure" fill="none" stroke="#60a5fa" stroke-width="1.5" points=""/>
-      <polyline id="chart-line-freq"     fill="none" stroke="#34d399" stroke-width="1.5" points="" opacity=".85"/>
-      <polyline id="chart-line-flow"     fill="none" stroke="#fb923c" stroke-width="1.5" points="" opacity=".85"/>
-      <line id="chart-crosshair" stroke="#8b949e" stroke-width="1" stroke-dasharray="3 3" x1="-1" y1="0" x2="-1" y2="9999" visibility="hidden"/>
-      <g id="chart-tooltip" visibility="hidden">
-        <rect id="chart-tt-bg" rx="3" fill="#1e293b" stroke="#334155" stroke-width="1"/>
-        <text id="chart-tt-text" font-size="9" fill="#e2e8f0" font-family="monospace"></text>
-      </g>
-    </svg>
-  </div>
-
-  <!-- RIGHT: KPI Panel -->
-  <div class="hmi-panel" id="panel-kpi" style="overflow-y:auto">
-
-    <!-- ELEKTRIK -->
-    <div class="kpi-section">
-      <div class="kpi-section-title">⚡ Elektrik</div>
-      <div class="kpi-row" style="align-items:flex-end">
-        <span id="kpi-power-val" class="kpi-big" style="color:#fbbf24">0 W</span>
-      </div>
-      <div class="kpi-row">
-        <span class="kpi-lbl">Spannung</span>
-        <span id="kpi-volt-val" class="kpi-med" style="color:#a78bfa">0<span class="kpi-unit">V</span></span>
-      </div>
-      <div class="kpi-row">
-        <span class="kpi-lbl">Strom</span>
-        <span id="kpi-cur-val" class="kpi-med" style="color:#34d399">0.00<span class="kpi-unit">A</span></span>
-      </div>
-    </div>
-
-    <!-- PUMPE -->
-    <div class="kpi-section">
-      <div class="kpi-section-title">⚙ Pumpe</div>
-      <div class="kpi-row" style="margin-bottom:.35rem">
-        <span id="kpi-pump-badge" class="status-badge status-stop">STOP</span>
-        <span id="kpi-freq-val" class="kpi-big" style="color:#34d399">0.0<span class="kpi-unit">Hz</span></span>
-      </div>
-      <div class="kpi-row">
-        <span class="kpi-lbl">Sollwert</span>
-        <span id="kpi-freq-sp-val" class="kpi-sml" style="color:#94a3b8">0.0<span class="kpi-unit">Hz</span></span>
-      </div>
-      <!-- Dry-run alert (hidden by default) -->
-      <div id="piDryRunBox" class="dryrun-alert mt-2" style="display:none">
-        <span>&#9888; Trockenlauf-Sperre</span>
-        <button onclick="resetDryRun()" style="font-size:.62rem;padding:.15rem .45rem;border-radius:2px;border:1px solid rgba(239,68,68,.4);background:none;color:#f87171;cursor:pointer;flex-shrink:0">Quittieren</button>
-      </div>
-    </div>
-
-    <!-- DRUCK & DURCHFLUSS -->
-    <div class="kpi-section">
-      <div class="kpi-section-title">💧 Druck &amp; Durchfluss</div>
-      <div class="kpi-row" style="align-items:flex-end">
-        <span class="kpi-lbl">Druck</span>
-        <span id="kpi-pressure-val" class="kpi-big" style="color:#60a5fa">-.--<span class="kpi-unit">bar</span></span>
-      </div>
-      <div class="kpi-row">
-        <span class="kpi-lbl">Sollwert</span>
-        <span id="kpi-sp-val" class="kpi-sml" style="color:#f59e0b">–<span class="kpi-unit">bar</span></span>
-      </div>
-      <div class="kpi-row">
-        <span class="kpi-lbl">Durchfluss</span>
-        <span id="kpi-flow-val" class="kpi-med" style="color:#fb923c">--<span class="kpi-unit">L/min</span></span>
-      </div>
-      <div class="kpi-row">
-        <span class="kpi-lbl">Wassertemp.</span>
-        <span id="kpi-wtemp-val" class="kpi-sml" style="color:#2dd4bf">--<span class="kpi-unit">°C</span></span>
-      </div>
-      <div class="kpi-row">
-        <span class="kpi-lbl">PI-Status</span>
-        <span id="kpi-pi-badge" class="status-badge status-stop">AUS</span>
-      </div>
-    </div>
-
-    <!-- SYSTEM -->
-    <div class="kpi-section">
-      <div class="kpi-section-title">🖥 System</div>
-      <div class="kpi-row">
-        <span class="kpi-lbl">IP</span>
-        <span id="sysIP" class="kpi-sml" style="font-family:monospace;color:#94a3b8">0.0.0.0</span>
-      </div>
-      <div class="kpi-row">
-        <span class="kpi-lbl">Uptime</span>
-        <span id="sysUp" class="kpi-sml" style="color:#94a3b8">0s</span>
-      </div>
-      <div class="kpi-row">
-        <span class="kpi-lbl">Firmware</span>
-        <span id="sysFW" class="kpi-sml" style="font-family:monospace;color:#94a3b8">-</span>
-      </div>
-      <div class="kpi-row">
-        <span class="kpi-lbl">TCP Clients</span>
-        <span id="tcpSt" class="kpi-sml" style="color:#94a3b8">0</span>
-      </div>
-      <div class="kpi-row">
-        <span class="kpi-lbl">Lüfter</span>
-        <span id="kpi-fan-rpm-val" class="kpi-sml" style="color:#22d3ee">-- RPM</span>
-      </div>
-      <div class="kpi-row">
-        <span class="kpi-lbl">Lufttemp.</span>
-        <span id="kpi-airtemp-val" class="kpi-sml" style="color:#fb923c">--°C</span>
-      </div>
-    </div>
-
-    <!-- ZEITSPERRE STATUS -->
-    <div class="kpi-section">
-      <div class="kpi-section-title">⏰ Zeitsperre</div>
-      <div class="kpi-row">
-        <span class="flex items-center gap-1.5"><span id="tgDot" class="dot dot-gray"></span><span id="tgStatus" class="kpi-sml" style="color:#94a3b8">--</span></span>
-      </div>
-    </div>
-
-    <!-- PRESET STATUS -->
-    <div class="kpi-section">
-      <div class="kpi-section-title">📋 Betriebsmodus</div>
-      <div class="kpi-row">
-        <span class="kpi-lbl">Aktiv</span>
-        <span id="presetActiveName" class="kpi-sml" style="color:#2dd4bf">--</span>
-      </div>
-      <div class="kpi-row">
-        <span class="kpi-lbl">Modus</span>
-        <span id="presetModeLabel" class="kpi-sml" style="color:#94a3b8">--</span>
-      </div>
-      <div class="kpi-row">
-        <span class="kpi-lbl">Sollwert</span>
-        <span id="presetSetpointVal" class="kpi-sml" style="color:#94a3b8">--</span>
-      </div>
-    </div>
-
-  </div><!-- /#panel-kpi -->
-</div><!-- /#page-overview -->
-
-<!-- ── PAGE: SETTINGS ── -->
-<div id="page-settings">
-  <div class="settings-layout">
-
-    <!-- Sidebar Navigation -->
-    <div class="settings-sidebar">
-      <div class="settings-sidebar-title">Einstellungen</div>
-      <button class="settings-nav-item active" data-stab="pi" onclick="switchSettingsTab('pi')">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="#60a5fa" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-        PI-Druckregelung
-      </button>
-      <button class="settings-nav-item" data-stab="timeguard" onclick="switchSettingsTab('timeguard')">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="#fbbf24" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        Zeitsperre
-      </button>
-      <button class="settings-nav-item" data-stab="fan" onclick="switchSettingsTab('fan')">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="#22d3ee" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-        Lüfter
-      </button>
-      <button class="settings-nav-item" data-stab="presets" onclick="switchSettingsTab('presets')">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="#2dd4bf" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
-        Betriebsmodi
-      </button>
-      <button class="settings-nav-item" data-stab="vacation" onclick="switchSettingsTab('vacation')">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="#d97706" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
-        Urlaubsmodus
-      </button>
-    </div>
-
-    <!-- Content Area -->
-    <div class="settings-content">
-
-      <!-- TAB: PI-Regelung -->
-      <div class="settings-panel active" id="stab-pi">
-        <div class="settings-panel-title">
-          <svg class="w-5 h-5" fill="none" stroke="#60a5fa" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-          PI-Druckregelung
-        </div>
-        <div class="flex items-center justify-between mb-4 p-3" style="border-radius:4px;background:var(--surface)">
-          <span style="font-size:.8rem">PI-Regelung aktiv</span>
-          <label class="toggle-wrap">
-            <input type="checkbox" id="piEnabled" onchange="piDirty()">
-            <span class="toggle-track"></span>
-            <span class="toggle-thumb"></span>
-          </label>
-        </div>
-        <div style="font-size:.65rem;font-weight:600;color:var(--hmi-text-dim);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem">Druckschwellen</div>
-        <div class="grid grid-cols-3 gap-3 mb-4">
-          <div><label style="font-size:.7rem;color:#64748b;display:block;margin-bottom:.25rem">EIN (bar)</label>
-            <input type="number" id="piPon" value="2.2" step="0.1" min="0.1" max="6" oninput="piDirty()"></div>
-          <div><label style="font-size:.7rem;color:#64748b;display:block;margin-bottom:.25rem">Sollwert (bar)</label>
-            <input type="number" id="piSpNum" value="3.0" step="0.1" min="0.5" max="6" oninput="piDirty()"></div>
-          <div><label style="font-size:.7rem;color:#64748b;display:block;margin-bottom:.25rem">AUS (bar)</label>
-            <input type="number" id="piPoff" value="4.0" step="0.1" min="1" max="8" oninput="piDirty()"></div>
-        </div>
-        <div style="font-size:.65rem;font-weight:600;color:var(--hmi-text-dim);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem">Regler-Parameter</div>
-        <div class="grid grid-cols-2 gap-3 mb-4">
-          <div><label style="font-size:.7rem;color:#64748b;display:block;margin-bottom:.25rem">Kp (Hz/bar)</label>
-            <input type="number" id="piKp" value="3.0" step="0.1" min="0.1" max="20" oninput="piDirty()"></div>
-          <div><label style="font-size:.7rem;color:#64748b;display:block;margin-bottom:.25rem">Ki (Hz/bar·s)</label>
-            <input type="number" id="piKi" value="0.3" step="0.01" min="0" max="5" oninput="piDirty()"></div>
-        </div>
-        <div style="font-size:.65rem;font-weight:600;color:var(--hmi-text-dim);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem">Frequenzgrenzen</div>
-        <div class="grid grid-cols-2 gap-3 mb-4">
-          <div><label style="font-size:.7rem;color:#64748b;display:block;margin-bottom:.25rem">Min-Freq (Hz)</label>
-            <input type="number" id="piFreqMin" value="35" step="1" min="10" max="50" oninput="piDirty()"></div>
-          <div><label style="font-size:.7rem;color:#64748b;display:block;margin-bottom:.25rem">Max-Freq (Hz)</label>
-            <input type="number" id="piFreqMax" value="50" step="1" min="10" max="50" oninput="piDirty()"></div>
-        </div>
-        <button id="piSaveBtn" class="btn-save" style="background:#2563eb;color:#fff;max-width:280px" onclick="piSave()" disabled>Gespeichert</button>
-      </div>
-
-      <!-- TAB: Zeitsperre -->
-      <div class="settings-panel" id="stab-timeguard">
-        <div class="settings-panel-title">
-          <svg class="w-5 h-5" fill="none" stroke="#fbbf24" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-          Zeitsperre
-        </div>
-        <div class="flex items-center justify-between mb-4 p-3" style="border-radius:4px;background:var(--surface)">
-          <span style="font-size:.8rem">Zeitsperre aktiv</span>
-          <label class="toggle-wrap">
-            <input type="checkbox" id="tgEnabled" onchange="tgDirty()">
-            <span class="toggle-track"></span>
-            <span class="toggle-thumb"></span>
-          </label>
-        </div>
-        <div style="font-size:.65rem;font-weight:600;color:var(--hmi-text-dim);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem">Zeitfenster</div>
-        <div class="grid grid-cols-2 gap-3 mb-4">
-          <div><label style="font-size:.7rem;color:#64748b;display:block;margin-bottom:.25rem">Startzeit</label>
-            <input type="time" id="tgStart" oninput="tgDirty()"></div>
-          <div><label style="font-size:.7rem;color:#64748b;display:block;margin-bottom:.25rem">Endzeit</label>
-            <input type="time" id="tgEnd" oninput="tgDirty()"></div>
-        </div>
-        <div style="font-size:.65rem;font-weight:600;color:var(--hmi-text-dim);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem">Wochentage</div>
-        <div class="flex gap-1.5 mb-4" id="tgDaysRow">
-          <button class="day-pill active" id="tgD0" onclick="tgToggleDay(0)">Mo</button>
-          <button class="day-pill active" id="tgD1" onclick="tgToggleDay(1)">Di</button>
-          <button class="day-pill active" id="tgD2" onclick="tgToggleDay(2)">Mi</button>
-          <button class="day-pill active" id="tgD3" onclick="tgToggleDay(3)">Do</button>
-          <button class="day-pill active" id="tgD4" onclick="tgToggleDay(4)">Fr</button>
-          <button class="day-pill active" id="tgD5" onclick="tgToggleDay(5)">Sa</button>
-          <button class="day-pill active" id="tgD6" onclick="tgToggleDay(6)">So</button>
-        </div>
-        <button id="tgSaveBtn" class="btn-save" style="background:#d97706;color:#fff;max-width:280px" onclick="tgSave()" disabled>Gespeichert</button>
-      </div>
-
-      <!-- TAB: Lüfter -->
-      <div class="settings-panel" id="stab-fan">
-        <div class="settings-panel-title">
-          <svg class="w-5 h-5" fill="none" stroke="#22d3ee" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-          Lüftersteuerung
-        </div>
-        <div class="flex items-center gap-5 mb-4 p-3" style="border-radius:4px;background:var(--surface)">
-          <svg id="fanSvg" viewBox="0 0 100 100" class="w-16 h-16 flex-shrink-0" style="color:#22d3ee">
-            <g fill="currentColor" transform="translate(50,50)">
-              <ellipse rx="11" ry="32" transform="rotate(0)" opacity="0.85"/>
-              <ellipse rx="11" ry="32" transform="rotate(120)" opacity="0.85"/>
-              <ellipse rx="11" ry="32" transform="rotate(240)" opacity="0.85"/>
-              <circle r="7"/>
-            </g>
-          </svg>
-          <div>
-            <div style="font-size:2rem;font-weight:700;color:#22d3ee;line-height:1"><span id="fanRPM">0</span> <span style="font-size:.7rem;color:#64748b">RPM</span></div>
-            <div style="font-size:.8rem;margin-top:.35rem">PWM: <span id="fanPWM" style="font-family:monospace;font-weight:700">0</span><span style="color:#64748b"> / 255</span></div>
-          </div>
-        </div>
-        <div style="font-size:.65rem;font-weight:600;color:var(--hmi-text-dim);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem">Modus</div>
-        <div class="seg-ctrl mb-4" style="max-width:360px">
-          <button id="fm0" class="seg-btn active" onclick="setFanMode('Auto')">Auto</button>
-          <button id="fm1" class="seg-btn" onclick="setFanMode('LOGO')">LOGO</button>
-          <button id="fm2" class="seg-btn" onclick="setFanMode('MQTT')">MQTT</button>
-          <button id="fm3" class="seg-btn" onclick="setFanMode('Web')">Web</button>
-        </div>
-        <div style="font-size:.65rem;font-weight:600;color:var(--hmi-text-dim);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem">PWM Override</div>
-        <div style="max-width:360px">
-          <div class="flex justify-between" style="font-size:.7rem;color:#64748b;margin-bottom:.3rem">
-            <span>Wert</span><span id="fanPWMVal" style="font-family:monospace;color:#94a3b8">0</span>
-          </div>
-          <input id="fanPWMSlider" type="range" min="0" max="255" step="1" value="0"
-                 oninput="fanPWMVal.textContent=this.value"
-                 onchange="api('fan/pwm','POST',{pwm:parseInt(this.value)})">
-        </div>
-      </div>
-
-      <!-- TAB: Presets -->
-      <div class="settings-panel" id="stab-presets">
-        <div class="settings-panel-title">
-          <svg class="w-5 h-5" fill="none" stroke="#2dd4bf" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
-          Betriebsmodi / Presets
-        </div>
-        <div style="font-size:.65rem;font-weight:600;color:var(--hmi-text-dim);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem">Preset auswählen</div>
-        <div id="presetButtons" class="grid grid-cols-3 gap-2 mb-5" style="max-width:420px"></div>
-
-        <div style="font-size:.65rem;font-weight:600;color:var(--hmi-text-dim);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem">Presets verwalten</div>
-        <div class="mb-3">
-          <button onclick="togglePresetEditor()" class="flex items-center gap-1.5" style="font-size:.72rem;color:#64748b;background:none;border:none;cursor:pointer">
-            <svg id="presetEditorChev" class="w-3.5 h-3.5 chev collapsed" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-            Presets bearbeiten
-          </button>
-        </div>
-        <div id="presetEditorPanel" class="hidden space-y-2" style="max-width:480px">
-          <div id="presetEditList" class="space-y-1.5"></div>
-          <div style="padding:.75rem;border-radius:4px;background:var(--surface)">
-            <div id="npFormTitle" style="font-size:.65rem;font-weight:700;margin-bottom:.6rem;color:#2dd4bf;text-transform:uppercase;letter-spacing:.06em">Neuer Preset</div>
-            <div class="grid grid-cols-2 gap-2 mb-2">
-              <div><label style="font-size:.7rem;color:#64748b;display:block;margin-bottom:.25rem">Name</label>
-                <input type="text" id="npName" maxlength="31" placeholder="z.B. Garten vorn"></div>
-              <div><label style="font-size:.7rem;color:#64748b;display:block;margin-bottom:.25rem">Modus</label>
-                <select id="npMode" onchange="npModeChange()">
-                  <option value="0">Druck (bar)</option>
-                  <option value="1" selected>Durchfluss (L/min)</option>
-                </select></div>
-            </div>
-            <div class="grid grid-cols-2 gap-2 mb-2">
-              <div><label style="font-size:.7rem;color:#64748b;display:block;margin-bottom:.25rem">Sollwert (<span id="npUnit">L/min</span>)</label>
-                <input type="number" id="npSP" value="30" step="0.5" min="0.1" max="85"></div>
-              <div><label style="font-size:.7rem;color:#64748b;display:block;margin-bottom:.25rem">Kp</label>
-                <input type="number" id="npKp" value="0.3" step="0.01" min="0.01" max="20"></div>
-            </div>
-            <div class="grid grid-cols-3 gap-2 mb-3">
-              <div><label style="font-size:.7rem;color:#64748b;display:block;margin-bottom:.25rem">Ki</label>
-                <input type="number" id="npKi" value="0.05" step="0.01" min="0" max="5"></div>
-              <div><label style="font-size:.7rem;color:#64748b;display:block;margin-bottom:.25rem">f-min Hz</label>
-                <input type="number" id="npFmin" value="35" step="1" min="10" max="50"></div>
-              <div><label style="font-size:.7rem;color:#64748b;display:block;margin-bottom:.25rem">f-max Hz</label>
-                <input type="number" id="npFmax" value="50" step="1" min="10" max="50"></div>
-            </div>
-            <button id="npSaveBtn" onclick="saveNewPreset()" class="btn-save" style="background:#0d9488;color:#fff;max-width:280px">Preset hinzufügen</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- TAB: Urlaubsmodus -->
-      <div class="settings-panel" id="stab-vacation">
-        <div class="settings-panel-title">
-          <svg class="w-5 h-5" fill="none" stroke="#d97706" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
-          Urlaubsmodus / Außer-Haus
-        </div>
-        <p style="font-size:.8rem;color:var(--hmi-text-dim);margin-bottom:1rem;line-height:1.5">Sperrt die Pumpe vollständig. Kein automatischer Start durch die PI-Regelung möglich.</p>
-        <button id="vacationBtnSettings" class="btn-vacation" style="background:#d97706;color:#fff;margin-bottom:.75rem;max-width:320px;padding:.6rem 0" onclick="toggleVacation(true)">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
-          Urlaubsmodus aktivieren
-        </button>
-        <div id="vacationStatusSettings" style="font-size:.8rem;color:#64748b">Status: Inaktiv</div>
-      </div>
-
-    </div><!-- /.settings-content -->
-  </div><!-- /.settings-layout -->
-</div><!-- /#page-settings -->
-
-<!-- ── PAGE: LOG ── -->
-<div id="page-log">
-  <div class="flex items-center justify-between mb-3">
-    <h2 style="font-size:.75rem;font-weight:700;color:#94a3b8;display:flex;align-items:center;gap:.5rem">
-      <svg class="w-4 h-4" fill="none" stroke="#4ade80" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
-      Diagnose-Log
-    </h2>
-    <div class="flex gap-2 items-center">
-      <label style="font-size:.72rem;color:#64748b;cursor:pointer;display:flex;align-items:center;gap:.3rem"><input type="checkbox" id="logAuto" checked style="accent-color:#22c55e"> Auto-Scroll</label>
-      <button onclick="clearLog()" style="font-size:.7rem;padding:.25rem .6rem;border-radius:3px;background:var(--surface2);color:#94a3b8;border:none;cursor:pointer">Löschen</button>
-    </div>
-  </div>
-  <div id="logBox"></div>
-</div><!-- /#page-log -->
-
-<!-- ========== ROW 3: BOTTOM NAV ========== -->
-<div class="hmi-bottomnav">
-  <button class="nav-tab active" data-page="overview" onclick="switchPage('overview')">
-    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7"/></svg>
-    Übersicht
-  </button>
-  <button class="nav-tab" data-page="settings" onclick="switchPage('settings')">
-    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-    Einstellungen
-  </button>
-  <button class="nav-tab" data-page="presets" onclick="switchPage('settings');switchSettingsTab('presets')">
-    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
-    Presets
-  </button>
-  <button class="nav-tab" data-page="log" onclick="switchPage('log')">
-    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
-    Protokoll
-  </button>
-</div>
-
-</div><!-- /.hmi-layout -->
-
-<!-- ========== TOAST CONTAINER ========== -->
-<div id="toast-container"></div>
-
-<!-- ========== JAVASCRIPT ========== -->
-<script>
-'use strict';
-
-// ── Page Switching ──
-function switchPage(name) {
-  const pages = ['overview','settings','log'];
-  pages.forEach(p => {
-    const el = document.getElementById('page-'+p);
-    if (el) el.style.display = p === name ? (p === 'overview' ? 'grid' : 'block') : 'none';
-  });
-  document.querySelectorAll('.nav-tab').forEach(t => {
-    const dp = t.dataset.page;
-    t.classList.toggle('active', dp === name || (name === 'settings' && dp === 'settings'));
-  });
-  localStorage.setItem('activePage', name);
-}
-
-// ── Settings Tab Switching ──
-function switchSettingsTab(tabName) {
-  document.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.settings-nav-item').forEach(n => n.classList.remove('active'));
-  const panel = document.getElementById('stab-'+tabName);
-  if (panel) panel.classList.add('active');
-  const navItem = document.querySelector('.settings-nav-item[data-stab="'+tabName+'"]');
-  if (navItem) navItem.classList.add('active');
-  // Highlight correct bottom nav tab
-  document.querySelectorAll('.nav-tab').forEach(t => {
-    if (t.dataset.page === 'presets') t.classList.toggle('active', tabName === 'presets');
-    if (t.dataset.page === 'settings') t.classList.toggle('active', tabName !== 'presets');
-  });
-  localStorage.setItem('activeSettingsTab', tabName);
-}
-
-// ── Toast ──
-function showToast(msg, type='info') {
-  const c = document.getElementById('toast-container');
-  const t = document.createElement('div');
-  t.className = 'toast ' + type;
-  t.textContent = msg;
-  c.appendChild(t);
-  setTimeout(() => { t.style.opacity='0'; t.style.transition='opacity .3s'; setTimeout(()=>t.remove(),300); }, 2700);
-}
-
-// ── WebSocket ──
-let ws = null;
-function connectWS() {
-  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  ws = new WebSocket(proto + '//' + location.host + '/ws');
-  ws.onopen = () => { setText('wsDot',''); document.getElementById('wsDot').className='dot dot-green'; };
-  ws.onmessage = e => {
-    try {
-      const d = JSON.parse(e.data);
-      if (d.log) { appendLog(d.log, d.logSeq); }
-      else { updateUI(d); }
-    } catch(x) {}
-  };
-  ws.onclose = () => {
-    document.getElementById('wsDot').className = 'dot dot-red';
-    setTimeout(connectWS, 2000);
-  };
-  ws.onerror = () => { ws.close(); };
-}
-
-// ── Helper ──
-function setText(id, val) {
-  const el = document.getElementById(id);
-  if (el) el.textContent = val;
-}
-
-// ── Dashboard Init ──
-function initDash() {
-  connectWS();
-  loadPresets();
-  setInterval(async () => {
-    if (!ws || ws.readyState !== 1) {
-      const r = await fetch('/api/status');
-      if (r.ok) updateUI(await r.json());
-    }
-  }, 3000);
-  setInterval(renderChart, 1000);
-  if (window.ResizeObserver) {
-    new ResizeObserver(() => renderChart()).observe(document.getElementById('chart-svg'));
-  }
-}
-
-// ── Top-Bar Mode Badge ──
-function updateModeBadge(v20) {
-  const badge = document.getElementById('hmi-mode-badge');
-  if (!v20 || !v20.connected) {
-    badge.className = 'hmi-mode-badge hmi-mode-stop'; badge.textContent = 'OFFLINE ■';
-  } else if (v20.fault > 0) {
-    badge.className = 'hmi-mode-badge hmi-mode-fault'; badge.textContent = 'STÖRUNG ⚠';
-  } else if (v20.running) {
-    badge.className = 'hmi-mode-badge hmi-mode-run'; badge.textContent = 'LAUFEN ▶';
-  } else {
-    badge.className = 'hmi-mode-badge hmi-mode-stop'; badge.textContent = 'BEREIT ■';
-  }
-}
-
-// ── KPI Panel Update ──
-function updateKPIPanel(d) {
-  if (d.v20) {
-    const v = d.v20;
-    const pw = Math.round((v.power || 0) * 1000);
-    const pwStr = pw >= 1000 ? (pw/1000).toFixed(2)+' kW' : pw+' W';
-    setText('kpi-power-val', pwStr);
-    setText('kpi-volt-val', (v.voltage||0).toFixed(0));
-    setText('kpi-cur-val', (v.current||0).toFixed(2));
-    setText('kpi-freq-val', v.frequency.toFixed(1));
-    setText('kpi-freq-sp-val', (v.freq_setpoint||0).toFixed(1));
-    // Pump status badge
-    const pb = document.getElementById('kpi-pump-badge');
-    if (pb) {
-      if (!v.connected) { pb.className='status-badge status-stop'; pb.textContent='OFFLINE'; }
-      else if (v.fault > 0) { pb.className='status-badge status-fault'; pb.textContent='STÖRUNG'; }
-      else if (v.running) { pb.className='status-badge status-run'; pb.textContent='LÄUFT'; }
-      else { pb.className='status-badge status-stop'; pb.textContent='BEREIT'; }
-    }
-  }
-  if (d.pi) {
-    const pi = d.pi;
-    setText('kpi-pressure-val', (pi.pressure||0).toFixed(2));
-    setText('kpi-sp-val', (pi.setpoint||0).toFixed(2));
-    const flowEl = document.getElementById('kpi-flow-val');
-    if (flowEl) {
-      const fe = pi.flow_est;
-      flowEl.textContent = (pi.flow > 0 ? (fe?'~':'')+(pi.flow||0).toFixed(1) : '0') + ' L/min';
-    }
-    setText('kpi-wtemp-val', (pi.water_temp != null && pi.water_temp > -100) ? pi.water_temp.toFixed(1)+'°C' : '--°C');
-    // PI status badge
-    const pib = document.getElementById('kpi-pi-badge');
-    if (pib) {
-      const ps = pi.pump_state || 0;
-      if (pi.dry_run_locked) { pib.className='status-badge status-fault'; pib.textContent='TROCKENLAUF'; }
-      else if (!pi.enabled) { pib.className='status-badge status-stop'; pib.textContent='AUS'; }
-      else if (ps === 2) { pib.className='status-badge status-run'; pib.textContent='AKTIV'; }
-      else if (ps === 1) { pib.className='status-badge status-warn'; pib.textContent='STARTET'; }
-      else { pib.className='status-badge status-stop'; pib.textContent='BEREIT'; }
-    }
-    // Dry-run alert box
-    const drb = document.getElementById('piDryRunBox');
-    if (drb) drb.style.display = pi.dry_run_locked ? 'flex' : 'none';
-    // Chart SP label
-    setText('chart-sp-label', 'SP: '+(pi.setpoint||0).toFixed(2)+' bar');
-  }
-  if (d.fan) {
-    setText('kpi-fan-rpm-val', d.fan.rpm + ' RPM');
-  }
-  if (d.temp !== undefined) {
-    setText('kpi-airtemp-val', d.temp > -100 ? d.temp.toFixed(1)+'°C' : '--°C');
-  }
-}
-
-// ── Schematic Update ──
-function updateSchematic(d) {
-  const running = d.v20 && d.v20.running;
-  // Pipe colors + animation
-  document.querySelectorAll('.sch-pipe-main').forEach(p => {
-    p.setAttribute('stroke', running ? 'var(--pipe-run)' : 'var(--pipe-idle)');
-    if (running) { p.classList.add('pipe-flow'); p.style.strokeDasharray = '6 4'; }
-    else { p.classList.remove('pipe-flow'); p.style.strokeDasharray = ''; }
-  });
-  // Motor
-  const motor = document.getElementById('sch-motor');
-  if (motor) {
-    motor.style.fill = running ? 'rgba(63,185,80,.22)' : 'rgba(139,148,158,.1)';
-    motor.style.stroke = running ? '#3fb950' : '#8b949e';
-  }
-  // VFD
-  const vfd = document.getElementById('sch-vfd');
-  if (vfd && d.v20) {
-    vfd.style.fill = d.v20.fault > 0 ? 'rgba(248,81,73,.18)' :
-                     d.v20.running    ? 'rgba(63,185,80,.12)' : 'rgba(139,148,158,.07)';
-    vfd.style.stroke = d.v20.fault > 0 ? '#f85149' :
-                       d.v20.running    ? '#3fb950' : '#8b949e';
-  }
-  // Sensor values
-  if (d.v20) setText('sch-freq-val', d.v20.frequency.toFixed(1) + ' Hz');
-  if (d.pi) {
-    const p = d.pi;
-    setText('sch-pressure-val', p.pressure != null ? p.pressure.toFixed(2)+' bar' : '-.-- bar');
-    setText('sch-flow-val', p.flow > 0 ? (p.flow_est?'~':'')+p.flow.toFixed(1)+' L/min' : '0 L/min');
-    setText('sch-wtemp-val', p.water_temp != null && p.water_temp > -100 ? p.water_temp.toFixed(1)+'°C' : '--°C');
-  }
-  if (d.temp !== undefined) setText('sch-airtemp-val', d.temp > -100 ? d.temp.toFixed(1)+'°C' : '--°C');
-  if (d.fan) {
-    setText('sch-fanrpm-val', d.fan.rpm + ' RPM');
-    // Fan blade spin
-    const blades = document.getElementById('sch-fan-blades');
-    if (blades) {
-      if (d.fan.rpm > 0) {
-        blades.style.animation = 'fan-spin ' + (60/Math.max(d.fan.rpm,1)).toFixed(2) + 's linear infinite';
-      } else {
-        blades.style.animation = 'none';
-      }
-    }
-  }
-}
-
-// ── Chart Engine ──
-const CHART_MINUTES = 30;
-const chartBuf = { t:[], pressure:[], freq:[], flow:[] };
-
-function chartPush(d) {
-  const now = Date.now();
-  chartBuf.t.push(now);
-  chartBuf.pressure.push(d.pi ? (d.pi.pressure || 0) : 0);
-  chartBuf.freq.push(d.v20 ? (d.v20.frequency || 0) : 0);
-  chartBuf.flow.push(d.pi ? (d.pi.flow || 0) : 0);
-  const cutoff = now - CHART_MINUTES * 60 * 1000;
-  while (chartBuf.t.length > 0 && chartBuf.t[0] < cutoff) {
-    chartBuf.t.shift(); chartBuf.pressure.shift(); chartBuf.freq.shift(); chartBuf.flow.shift();
-  }
-  // Update legend badges (current values)
-  if (d.pi) {
-    setText('chart-cur-pressure', (d.pi.pressure || 0).toFixed(2));
-    setText('chart-cur-flow', d.pi.flow > 0 ? d.pi.flow.toFixed(1) : '0');
-  }
-  if (d.v20) setText('chart-cur-freq', (d.v20.frequency || 0).toFixed(1));
-}
-
-function renderChart() {
-  const svg = document.getElementById('chart-svg');
-  if (!svg) return;
-  const W = svg.clientWidth || 0;
-  const H = svg.clientHeight || 0;
-  if (W < 20 || H < 20) return;
-  const PAD = { top: 16, right: 38, bottom: 28, left: 34 };
-  const cW = W - PAD.left - PAD.right;
-  const cH = H - PAD.top - PAD.bottom;
-  const n = chartBuf.t.length;
-
-  // Draw gridlines + axes
-  buildChartGrid(PAD, cW, cH);
-  if (n < 2) return;
-
-  const tMin = chartBuf.t[0], tMax = chartBuf.t[n-1];
-  const tRange = tMax - tMin || 1;
-  const P_MAX = 8, P_MIN = 0, Q_MAX = 100, Q_MIN = 0;
-
-  function xOf(t) { return PAD.left + (t - tMin) / tRange * cW; }
-  function yL(v, lo, hi) { return PAD.top + cH - Math.max(0, Math.min(1, (v-lo)/(hi-lo||1))) * cH; }
-  function yR(v, lo, hi) { return PAD.top + cH - Math.max(0, Math.min(1, (v-lo)/(hi-lo||1))) * cH; }
-
-  function makePts(arr, yFn, lo, hi) {
-    return arr.map((v,i) => xOf(chartBuf.t[i]).toFixed(1) + ',' + yFn(v,lo,hi).toFixed(1)).join(' ');
-  }
-
-  document.getElementById('chart-line-pressure').setAttribute('points', makePts(chartBuf.pressure, yL, P_MIN, P_MAX));
-  document.getElementById('chart-line-freq').setAttribute('points',
-    makePts(chartBuf.freq.map(f => f/50*P_MAX), yL, P_MIN, P_MAX));
-  document.getElementById('chart-line-flow').setAttribute('points',
-    makePts(chartBuf.flow, yR, Q_MIN, Q_MAX));
-
-  // Setpoint line
-  const spInput = document.getElementById('piSpNum');
-  const sp = spInput ? (parseFloat(spInput.value) || 3) : 3;
-  const spY = yL(sp, P_MIN, P_MAX).toFixed(1);
-  document.getElementById('chart-sp-line').setAttribute('d',
-    `M${PAD.left},${spY} H${(PAD.left+cW).toFixed(1)}`);
-
-  // Time axis
-  buildTimeAxis(PAD, cW, cH, tMin, tMax);
-}
-
-function buildChartGrid(PAD, cW, cH) {
-  const g = document.getElementById('chart-grid');
-  const yl = document.getElementById('chart-yaxis-l');
-  const yr = document.getElementById('chart-yaxis-r');
-  if (!g || !yl || !yr) return;
-  g.innerHTML = ''; yl.innerHTML = ''; yr.innerHTML = '';
-
-  const ns = 'http://www.w3.org/2000/svg';
-  // Horizontal lines + left labels (0,2,4,6,8 bar)
-  [0,2,4,6,8].forEach(v => {
-    const y = PAD.top + cH - (v/8) * cH;
-    const line = document.createElementNS(ns,'line');
-    line.setAttribute('x1', PAD.left); line.setAttribute('x2', PAD.left+cW);
-    line.setAttribute('y1', y); line.setAttribute('y2', y);
-    line.setAttribute('stroke','#21262d'); line.setAttribute('stroke-width','1');
-    g.appendChild(line);
-    const t = document.createElementNS(ns,'text');
-    t.setAttribute('x', PAD.left-3); t.setAttribute('y', y+3);
-    t.setAttribute('text-anchor','end'); t.setAttribute('font-size','8');
-    t.setAttribute('fill','#60a5fa'); t.textContent = v;
-    yl.appendChild(t);
-  });
-  // Right axis labels (0,25,50,75,100 L/min)
-  [0,25,50,75,100].forEach(v => {
-    const y = PAD.top + cH - (v/100) * cH;
-    const t = document.createElementNS(ns,'text');
-    t.setAttribute('x', PAD.left+cW+3); t.setAttribute('y', y+3);
-    t.setAttribute('font-size','8'); t.setAttribute('fill','#fb923c');
-    t.textContent = v;
-    yr.appendChild(t);
-  });
-}
-
-function buildTimeAxis(PAD, cW, cH, tMin, tMax) {
-  const g = document.getElementById('chart-xaxis');
-  if (!g) return;
-  g.innerHTML = '';
-  const ns = 'http://www.w3.org/2000/svg';
-  const interval = 5 * 60 * 1000;
-  let t = Math.ceil(tMin / interval) * interval;
-  const tRange = tMax - tMin || 1;
-  while (t <= tMax) {
-    const x = PAD.left + (t - tMin) / tRange * cW;
-    const d = new Date(t);
-    const label = d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
-    const tick = document.createElementNS(ns,'line');
-    tick.setAttribute('x1',x); tick.setAttribute('x2',x);
-    tick.setAttribute('y1', PAD.top+cH); tick.setAttribute('y2', PAD.top+cH+4);
-    tick.setAttribute('stroke','#30363d'); tick.setAttribute('stroke-width','1');
-    g.appendChild(tick);
-    const text = document.createElementNS(ns,'text');
-    text.setAttribute('x',x); text.setAttribute('y', PAD.top+cH+14);
-    text.setAttribute('text-anchor','middle'); text.setAttribute('font-size','8');
-    text.setAttribute('fill','#8b949e'); text.textContent = label;
-    g.appendChild(text);
-    t += interval;
-  }
-}
-
-// Chart hover crosshair
-document.getElementById('chart-svg').addEventListener('mousemove', e => {
-  const svg = e.currentTarget;
-  const rect = svg.getBoundingClientRect();
-  const mx = e.clientX - rect.left;
-  const my = e.clientY - rect.top;
-  const ch = document.getElementById('chart-crosshair');
-  const H = svg.clientHeight || 300;
-  ch.setAttribute('x1', mx); ch.setAttribute('x2', mx);
-  ch.setAttribute('y1', 0);  ch.setAttribute('y2', H);
-  ch.setAttribute('visibility', 'visible');
-  // Find nearest time point
-  const n = chartBuf.t.length;
-  if (n < 2) return;
-  const PAD = { left:34, right:38 };
-  const cW = (svg.clientWidth || 600) - PAD.left - PAD.right;
-  const fracX = Math.max(0, Math.min(1, (mx - PAD.left) / cW));
-  const idx = Math.min(n-1, Math.max(0, Math.round(fracX * (n-1))));
-  const tt = document.getElementById('chart-tooltip');
-  const ttBg = document.getElementById('chart-tt-bg');
-  const ttText = document.getElementById('chart-tt-text');
-  if (tt && ttBg && ttText) {
-    const lines = [
-      'P: ' + chartBuf.pressure[idx].toFixed(2) + ' bar',
-      'f: ' + chartBuf.freq[idx].toFixed(1) + ' Hz',
-      'Q: ' + chartBuf.flow[idx].toFixed(1) + ' L/min',
-    ];
-    while (ttText.firstChild) ttText.removeChild(ttText.firstChild);
-    lines.forEach((l, i) => {
-      const ns = 'http://www.w3.org/2000/svg';
-      const tspan = document.createElementNS(ns, 'tspan');
-      tspan.setAttribute('x', mx + 6); tspan.setAttribute('dy', i === 0 ? '10' : '11');
-      tspan.textContent = l;
-      ttText.appendChild(tspan);
-    });
-    const bx = mx + 4; const by = Math.max(16, Math.min(my - 18, (svg.clientHeight||300) - 52));
-    ttBg.setAttribute('x', bx); ttBg.setAttribute('y', by); ttBg.setAttribute('width','90'); ttBg.setAttribute('height','38');
-    ttText.setAttribute('x', bx+3); ttText.setAttribute('y', by);
-    tt.setAttribute('visibility','visible');
-  }
-});
-document.getElementById('chart-svg').addEventListener('mouseleave', () => {
-  const ch = document.getElementById('chart-crosshair');
-  const tt = document.getElementById('chart-tooltip');
-  if (ch) ch.setAttribute('visibility','hidden');
-  if (tt) tt.setAttribute('visibility','hidden');
-});
-
-// ── Main UI Update ──
-function updateUI(d) {
-  if (!d) return;
-
-  // V20
-  if (d.v20) {
-    const v = d.v20;
-    const hz = v.frequency;
-    document.getElementById('freqSlider').value = v.freq_setpoint;
-    document.getElementById('freqVal').textContent = v.freq_setpoint.toFixed(1) + ' Hz';
-    // Fan animation in settings card
-    const fsvg = document.getElementById('fanSvg');
-    if (fsvg && d.fan) {
-      if (d.fan.rpm > 0) { fsvg.style.animationDuration=(60/Math.max(d.fan.rpm,1))+'s'; fsvg.classList.add('fan-spin'); }
-      else { fsvg.classList.remove('fan-spin'); }
-    }
-  }
-
-  // Temp (air temp for schematic/KPI only)
-  // Fan
-  if (d.fan) {
-    const f = d.fan;
-    setText('fanRPM', f.rpm);
-    setText('fanPWM', f.pwm);
-    document.getElementById('fanPWMSlider').value = f.pwm;
-    setText('fanPWMVal', f.pwm);
-    const modes = ['Auto','LOGO','MQTT','Web'];
-    const mIdx = modes.indexOf(f.mode);
-    for (let i=0; i<4; i++) {
-      const b = document.getElementById('fm'+i);
-      if (b) b.classList.toggle('active', i === mIdx);
-    }
-  }
-
-  // Zeitsperre
-  if (d.timeguard) updateTimeguard(d.timeguard);
-
-  // PI
-  if (d.pi) updatePI(d.pi);
-
-  // Presets
-  if (d.active_preset !== undefined) updatePresetStatus(d);
-
-  // Vacation
-  if (d.vacation !== undefined) updateVacationUI(d.vacation.enabled);
-
-  // System
-  if (d.sys) {
-    const s = d.sys;
-    setText('sysIP', s.ip);
-    setText('hdrIP', s.ip);
-    setText('sysFW', s.fw);
-    let u = s.uptime, str = '';
-    if (u >= 86400) { str += Math.floor(u/86400)+'d '; u %= 86400; }
-    if (u >= 3600) { str += Math.floor(u/3600)+'h '; u %= 3600; }
-    if (u >= 60) { str += Math.floor(u/60)+'m '; u %= 60; }
-    str += u + 's';
-    setText('sysUp', str);
-    const rd = document.getElementById('rtuDot'), rs = document.getElementById('rtuSt');
-    if (s.rtu_connected) { rd.className='dot dot-green'; rs.textContent='RTU'; }
-    else { rd.className='dot dot-red'; rs.textContent='RTU'; }
-    setText('tcpSt', s.tcp_clients + ' Client' + (s.tcp_clients!==1?'s':''));
-    const md = document.getElementById('mqttDot'), ms = document.getElementById('mqttSt');
-    if (s.mqtt) { md.className='dot dot-green'; ms.textContent='MQTT'; }
-    else { md.className='dot dot-red'; ms.textContent='MQTT'; }
-  }
-
-  // New HMI calls
-  updateModeBadge(d.v20);
-  updateKPIPanel(d);
-  updateSchematic(d);
-  chartPush(d);
-  renderChart();
-}
-
-// ── API ──
-async function api(ep, method, body) {
-  const opts = { method: method||'POST', headers: {'Content-Type':'application/json'} };
-  if (body) opts.body = JSON.stringify(body);
-  return fetch('/api/' + ep, opts);
-}
-
-// ── Urlaubsmodus ──
-async function toggleVacation(enable) {
-  await api('vacation', 'POST', {enabled: enable});
-  updateVacationUI(enable);
-  showToast(enable ? 'Urlaubsmodus aktiviert – Pumpe gesperrt' : 'Urlaubsmodus deaktiviert', 'info');
-}
-function updateVacationUI(enabled) {
-  const banner = document.getElementById('vacationBanner');
-  const btn = document.getElementById('vacationBtn');
-  const btnS = document.getElementById('vacationBtnSettings');
-  const statusS = document.getElementById('vacationStatusSettings');
-  if (banner) banner.style.display = enabled ? 'block' : 'none';
-  if (btn) {
-    btn.onclick = enabled ? () => toggleVacation(false) : () => toggleVacation(true);
-    btn.innerHTML = enabled
-      ? '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Urlaub AKTIV – Deaktivieren'
-      : '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg> Urlaubsmodus';
-    btn.style.background = enabled ? '#92400e' : '#d97706';
-  }
-  if (btnS) {
-    btnS.onclick = enabled ? () => toggleVacation(false) : () => toggleVacation(true);
-    btnS.textContent = enabled ? 'Urlaubsmodus deaktivieren' : 'Urlaubsmodus aktivieren';
-    btnS.style.background = enabled ? '#92400e' : '#d97706';
-  }
-  if (statusS) {
-    statusS.textContent = 'Status: ' + (enabled ? 'AKTIV – Pumpe gesperrt' : 'Inaktiv');
-    statusS.style.color = enabled ? '#fbbf24' : '#64748b';
-  }
-}
-
-function setFreq(hz) {
-  document.getElementById('freqSlider').value = hz;
-  document.getElementById('freqVal').textContent = hz + ' Hz';
-  api('v20/freq', 'POST', {hz});
-}
-function setFanMode(m) { api('fan/mode', 'POST', {mode: m}); }
-
-// ── @keyframes for fan in schematic ──
-(function() {
-  if (!document.getElementById('sch-fan-style')) {
-    const s = document.createElement('style');
-    s.id = 'sch-fan-style';
-    s.textContent = '@keyframes fan-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}';
-    document.head.appendChild(s);
-  }
-})();
-
-// ── Zeitsperre UI ──
-let tgDays = [true,true,true,true,true,true,true];
-let tgChanged = false;
-function tgDirty() {
-  tgChanged = true;
-  const btn = document.getElementById('tgSaveBtn');
-  btn.disabled = false; btn.textContent = 'Speichern';
-}
-function tgToggleDay(i) {
-  tgDays[i] = !tgDays[i];
-  const btn = document.getElementById('tgD'+i);
-  if (btn) btn.classList.toggle('active', tgDays[i]);
-  tgDirty();
-}
-async function tgSave() {
-  const startVal = document.getElementById('tgStart').value || '07:00';
-  const endVal = document.getElementById('tgEnd').value || '22:00';
-  const [sh,sm] = startVal.split(':').map(Number);
-  const [eh,em] = endVal.split(':').map(Number);
-  const body = { enabled: document.getElementById('tgEnabled').checked, start_hour:sh, start_min:sm, end_hour:eh, end_min:em, days:tgDays };
-  await api('timeguard', 'POST', body);
-  showToast('Zeitsperre gespeichert', 'success');
-  tgChanged = false;
-  const btn = document.getElementById('tgSaveBtn');
-  btn.disabled = true; btn.textContent = 'Gespeichert';
-}
-function updateTimeguard(tg) {
-  if (!tg) return;
-  setText('tgClock', tg.time || '--:--');
-  const dot = document.getElementById('tgDot'), st = document.getElementById('tgStatus');
-  if (!tg.synced) { dot.className='dot dot-yellow'; st.textContent='KEIN NTP'; st.style.color='#d29922'; }
-  else if (!tg.enabled) { dot.className='dot dot-gray'; st.textContent='DEAKTIVIERT'; st.style.color='#8b949e'; }
-  else if (tg.allowed) { dot.className='dot dot-green'; st.textContent='FREI'; st.style.color='#3fb950'; }
-  else { dot.className='dot dot-red'; st.textContent='GESPERRT'; st.style.color='#f85149'; }
-  if (!tgChanged) {
-    document.getElementById('tgEnabled').checked = tg.enabled;
-    document.getElementById('tgStart').value = tg.start || '07:00';
-    document.getElementById('tgEnd').value = tg.end || '22:00';
-    if (tg.days && tg.days.length === 7) {
-      tgDays = tg.days.slice();
-      for (let i=0; i<7; i++) {
-        const b = document.getElementById('tgD'+i);
-        if (b) b.classList.toggle('active', tgDays[i]);
-      }
-    }
-  }
-}
-
-// ── PI Regelung UI ──
-let piChanged = false;
-async function resetDryRun() { await api('pressure/reset_dryrun','POST'); showToast('Trockenlauf quittiert','info'); }
-function piDirty() {
-  piChanged = true;
-  const btn = document.getElementById('piSaveBtn');
-  btn.disabled = false; btn.textContent = 'Speichern';
-}
-async function piSave() {
-  const body = {
-    enabled: document.getElementById('piEnabled').checked,
-    setpoint: parseFloat(document.getElementById('piSpNum').value),
-    p_on: parseFloat(document.getElementById('piPon').value),
-    p_off: parseFloat(document.getElementById('piPoff').value),
-    kp: parseFloat(document.getElementById('piKp').value),
-    ki: parseFloat(document.getElementById('piKi').value),
-    freq_min: parseFloat(document.getElementById('piFreqMin').value),
-    freq_max: parseFloat(document.getElementById('piFreqMax').value)
-  };
-  await api('pressure', 'POST', body);
-  showToast('PI-Parameter gespeichert', 'success');
-  piChanged = false;
-  const btn = document.getElementById('piSaveBtn');
-  btn.disabled = true; btn.textContent = 'Gespeichert';
-}
-function updatePI(pi) {
-  if (!pi) return;
-  if (!piChanged) {
-    document.getElementById('piEnabled').checked = pi.enabled;
-    document.getElementById('piSpNum').value = (pi.setpoint||3.0).toFixed(1);
-    document.getElementById('piPon').value = (pi.p_on||2.2).toFixed(1);
-    document.getElementById('piPoff').value = (pi.p_off||4.0).toFixed(1);
-    document.getElementById('piKp').value = (pi.kp||8.0).toFixed(1);
-    document.getElementById('piKi').value = (pi.ki||1.0).toFixed(2);
-    document.getElementById('piFreqMin').value = (pi.freq_min||35).toFixed(0);
-    document.getElementById('piFreqMax').value = (pi.freq_max||50).toFixed(0);
-  }
-}
-
-// ── Betriebsmodi (Presets) ──
-let _presets = [], _activePreset = '';
-async function loadPresets() {
-  try {
-    const r = await fetch('/api/presets'); if (!r.ok) return;
-    const d = await r.json(); _presets = d.presets||[]; _activePreset = d.active||'';
-    renderPresetButtons(); renderPresetEditor();
-  } catch(e) {}
-}
-function renderPresetButtons() {
-  const c = document.getElementById('presetButtons'); if (!c) return;
-  c.innerHTML = '';
-  _presets.forEach(p => {
-    const active = (p.name === _activePreset);
-    const btn = document.createElement('button');
-    btn.textContent = p.name;
-    btn.style.cssText = 'padding:.4rem .6rem;border-radius:3px;font-size:.72rem;font-weight:600;cursor:pointer;transition:background .15s,color .15s;border:1px solid;text-overflow:ellipsis;overflow:hidden;white-space:nowrap;' +
-      (active ? 'background:rgba(45,212,191,.18);border-color:rgba(45,212,191,.35);color:#2dd4bf;' : 'background:var(--surface);border-color:var(--card-border);color:#94a3b8;');
-    btn.onclick = () => applyPreset(p.name);
-    c.appendChild(btn);
-  });
-}
-async function applyPreset(name) {
-  await api('preset/apply', 'POST', {name});
-  showToast('Preset "'+name+'" aktiv', 'success');
-  await loadPresets();
-}
-function updatePresetStatus(d) {
-  if (!d) return;
-  const name = d.active_preset || ''; const mode = d.ctrl_mode;
-  if (name !== _activePreset) { _activePreset = name; renderPresetButtons(); }
-  setText('presetActiveName', name || '--');
-  setText('presetModeLabel', mode === 1 ? 'Durchfluss' : 'Druck');
-  const sv = document.getElementById('presetSetpointVal');
-  if (sv) {
-    const p = _presets.find(x => x.name === name);
-    if (p) {
-      if (mode === 1) { const fs = d.pi&&d.pi.flow_setpoint!=null?d.pi.flow_setpoint:p.setpoint; sv.textContent = fs.toFixed(0)+' L/min'; }
-      else { sv.textContent = p.setpoint.toFixed(1)+' bar'; }
-    } else { sv.textContent = '--'; }
-  }
-}
-function renderPresetEditor() {
-  const list = document.getElementById('presetEditList'); if (!list) return;
-  list.innerHTML = '';
-  _presets.forEach(p => {
-    const row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;background:var(--surface);border-radius:3px;padding:.35rem .55rem;font-size:.72rem;gap:.4rem';
-    const esc = p.name.replace(/'/g,"\\'");
-    const editBtn = `<button onclick="editPreset('${esc}')" style="color:#2dd4bf;font-size:.62rem;padding:.15rem .45rem;border-radius:2px;border:1px solid rgba(45,212,191,.3);background:none;cursor:pointer;flex-shrink:0">Bearb.</button>`;
-    const delBtn = p.name !== 'Normal' ? `<button onclick="deletePreset('${esc}')" style="color:#f87171;font-size:.62rem;padding:.15rem .45rem;border-radius:2px;border:1px solid rgba(239,68,68,.3);background:none;cursor:pointer;flex-shrink:0">Löschen</button>` : '';
-    row.innerHTML = `<span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</span>` +
-      `<span style="color:#64748b;font-size:.62rem;flex-shrink:0">${p.mode===1?'Q':'P'} · ${p.setpoint}${p.mode===1?' L/min':' bar'}</span>` +
-      `<span style="display:flex;gap:3px;flex-shrink:0">${editBtn}${delBtn}</span>`;
-    list.appendChild(row);
-  });
-}
-function editPreset(name) {
-  const p = _presets.find(x => x.name === name); if (!p) return;
-  document.getElementById('npName').value = p.name;
-  document.getElementById('npMode').value = p.mode;
-  document.getElementById('npSP').value = p.setpoint;
-  document.getElementById('npKp').value = p.kp;
-  document.getElementById('npKi').value = p.ki;
-  document.getElementById('npFmin').value = p.freq_min;
-  document.getElementById('npFmax').value = p.freq_max;
-  document.getElementById('npUnit').textContent = p.mode===1 ? 'L/min' : 'bar';
-  const panel = document.getElementById('presetEditorPanel');
-  if (panel.classList.contains('hidden')) togglePresetEditor();
-  setText('npFormTitle', 'Preset bearbeiten');
-  setText('npSaveBtn', 'Änderungen speichern');
-  document.getElementById('npName').focus();
-}
-async function deletePreset(name) {
-  if (!confirm(`Preset "${name}" wirklich löschen?`)) return;
-  await fetch('/api/presets/' + encodeURIComponent(name), {method:'DELETE'});
-  showToast('Preset gelöscht', 'info');
-  await loadPresets();
-}
-async function saveNewPreset() {
-  const name = document.getElementById('npName').value.trim();
-  if (!name) { showToast('Name erforderlich','error'); return; }
-  const body = { name, mode: parseInt(document.getElementById('npMode').value), setpoint: parseFloat(document.getElementById('npSP').value), kp: parseFloat(document.getElementById('npKp').value), ki: parseFloat(document.getElementById('npKi').value), freq_min: parseFloat(document.getElementById('npFmin').value), freq_max: parseFloat(document.getElementById('npFmax').value) };
-  const r = await fetch('/api/presets', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
-  if (r.ok) {
-    showToast('Preset gespeichert','success');
-    document.getElementById('npName').value = '';
-    setText('npFormTitle','Neuer Preset');
-    setText('npSaveBtn','Preset hinzufügen');
-    await loadPresets();
-  }
-}
-function npModeChange() {
-  const m = parseInt(document.getElementById('npMode').value);
-  setText('npUnit', m===1 ? 'L/min' : 'bar');
-  document.getElementById('npKp').value = m===1 ? '0.30' : '8.0';
-  document.getElementById('npKi').value = m===1 ? '0.05' : '1.0';
-  document.getElementById('npSP').value = m===1 ? '30' : '3.0';
-}
-function togglePresetEditor() {
-  const p = document.getElementById('presetEditorPanel');
-  const c = document.getElementById('presetEditorChev');
-  const vis = p.classList.toggle('hidden');
-  if (c) c.classList.toggle('collapsed', vis);
-}
-
-// ── Log Panel ──
-let _logBuf = [], _logSeq = 0;
-function clearLog() { _logBuf = []; setText('logBox',''); }
-function appendLog(lines, seq) {
-  const box = document.getElementById('logBox'); if (!box || !lines) return;
-  if (seq === undefined) { _logBuf = lines.slice(); }
-  else if (_logSeq === 0) { _logBuf = lines.slice(); }
-  else {
-    const newCount = seq - _logSeq;
-    if (newCount > 0 && newCount <= lines.length) { _logBuf.push(...lines.slice(-newCount)); }
-    else if (newCount < 0 || newCount > lines.length) { _logBuf = lines.slice(); }
-  }
-  _logSeq = seq || 0;
-  if (_logBuf.length > 500) _logBuf = _logBuf.slice(-500);
-  box.textContent = _logBuf.join('\n');
-  const auto = document.getElementById('logAuto');
-  if (auto && auto.checked) box.scrollTop = box.scrollHeight;
-}
-
-// ── Theme Toggle ──
-function toggleTheme() {
-  const html = document.documentElement;
-  const light = html.getAttribute('data-theme') === 'light';
-  const next = light ? 'dark' : 'light';
-  html.setAttribute('data-theme', next);
-  localStorage.setItem('theme', next);
-  updateThemeIcons(next);
-  document.querySelector('meta[name="theme-color"]').content = next==='light' ? '#eaeef2' : '#0d1117';
-}
-function updateThemeIcons(theme) {
-  const light = theme === 'light';
-  document.getElementById('themeIconMoon').classList.toggle('hidden', light);
-  document.getElementById('themeIconSun').classList.toggle('hidden', !light);
-}
-
-// ── @keyframes fan (settings card) ──
-(function() {
-  const s = document.createElement('style');
-  s.textContent = '@keyframes fan-spin{from{transform-origin:center;transform:rotate(0deg)}to{transform-origin:center;transform:rotate(360deg)}}';
-  document.head.appendChild(s);
-})();
-
-// ── Init ──
-document.addEventListener('DOMContentLoaded', () => {
-  const saved = localStorage.getItem('activePage') || 'overview';
-  switchPage(saved);
-  const savedTab = localStorage.getItem('activeSettingsTab') || 'pi';
-  switchSettingsTab(savedTab);
-  initDash();
-  gsap.from('#page-overview', {opacity:0, duration:0.4, ease:'power2.out'});
-  updateThemeIcons(localStorage.getItem('theme') || 'dark');
-  if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js').catch(()=>{}); }
-});
-</script>
+<script src="/app.js" defer></script>
 </body>
 </html>

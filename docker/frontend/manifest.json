@@ -4,8 +4,8 @@
   "id": "/",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0d1117",
-  "theme_color": "#0d1117",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
   "description": "Pumpensteuerung Dashboard",
   "orientation": "any",
   "icons": [

@@ -1,55 +1,28 @@
 'use strict';
-const CACHE = 'pumpe-v6';
-const STATIC = [
-  '/',
-  '/index.html',
-  '/styles.css',
-  '/app.js',
-  '/manifest.json',
-  '/icon.svg'
-];
+/* Self-destruct service worker:
+   - löscht alle Caches
+   - deregistriert sich selbst
+   - lädt offene Clients neu
+   Grund: alte SW-Versionen haben veraltetes Markup ausgeliefert. */
 
-self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(STATIC)).catch(() => {})
-  );
+self.addEventListener('install', (e) => {
   self.skipWaiting();
 });
 
-self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    ).then(() => self.clients.claim())
-  );
+self.addEventListener('activate', (e) => {
+  e.waitUntil((async () => {
+    try {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    } catch {}
+    try {
+      await self.registration.unregister();
+    } catch {}
+    const clients = await self.clients.matchAll({ type: 'window' });
+    for (const c of clients) {
+      try { c.navigate(c.url); } catch {}
+    }
+  })());
 });
 
-self.addEventListener('fetch', e => {
-  const url = new URL(e.request.url);
-
-  // Skip WebSocket and API requests
-  if (url.pathname.startsWith('/api/') || url.pathname === '/ws') return;
-
-  // Navigation requests: network-first, cache fallback
-  if (e.request.mode === 'navigate') {
-    e.respondWith(
-      fetch(e.request).then(r => {
-        const clone = r.clone();
-        caches.open(CACHE).then(c => c.put(e.request, clone));
-        return r;
-      }).catch(() => caches.match('/index.html').then(r => r || caches.match('/')))
-    );
-    return;
-  }
-
-  // Other requests: network-first with cache fallback
-  e.respondWith(
-    fetch(e.request).then(r => {
-      if (r && r.status === 200) {
-        const clone = r.clone();
-        caches.open(CACHE).then(c => c.put(e.request, clone));
-      }
-      return r;
-    }).catch(() => caches.match(e.request))
-  );
-});
+self.addEventListener('fetch', () => { /* no-op, lass den Browser machen */ });

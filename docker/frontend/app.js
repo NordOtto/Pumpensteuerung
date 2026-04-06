@@ -389,11 +389,16 @@ async function renderPresets() {
   });
 }
 
-// ---------------- Service Worker ----------------
+// ---------------- Service Worker (Cleanup) ----------------
+// Alte SW-Versionen haben veraltetes Markup ausgeliefert.
+// Wir deregistrieren jeden vorhandenen SW und löschen alle Caches.
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
-  });
+  navigator.serviceWorker.getRegistrations().then((regs) => {
+    regs.forEach((r) => r.unregister().catch(() => {}));
+  }).catch(() => {});
+  if (window.caches) {
+    caches.keys().then((keys) => keys.forEach((k) => caches.delete(k))).catch(() => {});
+  }
 }
 
 // ---------------- Boot ----------------

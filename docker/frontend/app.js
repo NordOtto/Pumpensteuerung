@@ -34,26 +34,26 @@ const $ = (id) => document.getElementById(id);
 
 const els = {
   freq:        $('vFreq'),
-  freqCard:    $('vFreqCard'),
   freqSet:     $('vFreqSet'),
   pressure:    $('vPressure'),
   pressureSet: $('vPressureSet'),
   flow:        $('vFlow'),
   flowSub:     $('vFlowSub'),
+  waterTemp:   $('vWaterTemp'),
+  waterTempSub:$('vWaterTempSub'),
+  motorTemp:   $('vMotorTemp'),
+  motorTempSub:$('vMotorTempSub'),
+  fanRpm:      $('vFanRpm'),
+  fanSub:      $('vFanSub'),
   voltage:     $('dVoltage'),
   current:     $('dCurrent'),
   power:       $('dPower'),
-  waterTemp:   $('dWaterTemp'),
-  airTemp:     $('dAirTemp'),
-  fan:         $('dFan'),
-  statusText:  $('statusText'),
-  statusSub:   $('vStatusSubMini'),
+  dcBus:       $('dDcBus'),
+  freqOut:     $('dFreqOut'),
+  freqSetHw:   $('dFreqSet'),
   statusBadge: $('statusBadge'),
   badgeText:   $('statusBadgeText'),
   badgeDot:    $('statusBadgeDot'),
-  dotMqtt:     $('dotMqtt'),
-  dotModbus:   $('dotModbus'),
-  dotPump:     $('dotPump'),
   statusMqtt:  $('statusMqtt'),
   statusModbus:$('statusModbus'),
   uptime:      $('statusUptime'),
@@ -104,9 +104,6 @@ function connectWS() {
   ws.onclose = () => {
     log('WS getrennt, reconnect...');
     setTimeout(connectWS, 3000);
-    setDot('dotMqtt', false);
-    setDot('dotModbus', false);
-    setDot('dotPump', false);
     setStatusBadge('offline', 'Offline');
   };
   ws.onerror = () => { log('WS Error'); ws.close(); };
@@ -152,34 +149,26 @@ function updateUI(st) {
   if (st.v20) {
     const freq = (st.v20.frequency || 0).toFixed(1);
     els.freq.textContent = freq;
-    els.freqCard.textContent = freq;
     els.freqSet.textContent = (st.v20.freq_setpoint || 0).toFixed(1);
     els.voltage.textContent = (st.v20.voltage || 0).toFixed(1);
     els.current.textContent = (st.v20.current || 0).toFixed(2);
     els.power.textContent = (st.v20.power || 0).toFixed(2);
+    els.dcBus.textContent = (st.v20.dc_bus || 0).toFixed(0);
+    els.freqOut.textContent = freq;
+    els.freqSetHw.textContent = (st.v20.freq_setpoint || 0).toFixed(1);
 
-    // Status badge + text
-    let badgeState = 'ready', badgeLabel = 'Bereit', statusColor = 'text-blue-500 dark:text-blue-400';
+    // Status badge
+    let badgeState = 'ready', badgeLabel = 'Bereit';
     if (st.v20.fault) {
       badgeState = 'fault'; badgeLabel = `Störung ${st.v20.fault_code || ''}`;
-      statusColor = 'text-red-500';
     } else if (st.v20.running) {
       badgeState = 'running'; badgeLabel = 'Läuft';
-      statusColor = 'text-green-500 dark:text-green-400';
     } else if (!st.v20.connected) {
       badgeState = 'offline'; badgeLabel = 'Offline';
-      statusColor = 'text-slate-400';
     }
     setStatusBadge(badgeState, badgeLabel);
-    els.statusText.className = `text-xl sm:text-3xl font-bold ${statusColor}`;
-    els.statusText.textContent = badgeLabel;
-    els.statusSub.textContent = st.v20.running ? 'Motor Aktiv' : st.v20.fault ? 'Fehler prüfen' : st.v20.connected ? 'Standby' : 'Keine Verbindung';
 
-    // Pump dot
-    setDot('dotPump', st.v20.running);
-
-    // Modbus dot
-    setDot('dotModbus', st.v20.connected);
+    // Modbus status
     els.statusModbus.textContent = st.v20.connected ? 'Verbunden' : 'Fehler';
     els.statusModbus.className = `text-[10px] font-bold px-2 py-0.5 rounded-md ${st.v20.connected ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' : 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'}`;
   }
@@ -188,28 +177,55 @@ function updateUI(st) {
   if (st.pi) {
     els.pressure.textContent = (st.pi.pressure || 0).toFixed(2);
     els.flow.textContent = (st.pi.flow || 0).toFixed(1);
-    els.waterTemp.textContent = st.pi.water_temp !== -127 ? (st.pi.water_temp || 0).toFixed(1) : '--';
     pushChart(st.pi.pressure);
+
+    // Water temp KPI card
+    if (st.pi.water_temp !== -127 && st.pi.water_temp !== undefined) {
+      els.waterTemp.textContent = (st.pi.water_temp).toFixed(1);
+      const wt = st.pi.water_temp;
+      els.waterTempSub.textContent = wt < 10 ? 'Kalt' : wt < 18 ? 'Normal' : 'Warm';
+      els.waterTempSub.className = `text-xs font-medium mt-1 ${wt < 10 ? 'text-cyan-500' : wt < 18 ? 'text-green-500' : 'text-orange-500'}`;
+    } else {
+      els.waterTemp.textContent = '--';
+      els.waterTempSub.textContent = 'Kein Sensor';
+      els.waterTempSub.className = 'text-xs text-slate-400 font-medium mt-1';
+    }
 
     // Flow sub-status
     if (st.pi.flow > 0.5) {
       els.flowSub.textContent = 'Strömung Ok';
       els.flowSub.className = 'text-xs text-green-600 dark:text-green-400 font-medium mt-1';
     } else {
-      els.flowSub.textContent = 'Kein Fluss';
+      els.flowSub.textContent = 'Kein Durchfluss';
       els.flowSub.className = 'text-xs text-slate-400 font-medium mt-1';
     }
   }
 
-  // Air temp
-  if (st.temp !== undefined) els.airTemp.textContent = st.temp !== -127 ? st.temp : '--';
+  // Enclosure / motor temp KPI card
+  if (st.temp !== undefined) {
+    if (st.temp !== -127) {
+      els.motorTemp.textContent = st.temp;
+      const mt = st.temp;
+      els.motorTempSub.textContent = mt < 30 ? 'Normal' : mt < 50 ? 'Warm' : 'Heiß!';
+      els.motorTempSub.className = `text-xs font-medium mt-1 ${mt < 30 ? 'text-green-500' : mt < 50 ? 'text-orange-500' : 'text-red-500'}`;
+    } else {
+      els.motorTemp.textContent = '--';
+      els.motorTempSub.textContent = 'Kein Sensor';
+      els.motorTempSub.className = 'text-xs text-slate-400 font-medium mt-1';
+    }
+  }
 
-  // Fan
-  if (st.fan) els.fan.textContent = st.fan.rpm;
+  // Fan RPM KPI card
+  if (st.fan) {
+    els.fanRpm.textContent = st.fan.rpm;
+    const mode = st.fan.mode === 'Auto' ? 'Automatik' : 'Manuell';
+    const pct = Math.round(st.fan.pwm / 255 * 100);
+    els.fanSub.textContent = `${mode} · ${pct}%`;
+    els.fanSub.className = `text-xs font-medium mt-1 ${st.fan.rpm > 0 ? 'text-sky-500' : 'text-slate-400'}`;
+  }
 
-  // MQTT dot
+  // MQTT status
   if (st.sys) {
-    setDot('dotMqtt', st.sys.mqtt);
     els.statusMqtt.textContent = st.sys.mqtt ? 'Verbunden' : 'Getrennt';
     els.statusMqtt.className = `text-[10px] font-bold px-2 py-0.5 rounded-md ${st.sys.mqtt ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' : 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'}`;
 

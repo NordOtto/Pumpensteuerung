@@ -86,34 +86,23 @@
         </div>
 
         <!-- Control Bar -->
-        <div class="bg-gradient-to-b from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 mt-[-8px] rounded-b-[1.1rem] p-3 sm:p-5 pt-5 sm:pt-6 border-t border-slate-300 dark:border-slate-700 relative z-20 flex flex-col sm:flex-row items-center gap-3 sm:gap-4">
-          <div class="flex gap-3 justify-center flex-1 w-full">
-            <button id="btnStart" class="skeuo-btn-green flex-1 sm:flex-none sm:w-40 py-3 sm:py-4 px-4 sm:px-6 text-sm sm:text-lg">START</button>
-            <button id="btnStop" class="skeuo-btn-red flex-1 sm:flex-none sm:w-40 py-3 sm:py-4 px-4 sm:px-6 text-sm sm:text-lg">STOP</button>
-            <button id="btnReset" class="bg-slate-300 dark:bg-slate-700 hover:bg-slate-400 dark:hover:bg-slate-600 active:bg-slate-500 dark:active:bg-slate-800 text-slate-700 dark:text-white font-bold py-3 sm:py-4 px-4 sm:px-5 rounded-xl shadow-[0_4px_0_#94a3b8,0_5px_10px_rgba(0,0,0,0.3)] dark:shadow-skeuo-btn transition-all active:translate-y-1 active:shadow-none border border-slate-400 dark:border-slate-600 flex items-center justify-center" title="Störung Quittieren">
-              <span class="material-symbols-outlined text-2xl sm:text-3xl">sync</span>
+        <div class="bg-gradient-to-b from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 mt-[-8px] rounded-b-[1.1rem] p-3 sm:p-5 pt-5 sm:pt-6 border-t border-slate-300 dark:border-slate-700 relative z-20">
+          <div class="flex gap-3 justify-center w-full">
+            <button id="btnStart" class="skeuo-btn-green flex-1 sm:flex-none sm:w-44 py-3.5 sm:py-4 px-5 sm:px-8 text-sm sm:text-base flex items-center justify-center gap-2">
+              <span class="material-symbols-outlined text-xl">play_arrow</span> Start
             </button>
-          </div>
-          <!-- Status Dots -->
-          <div class="flex items-center gap-5 sm:gap-6 px-4 sm:px-5 py-2 sm:py-2.5 bg-white/50 dark:bg-black/40 rounded-xl border border-slate-200 dark:border-slate-700/50">
-            <div class="flex items-center gap-1.5 sm:gap-2 text-xs text-slate-500 dark:text-slate-400" title="MQTT Broker">
-              <div id="dotMqtt" class="w-3 h-3 rounded-full bg-slate-400 transition-all"></div>
-              <span class="material-symbols-outlined text-lg">router</span>
-            </div>
-            <div class="flex items-center gap-1.5 sm:gap-2 text-xs text-slate-500 dark:text-slate-400" title="Modbus RTU">
-              <div id="dotModbus" class="w-3 h-3 rounded-full bg-slate-400 transition-all"></div>
-              <span class="material-symbols-outlined text-lg">sensors</span>
-            </div>
-            <div class="flex items-center gap-1.5 sm:gap-2 text-xs text-slate-500 dark:text-slate-400" title="Pumpe">
-              <div id="dotPump" class="w-3 h-3 rounded-full bg-slate-400 transition-all"></div>
-              <span class="material-symbols-outlined text-lg">power</span>
-            </div>
+            <button id="btnStop" class="skeuo-btn-red flex-1 sm:flex-none sm:w-44 py-3.5 sm:py-4 px-5 sm:px-8 text-sm sm:text-base flex items-center justify-center gap-2">
+              <span class="material-symbols-outlined text-xl">stop</span> Stop
+            </button>
+            <button id="btnReset" class="skeuo-btn-neutral sm:w-44 py-3.5 sm:py-4 px-5 sm:px-8 text-sm sm:text-base flex items-center justify-center gap-2" title="Störung Quittieren">
+              <span class="material-symbols-outlined text-xl">restart_alt</span> <span class="hidden sm:inline">Reset</span>
+            </button>
           </div>
         </div>
       </div>
 
       <!-- ===== KPI CARDS ===== -->
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
         <!-- Druck -->
         <div class="glass-card rounded-[1rem] p-4 sm:p-5 relative overflow-hidden flex flex-col justify-between min-h-[130px] sm:min-h-[160px] group hover:shadow-lg transition-all">
           <div class="flex justify-between items-center border-b border-slate-200/50 dark:border-slate-700/50 pb-2 z-10 relative">
@@ -129,10 +118,10 @@
           <div class="absolute bottom-0 left-0 w-full h-1/2 wave-bg opacity-70 pointer-events-none"></div>
         </div>
 
-        <!-- Fluss -->
+        <!-- Durchfluss -->
         <div class="glass-card rounded-[1rem] p-4 sm:p-5 relative overflow-hidden flex flex-col justify-between min-h-[130px] sm:min-h-[160px] group hover:shadow-lg transition-all">
           <div class="flex justify-between items-center border-b border-slate-200/50 dark:border-slate-700/50 pb-2 z-10 relative">
-            <span class="font-semibold text-slate-700 dark:text-slate-200 text-sm sm:text-base">Fluss</span>
+            <span class="font-semibold text-slate-700 dark:text-slate-200 text-sm sm:text-base">Durchfluss</span>
             <span class="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Sensor</span>
           </div>
           <div class="mt-2 sm:mt-3 z-10 relative">
@@ -145,34 +134,48 @@
           <div class="absolute bottom-0 left-0 w-full h-1/2 wave-bg opacity-70 pointer-events-none"></div>
         </div>
 
-        <!-- Ist-Freq -->
+        <!-- Wasser Temp -->
         <div class="glass-card rounded-[1rem] p-4 sm:p-5 relative overflow-hidden flex flex-col justify-between min-h-[130px] sm:min-h-[160px] group hover:shadow-lg transition-all">
           <div class="flex justify-between items-center border-b border-slate-200/50 dark:border-slate-700/50 pb-2 z-10 relative">
-            <span class="font-semibold text-slate-700 dark:text-slate-200 text-sm sm:text-base">Ist-Freq</span>
-            <span class="text-[10px] text-slate-400 font-medium uppercase tracking-wider">VFD</span>
+            <span class="font-semibold text-slate-700 dark:text-slate-200 text-sm sm:text-base">Wasser</span>
+            <span class="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Temperatur</span>
           </div>
           <div class="mt-2 sm:mt-3 z-10 relative">
-            <div class="text-3xl sm:text-4xl font-bold text-slate-800 dark:text-white tracking-tight">
-              <span id="vFreqCard">--</span> <span class="text-sm sm:text-lg text-slate-400 font-medium">Hz</span>
+            <div class="text-3xl sm:text-4xl font-bold text-slate-800 dark:text-white tracking-tight flex items-center">
+              <span class="text-cyan-500 mr-1 material-symbols-outlined text-2xl">ac_unit</span>
+              <span id="vWaterTemp">--</span> <span class="text-sm sm:text-lg text-slate-400 font-medium ml-1">°C</span>
             </div>
-            <div class="text-xs text-slate-400 mt-1">Output Freq</div>
+            <div id="vWaterTempSub" class="text-xs text-slate-400 dark:text-slate-500 font-medium mt-1">Brunnenwasser</div>
           </div>
-          <div class="absolute bottom-0 left-0 w-full h-1/2 wave-bg opacity-70 pointer-events-none"></div>
         </div>
 
-        <!-- Status -->
+        <!-- Motor / FU Temp -->
         <div class="glass-card rounded-[1rem] p-4 sm:p-5 relative overflow-hidden flex flex-col justify-between min-h-[130px] sm:min-h-[160px] group hover:shadow-lg transition-all">
           <div class="flex justify-between items-center border-b border-slate-200/50 dark:border-slate-700/50 pb-2 z-10 relative">
-            <span class="font-semibold text-slate-700 dark:text-slate-200 text-sm sm:text-base">Status</span>
+            <span class="font-semibold text-slate-700 dark:text-slate-200 text-sm sm:text-base">Gehäuse</span>
+            <span class="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Temperatur</span>
           </div>
-          <div class="mt-2 sm:mt-3 z-10 relative flex flex-col items-center justify-center">
-            <div class="flex items-center gap-2 sm:gap-3">
-              <div class="bg-slate-200 dark:bg-slate-700 p-2 rounded-full text-slate-600 dark:text-white shadow-sm">
-                <span class="material-symbols-outlined text-xl">power_settings_new</span>
-              </div>
-              <span id="statusText" class="text-xl sm:text-3xl font-bold text-slate-500 dark:text-slate-400">Lade...</span>
+          <div class="mt-2 sm:mt-3 z-10 relative">
+            <div class="text-3xl sm:text-4xl font-bold text-slate-800 dark:text-white tracking-tight flex items-center">
+              <span class="text-orange-500 mr-1 material-symbols-outlined text-2xl">thermostat</span>
+              <span id="vMotorTemp">--</span> <span class="text-sm sm:text-lg text-slate-400 font-medium ml-1">°C</span>
             </div>
-            <div id="vStatusSubMini" class="text-[10px] sm:text-xs text-slate-400 text-center mt-2 font-medium">&nbsp;</div>
+            <div id="vMotorTempSub" class="text-xs text-slate-400 dark:text-slate-500 font-medium mt-1">FU / Motor</div>
+          </div>
+        </div>
+
+        <!-- Lüfter RPM -->
+        <div class="glass-card rounded-[1rem] p-4 sm:p-5 relative overflow-hidden flex flex-col justify-between min-h-[130px] sm:min-h-[160px] group hover:shadow-lg transition-all col-span-2 lg:col-span-1">
+          <div class="flex justify-between items-center border-b border-slate-200/50 dark:border-slate-700/50 pb-2 z-10 relative">
+            <span class="font-semibold text-slate-700 dark:text-slate-200 text-sm sm:text-base">Lüfter</span>
+            <span class="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Kühlung</span>
+          </div>
+          <div class="mt-2 sm:mt-3 z-10 relative">
+            <div class="text-3xl sm:text-4xl font-bold text-slate-800 dark:text-white tracking-tight flex items-center">
+              <span class="text-sky-500 mr-1 material-symbols-outlined text-2xl">mode_fan</span>
+              <span id="vFanRpm">--</span> <span class="text-sm sm:text-lg text-slate-400 font-medium ml-1">RPM</span>
+            </div>
+            <div id="vFanSub" class="text-xs text-slate-400 dark:text-slate-500 font-medium mt-1">&nbsp;</div>
           </div>
         </div>
       </div>
@@ -181,7 +184,7 @@
       <div class="glass-card rounded-[1rem] p-0 overflow-hidden shadow-sm">
         <div class="px-5 sm:px-6 py-3 border-b border-slate-200/50 dark:border-slate-700/50 bg-white/40 dark:bg-slate-800/40 flex justify-between items-center">
           <h3 class="font-bold text-slate-700 dark:text-slate-200 text-sm sm:text-base">Hardware Details</h3>
-          <span class="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Diagnostics</span>
+          <span class="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Sinamics V20</span>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2">
           <div class="md:border-r border-slate-200/50 dark:border-slate-700/50">
@@ -190,26 +193,26 @@
               <span class="hw-val"><span id="dVoltage">--</span> <span class="hw-unit">V</span></span>
             </div>
             <div class="hw-row">
-              <div class="hw-label"><span class="material-symbols-outlined">speed</span><span>Leistung</span></div>
-              <span class="hw-val"><span id="dPower">--</span> <span class="hw-unit">kW</span></span>
+              <div class="hw-label"><span class="material-symbols-outlined">electrical_services</span><span>Strom</span></div>
+              <span class="hw-val"><span id="dCurrent">--</span> <span class="hw-unit">A</span></span>
             </div>
             <div class="hw-row !border-b-0 md:!border-b-0">
-              <div class="hw-label"><span class="material-symbols-outlined">mode_fan</span><span>Lüfter</span></div>
-              <span class="hw-val"><span id="dFan">--</span> <span class="hw-unit">RPM</span></span>
+              <div class="hw-label"><span class="material-symbols-outlined">speed</span><span>Leistung</span></div>
+              <span class="hw-val"><span id="dPower">--</span> <span class="hw-unit">kW</span></span>
             </div>
           </div>
           <div>
             <div class="hw-row">
-              <div class="hw-label"><span class="material-symbols-outlined">electrical_services</span><span>Strom</span></div>
-              <span class="hw-val"><span id="dCurrent">--</span> <span class="hw-unit">A</span></span>
+              <div class="hw-label"><span class="material-symbols-outlined">dynamic_form</span><span>DC Zwischenkreis</span></div>
+              <span class="hw-val"><span id="dDcBus">--</span> <span class="hw-unit">V</span></span>
             </div>
             <div class="hw-row">
-              <div class="hw-label"><span class="material-symbols-outlined text-blue-500">ac_unit</span><span>Wasser Temp.</span></div>
-              <span class="hw-val"><span id="dWaterTemp">--</span> <span class="hw-unit">°C</span></span>
+              <div class="hw-label"><span class="material-symbols-outlined">straighten</span><span>Ist-Frequenz</span></div>
+              <span class="hw-val"><span id="dFreqOut">--</span> <span class="hw-unit">Hz</span></span>
             </div>
             <div class="hw-row !border-b-0">
-              <div class="hw-label"><span class="material-symbols-outlined">thermostat</span><span>Luft Temp.</span></div>
-              <span class="hw-val"><span id="dAirTemp">--</span> <span class="hw-unit">°C</span></span>
+              <div class="hw-label"><span class="material-symbols-outlined">tune</span><span>Sollfrequenz</span></div>
+              <span class="hw-val"><span id="dFreqSet">--</span> <span class="hw-unit">Hz</span></span>
             </div>
           </div>
         </div>

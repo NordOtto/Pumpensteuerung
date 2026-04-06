@@ -26,11 +26,81 @@ setInterval(() => {
     new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 }, 1000);
 
+// ─── Auth ───
+let authToken = localStorage.getItem('authToken');
+
 // ─── Element References ───
 let ws;
 const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
 const wsUrl = `${wsProto}//${location.host}/ws`;
 const $ = (id) => document.getElementById(id);
+
+function authFetch(url, opts = {}) {
+  opts.headers = Object.assign({ 'Authorization': 'Bearer ' + authToken }, opts.headers || {});
+  return fetch(url, opts).then(r => { if (r.status === 401) { doLogout(); } return r; });
+}
+
+async function tryAutoLogin() {
+  if (!authToken) return showLogin();
+  try {
+    const r = await fetch('/api/presets', { headers: { 'Authorization': 'Bearer ' + authToken } });
+    if (r.ok) { showApp(); connectWS(); }
+    else { showLogin(); }
+  } catch { showLogin(); }
+}
+
+function showLogin() {
+  $('loginOverlay').classList.remove('hidden');
+  $('mainApp').classList.add('hidden');
+  $('mobileNav').classList.add('hidden');
+  $('loginUser').focus();
+}
+
+function showApp() {
+  $('loginOverlay').classList.add('hidden');
+  $('mainApp').classList.remove('hidden');
+  $('mobileNav').classList.remove('hidden');
+}
+
+async function doLogin() {
+  const user = $('loginUser').value.trim();
+  const pass = $('loginPass').value;
+  const errEl = $('loginError');
+  if (!user || !pass) { errEl.textContent = 'Bitte ausfüllen'; errEl.classList.remove('hidden'); return; }
+  try {
+    const r = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user, pass })
+    });
+    if (r.ok) {
+      const data = await r.json();
+      authToken = data.token;
+      localStorage.setItem('authToken', authToken);
+      errEl.classList.add('hidden');
+      showApp();
+      connectWS();
+    } else {
+      errEl.textContent = 'Falscher Benutzer oder Passwort';
+      errEl.classList.remove('hidden');
+    }
+  } catch {
+    errEl.textContent = 'Verbindungsfehler';
+    errEl.classList.remove('hidden');
+  }
+}
+
+function doLogout() {
+  authToken = null;
+  localStorage.removeItem('authToken');
+  if (ws) { ws.close(); ws = null; }
+  showLogin();
+}
+
+$('btnLogin').onclick = doLogin;
+$('loginPass').addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
+$('loginUser').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('loginPass').focus(); });
+$('btnLogout').onclick = doLogout;
 
 const els = {
   freq:        $('vFreq'),
@@ -110,7 +180,7 @@ document.addEventListener('keydown', (e) => {
 
 // ─── WebSocket ───
 function connectWS() {
-  ws = new WebSocket(wsUrl);
+  ws = new WebSocket(`${wsUrl}?token=${authToken}`);
   ws.onopen = () => log('WebSocket verbunden');
   ws.onclose = () => {
     log('WS getrennt, reconnect...');
@@ -364,9 +434,9 @@ function pushChart(val) {
 }
 
 // ─── Buttons ───
-$('btnStart').onclick = () => fetch('/api/v20/start', { method: 'POST' }).then(() => $toast.show('Start gesendet'));
-$('btnStop').onclick = () => fetch('/api/v20/stop', { method: 'POST' }).then(() => $toast.show('Stop gesendet'));
-$('btnReset').onclick = () => fetch('/api/v20/reset', { method: 'POST' }).then(() => $toast.show('Reset gesendet'));
+$('btnStart').onclick = () => authFetch('/api/v20/start', { method: 'POST' }).then(() => $toast.show('Start gesendet'));
+$('btnStop').onclick = () => authFetch('/api/v20/stop', { method: 'POST' }).then(() => $toast.show('Stop gesendet'));
+$('btnReset').onclick = () => authFetch('/api/v20/reset', { method: 'POST' }).then(() => $toast.show('Reset gesendet'));
 
 // ─── Freq Slider ───
 let slTimer;
@@ -376,7 +446,7 @@ els.slider.addEventListener('input', (e) => {
 els.slider.addEventListener('change', (e) => {
   clearTimeout(slTimer);
   slTimer = setTimeout(() => {
-    fetch('/api/v20/freq', {
+    authFetch('/api/v20/freq', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ hz: parseFloat(e.target.value) })
@@ -441,7 +511,7 @@ $('closeDrawer').onclick = () => {
 // ─── Presets ───
 async function loadPresets() {
   try {
-    const res = await fetch('/api/presets');
+    const res = await authFetch('/api/presets');
     const data = await res.json();
     const activePreset = data.active || '';
     const presets = data.presets || data;
@@ -479,7 +549,7 @@ async function loadPresets() {
 }
 
 window.applyP = async (name) => {
-  const res = await fetch('/api/preset/apply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
+  const res = await authFetch('/api/preset/apply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
   const d = await res.json();
   if (d.success || d.ok) { $toast.show(`Preset "${name}" geladen`); $('closeDrawer').click(); }
   else $toast.show(d.error || 'Fehler', 'error');
@@ -487,7 +557,7 @@ window.applyP = async (name) => {
 
 window.delP = async (name) => {
   if (!confirm(`Preset "${name}" löschen?`)) return;
-  const res = await fetch(`/api/presets/${encodeURIComponent(name)}`, { method: 'DELETE' });
+  const res = await authFetch(`/api/presets/${encodeURIComponent(name)}`, { method: 'DELETE' });
   const d = await res.json();
   if (d.ok) { $toast.show(`"${name}" gelöscht`); loadPresets(); }
   else $toast.show(d.error || 'Kann nicht gelöscht werden', 'error');
@@ -522,7 +592,7 @@ $('btnCreatePreset').onclick = async () => {
     freq_max: parseInt($('presetNewFmax').value)
   };
 
-  const res = await fetch('/api/presets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const res = await authFetch('/api/presets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const d = await res.json();
   if (d.success || d.ok) {
     $toast.show(name === $('presetNewName').value.trim() ? 'Preset gespeichert' : 'Preset angelegt');
@@ -551,7 +621,7 @@ $('savePI').onclick = async () => {
     enabled: els.piEnabled.checked,
     ctrl_mode: lastPiState.ctrl_mode || 0
   };
-  const res = await fetch('/api/pressure', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const res = await authFetch('/api/pressure', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const d = await res.json();
   if (d.success || d.ok) $toast.show('Parameter gespeichert');
   else $toast.show('Fehler beim Speichern', 'error');
@@ -561,8 +631,8 @@ $('savePI').onclick = async () => {
 $('saveFan').onclick = async () => {
   const mode = $('fanMode').value;
   const pwm = parseInt($('fanPwm').value);
-  await fetch('/api/fan/mode', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode }) });
-  await fetch('/api/fan/pwm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pwm }) });
+  await authFetch('/api/fan/mode', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode }) });
+  await authFetch('/api/fan/pwm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pwm }) });
   $toast.show('Lüfter aktualisiert');
 };
 
@@ -573,7 +643,7 @@ $('fanPwm').addEventListener('input', (e) => {
 // ─── Timeguard ───
 async function loadTimeguard() {
   try {
-    const res = await fetch('/api/timeguard');
+    const res = await authFetch('/api/timeguard');
     const tg = await res.json();
     $('tgEnabled').checked = tg.enabled;
     $('tgStartH').value = tg.start_hour;
@@ -621,7 +691,7 @@ $('saveTG').onclick = async () => {
     end_min: parseInt($('tgEndM').value) || 0,
     days
   };
-  const res = await fetch('/api/timeguard', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const res = await authFetch('/api/timeguard', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const d = await res.json();
   if (d.ok) $toast.show('Zeitsperre gespeichert');
   else $toast.show(d.error || 'Fehler', 'error');
@@ -751,4 +821,4 @@ $('saveTG').onclick = async () => {
 })();
 
 // ─── Start ───
-connectWS();
+tryAutoLogin();

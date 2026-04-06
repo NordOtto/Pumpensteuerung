@@ -13,6 +13,7 @@ const tg           = require('./timeguard');
 const presets      = require('./presets');
 const ha           = require('./haDiscovery');
 const ws           = require('./websocketServer');
+const auth         = require('./auth');
 const apiRouter    = require('./restApi');
 
 // ── Uptime-Zähler ──
@@ -82,7 +83,7 @@ async function main() {
   // ── Express App ──
   const app = express();
   app.use(express.json());
-  app.use('/api', apiRouter);
+  app.use('/api', auth.requireAuth, apiRouter);
 
   // ── HTTP Server ──
   const server = http.createServer(app);

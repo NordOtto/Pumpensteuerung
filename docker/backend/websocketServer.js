@@ -7,6 +7,7 @@
 
 const { WebSocketServer, WebSocket } = require('ws');
 const state = require('./state');
+const auth  = require('./auth');
 
 let wss = null;
 
@@ -114,7 +115,12 @@ function init(httpServer) {
   wss = new WebSocketServer({ noServer: true });
 
   httpServer.on('upgrade', (request, socket, head) => {
-    if (request.url === '/ws') {
+    if (request.url.startsWith('/ws')) {
+      if (!auth.verifyWsUpgrade(request)) {
+        socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+        socket.destroy();
+        return;
+      }
       wss.handleUpgrade(request, socket, head, (ws) => {
         wss.emit('connection', ws, request);
       });

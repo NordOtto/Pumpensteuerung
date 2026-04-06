@@ -11,8 +11,17 @@ const mqttCli  = require('./mqttClient');
 const pi       = require('./pressureCtrl');
 const tg       = require('./timeguard');
 const presets  = require('./presets');
+const auth     = require('./auth');
 
 const router = express.Router();
+
+// ── Auth ──
+router.post('/auth/login', (req, res) => {
+  const { user, pass } = req.body || {};
+  const token = auth.login(user, pass);
+  if (token) return res.json({ ok: true, token });
+  res.status(401).json({ error: 'Benutzername oder Passwort falsch' });
+});
 
 // ── V20 Steuerbefehle ──
 router.post('/v20/start', (_req, res) => {

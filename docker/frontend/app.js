@@ -57,26 +57,11 @@ function setVal(id, v) {
   el.value = (v == null || Number.isNaN(v)) ? '' : v;
 }
 
-// ---------------- Theme ----------------
-function applyTheme() {
-  const choice = localStorage.getItem('theme') || 'light';
-  let theme = choice;
-  if (choice === 'auto') {
-    const h = new Date().getHours();
-    theme = (h >= 7 && h < 19) ? 'light' : 'dark';
-  }
-  document.documentElement.setAttribute('data-theme', theme);
-  document.querySelector('meta[name=theme-color]').setAttribute('content', theme === 'dark' ? '#0a0f1a' : '#ffffff');
-}
-$('themeBtn').addEventListener('click', () => {
-  const cur = localStorage.getItem('theme') || 'light';
-  const next = cur === 'light' ? 'dark' : cur === 'dark' ? 'auto' : 'light';
-  localStorage.setItem('theme', next);
-  applyTheme();
-  toast('Theme: ' + next);
-});
-applyTheme();
-setInterval(applyTheme, 60_000);
+// ---------------- Theme (forced light) ----------------
+try { localStorage.removeItem('theme'); } catch {}
+document.documentElement.setAttribute('data-theme', 'light');
+const _tb = $('themeBtn');
+if (_tb) _tb.style.display = 'none';
 
 // ---------------- WebSocket ----------------
 let ws = null;

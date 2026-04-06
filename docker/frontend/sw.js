@@ -18,10 +18,8 @@ self.addEventListener('activate', (e) => {
     try {
       await self.registration.unregister();
     } catch {}
-    const clients = await self.clients.matchAll({ type: 'window' });
-    for (const c of clients) {
-      try { c.navigate(c.url); } catch {}
-    }
+    // KEIN c.navigate() — das löst eine Reload-Schleife aus.
+    // Der nächste manuelle Reload sieht die saubere Seite ohne SW.
   })());
 });
 

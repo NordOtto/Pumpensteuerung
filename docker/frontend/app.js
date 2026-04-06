@@ -28,7 +28,8 @@ setInterval(() => {
 
 // ─── Element References ───
 let ws;
-const wsUrl = `ws://${location.hostname}:${location.port}/ws`;
+const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+const wsUrl = `${wsProto}//${location.host}/ws`;
 const $ = (id) => document.getElementById(id);
 
 const els = {

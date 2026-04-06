@@ -339,6 +339,7 @@ input[type=range]::-moz-range-thumb {
   display: flex; flex-direction: column;
   animation: slideUp .25s ease;
 }
+[hidden] { display: none !important; }
 @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: none; opacity: 1; } }
 
 .drawer-head {

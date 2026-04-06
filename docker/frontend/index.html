@@ -4,93 +4,85 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <link rel="manifest" href="/manifest.json" />
-  <title>F025 Brunnenpumpe</title>
+  <title>Brunnenpumpe</title>
   <link rel="stylesheet" href="/styles.css" />
   <script src="/vendor/chart.js"></script>
   <script src="/vendor/lucide.js"></script>
 </head>
 <body class="bg-[#F2F6F9] text-slate-800 font-sans pb-[100px] lg:pb-0 h-screen overflow-hidden">
   
-  <div id="toast" class="fixed top-safe left-1/2 -translate-x-1/2 z-[100] transition-all transform -translate-y-[150%] max-w-sm w-[90%] px-5 py-4 rounded-2xl shadow-xl flex items-center justify-between text-sm font-semibold text-white pointer-events-none mt-4">
+  <div id="toast" class="fixed top-[100px] left-1/2 -translate-x-1/2 z-[100] transition-all transform -translate-y-[200%] max-w-sm w-[90%] px-5 py-4 rounded-2xl shadow-xl flex items-center justify-between text-sm font-semibold text-white pointer-events-none mt-4">
     <span class="msg"></span>
     <span class="cls cursor-pointer w-6 h-6 flex items-center justify-center rounded-full bg-white/20 pointer-events-auto" onclick="$toast.hide()"><i data-lucide="x" class="w-4 h-4"></i></span>
   </div>
 
-  <div class="flex h-full w-full">
+  <!-- FIXED TOP-BAR -->
+  <div class="fixed top-0 left-0 right-0 h-20 bg-white/90 backdrop-blur-md border-b border-slate-200 z-40 flex items-center justify-between px-4 lg:px-8 shadow-sm">
+      <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600"><i data-lucide="droplet" class="w-6 h-6"></i></div>
+          <div class="hidden sm:block">
+              <h1 class="text-xl font-black tracking-tight text-slate-800">Brunnenpumpe</h1>
+              <div class="text-[10px] text-slate-400 font-bold uppercase tracking-widest" id="topStatusText">System Normal</div>
+          </div>
+      </div>
+      <div class="flex items-center gap-2 sm:gap-4 flex-1 justify-end max-w-sm">
+          <button id="btnStart" class="flex-1 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-md transition-all active:scale-95 text-xs uppercase tracking-wider disabled:opacity-50 disabled:pointer-events-none">Start</button>
+          <button id="btnStop" class="flex-1 py-3 bg-rose-500 hover:bg-rose-400 text-white font-bold rounded-xl shadow-md transition-all active:scale-95 text-xs uppercase tracking-wider disabled:opacity-50 disabled:pointer-events-none">Stop</button>
+          <button id="btnReset" class="w-12 h-[40px] flex shrink-0 items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none" title="Störung Quittieren"><i data-lucide="rotate-ccw" class="w-5 h-5"></i></button>
+      </div>
+  </div>
+
+  <div class="flex h-full w-full pt-20">
     <!-- Sidebar Desktop -->
-    <aside class="hidden lg:flex w-72 flex-col bg-white rounded-r-[2.5rem] shadow-[10px_0_40px_rgba(0,0,0,0.02)] p-6 z-10 shrink-0 border-r border-slate-50 h-full overflow-y-auto">
-       <div class="flex items-center justify-center gap-4 text-2xl font-black text-blue-600 mb-10 mt-4">
-         <div class="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center"><i data-lucide="waves" class="w-8 h-8"></i></div>
-         <span class="tracking-wider">F025</span>
-       </div>
-       <nav class="flex flex-col gap-3 font-semibold text-sm">
+    <aside class="hidden lg:flex w-72 flex-col bg-white shadow-[10px_0_40px_rgba(0,0,0,0.02)] p-6 z-10 shrink-0 border-r border-slate-50 h-full overflow-y-auto">
+       <nav class="flex flex-col gap-3 font-semibold text-sm mt-4">
          <div class="px-4 text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Navigation</div>
          <a href="#" class="flex items-center gap-4 px-5 py-3.5 bg-blue-50 text-blue-600 rounded-2xl transition hover:bg-blue-100 shadow-inner"><i data-lucide="layout-dashboard"></i> Overview</a>
-         <a href="javascript:document.getElementById('drawer').classList.remove('hidden')" class="flex items-center gap-4 px-5 py-3.5 text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-2xl transition cursor-pointer"><i data-lucide="sliders-horizontal"></i> Einstellungen</a>
-         <a href="javascript:document.getElementById('drawer').classList.remove('hidden')" class="flex items-center gap-4 px-5 py-3.5 text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-2xl transition cursor-pointer"><i data-lucide="bookmark"></i> Presets</a>
+         <a href="#" onclick="window.showTab('settings')" class="flex items-center gap-4 px-5 py-3.5 text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-2xl transition cursor-pointer"><i data-lucide="sliders-horizontal"></i> Einstellungen</a>
+         <a href="#" onclick="window.showTab('presets')" class="flex items-center gap-4 px-5 py-3.5 text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-2xl transition cursor-pointer"><i data-lucide="bookmark"></i> Presets</a>
          
-         <div class="px-4 text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-8 mb-1">State Log</div>
+         <div class="px-4 text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-8 mb-1">System Log</div>
          <div class="relative flex-1 bg-slate-50 rounded-2xl p-4 overflow-hidden h-40">
             <div class="absolute inset-0 p-4 overflow-y-auto"><div id="logBox" class="text-[10px] text-slate-400 font-mono tracking-tight leading-relaxed">System ready...</div></div>
          </div>
        </nav>
-
-       <!-- Context Status Footer -->
-       <div class="mt-auto pt-8 flex justify-around">
-         <div id="dotBackend" class="sicon idle" title="Backend Server"><i data-lucide="server"></i></div>
-         <div id="dotMqtt" class="sicon idle" title="MQTT Broker"><i data-lucide="radio"></i></div>
-         <div id="dotRtu" class="sicon idle" title="Modbus RTU"><i data-lucide="cable"></i></div>
-       </div>
     </aside>
 
     <!-- Main Content Flow -->
     <main class="flex-1 flex flex-col h-full overflow-y-auto p-4 sm:p-6 lg:p-10 lg:pb-10 overscroll-y-none">
-       <!-- Header -->
-       <header class="flex justify-between items-center mb-8">
-         <div class="pl-2 lg:pl-0">
-           <h1 class="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight">Brunnenpumpe</h1>
-           <p class="text-slate-400 text-xs sm:text-sm font-semibold mt-1">Hol dir Live-Daten deiner Hausversorgung.</p>
-         </div>
-         <div class="flex items-center gap-3">
-           <div class="flex items-center px-4 py-2.5 bg-white rounded-2xl shadow-sm border border-slate-100 font-bold text-slate-600 gap-3">
-             <i data-lucide="clock" class="w-4 h-4 text-blue-500"></i>
-             <span id="clock" class="font-mono tracking-tight">--:--</span>
-           </div>
+       
+       <!-- Clock Header Row -->
+       <header class="flex justify-between items-center mb-6">
+         <h2 class="text-xl sm:text-2xl font-extrabold text-slate-800 tracking-tight">Systemübersicht</h2>
+         <div class="flex items-center px-4 py-2 bg-white rounded-xl shadow-sm border border-slate-100 font-bold text-slate-600 gap-2">
+           <i data-lucide="clock" class="w-4 h-4 text-blue-500"></i>
+           <span id="clock" class="font-mono tracking-tight text-sm">--:--</span>
          </div>
        </header>
 
        <!-- Upper Grid: Pump Status & Goals -->
        <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6">
          <!-- Cloudcard Pump Status -->
-         <div class="xl:col-span-1 bg-gradient-to-br from-[#1A73E8] to-[#4285F4] rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-[0_20px_40px_-5px_rgba(26,115,232,0.3)] flex flex-col justify-between min-h-[360px]">
+         <div class="xl:col-span-1 bg-gradient-to-br from-[#1A73E8] to-[#4285F4] rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-[0_20px_40px_-5px_rgba(26,115,232,0.3)] flex flex-col justify-between min-h-[300px]">
             <div class="absolute -right-20 -top-20 w-80 h-80 bg-white/10 rounded-full blur-[40px] pointer-events-none"></div>
             <div class="absolute -left-10 -bottom-10 w-40 h-40 bg-white/10 rounded-full blur-3xl pointer-events-none"></div>
 
-            <div class="relative z-10">
-               <div class="flex justify-between items-start mb-6">
+            <div class="relative z-10 w-full flex-1 flex flex-col">
+               <div class="flex justify-between items-start mb-4">
                  <div>
-                   <div class="text-blue-100 font-bold text-xs uppercase tracking-widest mb-1 opacity-90"><i data-lucide="cloud" class="inline w-3 h-3 mr-1 mb-0.5"></i> cloudcontrol</div>
-                   <div class="font-bold text-lg opacity-80 mt-1 tracking-tight">INVT GD20-EU</div>
+                   <div class="font-bold text-lg opacity-90 mt-1 tracking-tight">Manuelle Steuerung</div>
                  </div>
                  <div id="statusPill" class="status-pill text-xs flex items-center shrink-0 ml-4"><span id="statusText">Lade..</span></div>
                </div>
 
                <!-- Slider Value -->
-               <div class="flex items-end gap-3 mt-10">
+               <div class="flex items-end gap-3 mt-auto">
                   <div class="text-[3.5rem] sm:text-[4rem] font-bold leading-none tracking-tighter shadow-sm"><span id="freqSliderVal">--</span></div>
                   <div class="text-blue-100 font-semibold pb-3 text-xl uppercase tracking-widest">Hz</div>
                </div>
-               <div class="text-xs text-blue-100 font-semibold uppercase tracking-widest">Sollwert</div>
-            </div>
-
-            <!-- Controls override -->
-            <div class="relative z-10 w-full mt-auto pt-6">
-               <input type="range" id="freqSlider" min="30" max="50" step="0.5" class="w-full slider-apple mb-8 block transition-opacity" />
-               <div class="flex gap-2">
-                 <button id="btnStart" class="flex-[1.5] py-3.5 bg-white text-blue-600 hover:bg-slate-50 font-bold rounded-2xl shadow-sm transition-all active:scale-95 text-sm uppercase tracking-wider">Start</button>
-                 <button id="btnStop" class="flex-[1] py-3.5 bg-rose-500 hover:bg-rose-400 text-white font-bold rounded-2xl shadow-sm transition-all active:scale-95 text-sm uppercase tracking-wider">Stop</button>
-                 <button id="btnReset" class="flex-[0.5] flex items-center justify-center bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-2xl transition-all border border-white/20 active:scale-95"><i data-lucide="rotate-ccw" class="w-5 h-5 text-white/90"></i></button>
-               </div>
+               <div class="text-[10px] text-blue-100 font-bold uppercase tracking-widest mt-2">Frequenz-Override</div>
+               
+               <input type="range" id="freqSlider" min="30" max="50" step="0.5" class="w-full slider-apple mt-8 block transition-opacity" />
             </div>
          </div>
 
@@ -100,22 +92,20 @@
            <div id="cardPressure" class="kpi-card idle group cursor-default">
              <div class="flex justify-between items-center mb-6">
                <div class="icon-box w-12 h-12 rounded-2xl flex items-center justify-center group-hover:scale-110 transition"><i data-lucide="gauge"></i></div>
-               <span class="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-2 py-1 bg-slate-50 rounded-lg">Sensor</span>
              </div>
              <div>
-               <div class="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-1">Druck</div>
+               <div class="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Druck</div>
                <div class="text-[2.2rem] font-bold text-slate-800 leading-none flex items-end gap-1"><span id="vPressure" class="tracking-tight">--</span><span class="text-sm font-semibold text-slate-400 mb-1">bar</span></div>
-               <div class="text-[10px] uppercase font-bold text-slate-400 mt-3 pt-3 border-t border-slate-50">Soll <span id="vPressureSet">--</span></div>
+               <div class="text-[10px] uppercase font-bold text-slate-400 mt-3 pt-3 border-t border-slate-50 flex justify-between"><span>Sollwert</span> <span id="vPressureSet" class="text-slate-600">--</span></div>
              </div>
            </div>
 
            <div id="cardFlow" class="kpi-card idle group cursor-default">
              <div class="flex justify-between items-center mb-6">
                <div class="icon-box w-12 h-12 rounded-2xl flex items-center justify-center group-hover:scale-110 transition"><i data-lucide="waves"></i></div>
-               <span class="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-2 py-1 bg-slate-50 rounded-lg">Sensor</span>
              </div>
              <div>
-               <div class="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-1">Fluss</div>
+               <div class="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Durchfluss</div>
                <div class="text-[2.2rem] font-bold text-slate-800 leading-none flex items-end gap-1"><span id="vFlow" class="tracking-tight">--</span><span class="text-sm font-semibold text-slate-400 mb-1">l/m</span></div>
                <div class="flex items-center gap-1 text-[10px] uppercase font-bold text-slate-400 mt-3 pt-3 border-t border-slate-50 truncate"><span id="vFlowSub">&nbsp;</span></div>
              </div>
@@ -124,23 +114,21 @@
            <div id="cardFreq" class="kpi-card idle group cursor-default">
              <div class="flex justify-between items-center mb-6">
                <div class="icon-box w-12 h-12 rounded-2xl flex items-center justify-center group-hover:scale-110 transition"><i data-lucide="activity"></i></div>
-               <span class="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-2 py-1 bg-slate-50 rounded-lg">VFD</span>
              </div>
              <div>
-               <div class="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-1">Ist-Freq</div>
+               <div class="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Ist-Freq</div>
                <div class="text-[2.2rem] font-bold text-slate-800 leading-none flex items-end gap-1"><span id="vFreq" class="tracking-tight">--</span><span class="text-sm font-semibold text-slate-400 mb-1">Hz</span></div>
-               <div class="text-[10px] uppercase font-bold text-slate-400 mt-3 pt-3 border-t border-slate-50 truncate">Output Freq</div>
+               <div class="text-[10px] uppercase font-bold text-slate-400 mt-3 pt-3 border-t border-slate-50 flex justify-between"><span>Soll</span> <span id="vFreqSet" class="text-slate-600">--</span></div>
              </div>
            </div>
 
            <div id="cardStatus" class="kpi-card idle group cursor-default">
              <div class="flex justify-between items-center mb-6">
                <div class="icon-box w-12 h-12 rounded-2xl flex items-center justify-center group-hover:scale-110 transition"><i data-lucide="power"></i></div>
-               <span class="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-2 py-1 bg-slate-50 rounded-lg">Motor</span>
              </div>
              <div>
-               <div class="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-1">Status</div>
-               <div class="text-[2.2rem] font-bold text-slate-800 flex items-center gap-2 mt-[-4px]"><span id="vStatusIcon" class="leading-none flex items-center">●</span></div>
+               <div class="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Status</div>
+               <div class="text-[2rem] font-black text-slate-800 flex items-center gap-2"><span id="vStatusIcon" class="leading-none text-slate-300">●</span></div>
                <div class="text-[10px] uppercase font-bold text-slate-400 mt-3 pt-3 border-t border-slate-50 truncate" id="vStatusSubMini">&nbsp;</div>
              </div>
            </div>
@@ -148,82 +136,88 @@
          </div>
        </div>
 
-       <!-- Bottom Row: Statistics & Transactions -->
-       <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          <!-- Chart Card -->
+       <!-- Middle Row: Hardware / Connectivity & Details -->
+       <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6">
+          
+          <!-- System Connectivity Card (Replaces small dots) -->
+          <div class="xl:col-span-1 bg-white rounded-[2.5rem] p-6 shadow-[0_4px_20px_rgba(0,0,0,0.02)] border border-slate-50">
+             <h2 class="text-lg font-bold text-slate-800 tracking-tight mb-6">Systemstatus</h2>
+             <div class="flex flex-col gap-3">
+                <div class="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                   <div class="flex items-center gap-3">
+                      <div class="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center text-slate-500"><i data-lucide="radio" class="w-5 h-5"></i></div>
+                      <div>
+                         <div class="text-xs font-bold text-slate-700">MQTT Broker</div>
+                         <div class="text-[10px] text-slate-400 font-semibold uppercase tracking-widest">Verbindung</div>
+                      </div>
+                   </div>
+                   <div id="statusMqtt" class="text-xs font-bold px-3 py-1 rounded-lg bg-slate-200 text-slate-600">Lade...</div>
+                </div>
+
+                <div class="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                   <div class="flex items-center gap-3">
+                      <div class="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center text-slate-500"><i data-lucide="cable" class="w-5 h-5"></i></div>
+                      <div>
+                         <div class="text-xs font-bold text-slate-700">Frequenzumrichter</div>
+                         <div class="text-[10px] text-slate-400 font-semibold uppercase tracking-widest">Modbus RTU</div>
+                      </div>
+                   </div>
+                   <div id="statusModbus" class="text-xs font-bold px-3 py-1 rounded-lg bg-slate-200 text-slate-600">Lade...</div>
+                </div>
+                
+                <div class="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-100 mt-2">
+                    <div class="text-xs font-bold text-slate-600">Uptime</div>
+                    <div id="statusUptime" class="text-xs font-mono font-bold text-slate-800">--:--:--</div>
+                </div>
+             </div>
+          </div>
+
+          <!-- Statistics Chart -->
           <div class="xl:col-span-2 bg-white rounded-[2.5rem] p-6 lg:p-8 shadow-[0_4px_20px_rgba(0,0,0,0.02)] border border-slate-50 flex flex-col">
-            <div class="flex justify-between items-center mb-8">
-              <h2 class="text-xl font-bold text-slate-800 tracking-tight">Outcome Statistics</h2>
-              <span class="text-[10px] font-bold px-3 py-1.5 bg-slate-50 text-slate-500 uppercase tracking-widest rounded-xl">Letzte 30 Min</span>
+            <div class="flex justify-between items-center mb-6">
+              <h2 class="text-lg font-bold text-slate-800 tracking-tight">Druckverlauf</h2>
+              <span class="text-[10px] font-bold px-3 py-1 bg-slate-50 text-slate-500 uppercase tracking-widest rounded-lg">Letzte 30 Min</span>
             </div>
-            <div class="w-full h-56 flex-1 min-h-[220px]">
+            <div class="w-full h-full min-h-[180px]">
               <canvas id="pressureChart"></canvas>
             </div>
           </div>
+       </div>
 
-          <!-- Details List Card -->
-          <div class="xl:col-span-1 bg-white rounded-[2.5rem] p-6 lg:p-8 shadow-[0_4px_20px_rgba(0,0,0,0.02)] border border-slate-50">
-             <h2 class="text-xl font-bold text-slate-800 tracking-tight mb-8">Hardware Details</h2>
-             <div class="flex flex-col gap-2">
+       <!-- Bottom Row: Statistics & Transactions -->
+       <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <div class="bg-white rounded-[2.5rem] p-6 shadow-[0_4px_20px_rgba(0,0,0,0.02)] border border-slate-50">
+             <h2 class="text-lg font-bold text-slate-800 tracking-tight mb-4">Hardware Details</h2>
+             <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
                
-               <div class="flex justify-between items-center py-2.5 px-3 rounded-2xl hover:bg-slate-50 transition group cursor-default">
-                 <div class="flex items-center gap-4">
-                   <div class="w-10 h-10 rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center transition-transform group-hover:scale-110 shadow-inner">
-                     <i data-lucide="zap" class="w-4 h-4"></i>
-                   </div>
-                   <span class="font-bold text-sm text-slate-600">Spannung</span>
-                 </div>
-                 <div class="font-black text-slate-800 text-lg"><span id="dVoltage">--</span><span class="font-semibold text-xs text-slate-400 ml-1">V</span></div>
+               <div class="flex items-center gap-3 p-3 rounded-2xl hover:bg-slate-50 group">
+                 <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center shrink-0"><i data-lucide="zap" class="w-4 h-4"></i></div>
+                 <div><div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Spannung</div><div class="font-black text-slate-800"><span id="dVoltage">--</span><span class="text-[10px] ml-1">V</span></div></div>
                </div>
 
-               <div class="flex justify-between items-center py-2.5 px-3 rounded-2xl hover:bg-slate-50 transition group cursor-default">
-                 <div class="flex items-center gap-4">
-                   <div class="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-500 flex items-center justify-center transition-transform group-hover:scale-110 shadow-inner">
-                     <i data-lucide="plug" class="w-4 h-4"></i>
-                   </div>
-                   <span class="font-bold text-sm text-slate-600">Strom</span>
-                 </div>
-                 <div class="font-black text-slate-800 text-lg"><span id="dCurrent">--</span><span class="font-semibold text-xs text-slate-400 ml-1">A</span></div>
+               <div class="flex items-center gap-3 p-3 rounded-2xl hover:bg-slate-50 group">
+                 <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-500 flex items-center justify-center shrink-0"><i data-lucide="plug" class="w-4 h-4"></i></div>
+                 <div><div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Strom</div><div class="font-black text-slate-800"><span id="dCurrent">--</span><span class="text-[10px] ml-1">A</span></div></div>
                </div>
 
-               <div class="flex justify-between items-center py-2.5 px-3 rounded-2xl hover:bg-slate-50 transition group cursor-default">
-                 <div class="flex items-center gap-4">
-                   <div class="w-10 h-10 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center transition-transform group-hover:scale-110 shadow-inner">
-                     <i data-lucide="flame" class="w-4 h-4"></i>
-                   </div>
-                   <span class="font-bold text-sm text-slate-600">Leistung</span>
-                 </div>
-                 <div class="font-black text-slate-800 text-lg"><span id="dPower">--</span><span class="font-semibold text-xs text-slate-400 ml-1">kW</span></div>
+               <div class="flex items-center gap-3 p-3 rounded-2xl hover:bg-slate-50 group">
+                 <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center shrink-0"><i data-lucide="flame" class="w-4 h-4"></i></div>
+                 <div><div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Leistung</div><div class="font-black text-slate-800"><span id="dPower">--</span><span class="text-[10px] ml-1">kW</span></div></div>
                </div>
 
-               <div class="flex justify-between items-center py-2.5 px-3 rounded-2xl hover:bg-slate-50 transition group cursor-default mt-2 border-t border-slate-50 pt-4">
-                 <div class="flex items-center gap-4">
-                   <div class="w-10 h-10 rounded-2xl bg-teal-50 text-teal-500 flex items-center justify-center transition-transform group-hover:scale-110 shadow-inner">
-                     <i data-lucide="thermometer-snowflake" class="w-4 h-4"></i>
-                   </div>
-                   <span class="font-bold text-sm text-slate-600">Verteiler</span>
-                 </div>
-                 <div class="font-black text-slate-800 text-lg"><span id="dWaterTemp">--</span><span class="font-semibold text-xs text-slate-400 ml-1">°C</span></div>
+               <div class="flex items-center gap-3 p-3 rounded-2xl hover:bg-slate-50 group">
+                 <div class="w-10 h-10 rounded-xl bg-teal-50 text-teal-500 flex items-center justify-center shrink-0"><i data-lucide="droplet-snow" class="w-4 h-4"></i></div>
+                 <div><div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Temperatur</div><div class="font-black text-slate-800"><span id="dWaterTemp">--</span><span class="text-[10px] ml-1">°C</span></div></div>
                </div>
 
-               <div class="flex justify-between items-center py-2.5 px-3 rounded-2xl hover:bg-slate-50 transition group cursor-default">
-                 <div class="flex items-center gap-4">
-                   <div class="w-10 h-10 rounded-2xl bg-slate-100 text-slate-500 flex items-center justify-center transition-transform group-hover:scale-110 shadow-inner">
-                     <i data-lucide="thermometer" class="w-4 h-4"></i>
-                   </div>
-                   <span class="font-bold text-sm text-slate-600">Luft Temp</span>
-                 </div>
-                 <div class="font-black text-slate-800 text-lg"><span id="dAirTemp">--</span><span class="font-semibold text-xs text-slate-400 ml-1">°C</span></div>
+               <div class="flex items-center gap-3 p-3 rounded-2xl hover:bg-slate-50 group">
+                 <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center shrink-0"><i data-lucide="thermometer" class="w-4 h-4"></i></div>
+                 <div><div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Luft</div><div class="font-black text-slate-800"><span id="dAirTemp">--</span><span class="text-[10px] ml-1">°C</span></div></div>
                </div>
                
-               <div class="flex justify-between items-center py-2.5 px-3 rounded-2xl hover:bg-slate-50 transition group cursor-default">
-                 <div class="flex items-center gap-4">
-                   <div class="w-10 h-10 rounded-2xl bg-cyan-50 text-cyan-500 flex items-center justify-center transition-transform group-hover:scale-110 shadow-inner">
-                     <i data-lucide="fan" class="w-4 h-4"></i>
-                   </div>
-                   <span class="font-bold text-sm text-slate-600">Lüfter</span>
-                 </div>
-                 <div class="font-black text-slate-800 text-lg"><span id="dFan">--</span><span class="font-semibold text-xs text-slate-400 ml-1">RPM</span></div>
+               <div class="flex items-center gap-3 p-3 rounded-2xl hover:bg-slate-50 group">
+                 <div class="w-10 h-10 rounded-xl bg-cyan-50 text-cyan-500 flex items-center justify-center shrink-0"><i data-lucide="fan" class="w-4 h-4"></i></div>
+                 <div><div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Lüfter</div><div class="font-black text-slate-800"><span id="dFan">--</span><span class="text-[10px] ml-1">RPM</span></div></div>
                </div>
              </div>
           </div>
@@ -232,91 +226,169 @@
   </div>
 
   <!-- Mobile Floating Bottom Navbar -->
-  <nav class="lg:hidden fixed bottom-0 left-4 right-4 z-40 bg-white/95 backdrop-blur-2xl border border-white shadow-[0_15px_40px_rgba(0,0,0,0.06)] px-4 py-4 rounded-[2rem] flex justify-around items-center mb-[calc(24px+env(safe-area-inset-bottom))]">
+  <nav class="lg:hidden fixed bottom-0 left-4 right-4 z-40 bg-white/95 backdrop-blur-2xl border border-slate-100 shadow-[0_15px_40px_rgba(0,0,0,0.06)] px-4 py-4 rounded-[2rem] flex justify-around items-center mb-[calc(24px+env(safe-area-inset-bottom))]">
     <button class="flex flex-col items-center gap-1.5 text-blue-600 transition-transform active:scale-95"><div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shadow-inner"><i data-lucide="layout-dashboard" class="w-5 h-5"></i></div></button>
-    <button onclick="document.getElementById('drawer').classList.remove('hidden'); window.showTab('settings');" class="flex flex-col items-center gap-1.5 text-slate-400 hover:text-slate-600 transition-transform active:scale-95"><div class="w-10 h-10 rounded-xl bg-transparent flex items-center justify-center"><i data-lucide="sliders-horizontal" class="w-5 h-5"></i></div></button>
-    <button onclick="document.getElementById('drawer').classList.remove('hidden'); window.showTab('presets');" class="flex flex-col items-center gap-1.5 text-slate-400 hover:text-slate-600 transition-transform active:scale-95"><div class="w-10 h-10 rounded-xl bg-transparent flex items-center justify-center"><i data-lucide="bookmark" class="w-5 h-5"></i></div></button>
-    <button onclick="document.getElementById('drawer').classList.remove('hidden'); window.showTab('logs');" class="flex flex-col items-center gap-1.5 text-slate-400 hover:text-slate-600 transition-transform active:scale-95"><div class="w-10 h-10 rounded-xl bg-transparent flex items-center justify-center"><i data-lucide="scroll-text" class="w-5 h-5"></i></div></button>
+    <button onclick="window.showTab('settings');" class="flex flex-col items-center gap-1.5 text-slate-400 hover:text-slate-600 transition-transform active:scale-95"><div class="w-10 h-10 rounded-xl bg-transparent flex items-center justify-center"><i data-lucide="sliders-horizontal" class="w-5 h-5"></i></div></button>
+    <button onclick="window.showTab('presets');" class="flex flex-col items-center gap-1.5 text-slate-400 hover:text-slate-600 transition-transform active:scale-95"><div class="w-10 h-10 rounded-xl bg-transparent flex items-center justify-center"><i data-lucide="bookmark" class="w-5 h-5"></i></div></button>
+    <button onclick="window.showTab('logs');" class="flex flex-col items-center gap-1.5 text-slate-400 hover:text-slate-600 transition-transform active:scale-95"><div class="w-10 h-10 rounded-xl bg-transparent flex items-center justify-center"><i data-lucide="scroll-text" class="w-5 h-5"></i></div></button>
   </nav>
 
   <!-- Drawer Modal / Overlay -->
-  <div id="drawer" class="hidden fixed inset-0 z-50 bg-slate-900/20 backdrop-blur-sm flex justify-center items-end sm:items-center p-0 sm:p-6 pb-0">
-     <div class="bg-white w-full max-w-2xl max-h-[90vh] rounded-t-[2.5rem] sm:rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden transition-transform">
+  <div id="drawer" class="hidden fixed inset-0 z-[60] bg-slate-900/40 backdrop-blur-sm flex justify-center items-end sm:items-center p-0 sm:p-6 pb-0">
+     <div class="bg-white w-full max-w-3xl max-h-[90vh] rounded-t-[2.5rem] sm:rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden transition-transform transform translate-y-full drawer-animate">
         
         <!-- Drawer Header -->
-        <div class="flex justify-between items-center p-6 border-b border-slate-50 shrink-0">
-          <div class="flex bg-slate-50/80 p-1.5 rounded-2xl gap-1">
-             <button id="tbSettings" onclick="window.showTab('settings')" class="tab-btn active text-xs sm:text-sm shadow-sm">Parameter</button>
-             <button id="tbPresets" onclick="window.showTab('presets')" class="tab-btn text-xs sm:text-sm">Presets</button>
-             <!-- log tab shown if accessed via mobile nav -->
-          </div>
-          <button id="closeDrawer" class="w-11 h-11 rounded-2xl bg-white border border-slate-100 shadow-sm text-slate-400 hover:bg-rose-50 hover:text-rose-500 hover:border-rose-100 flex items-center justify-center transition-all active:scale-95"><i data-lucide="x" class="w-5 h-5"></i></button>
+        <div class="flex justify-between items-center p-6 sm:p-8 border-b border-slate-100 shrink-0 bg-white/95 backdrop-blur-md z-10 sticky top-0">
+          <h2 id="drawerTitle" class="text-xl font-black text-slate-800">Settings</h2>
+          <button id="closeDrawer" class="w-11 h-11 rounded-2xl bg-slate-50 border border-slate-100 shadow-inner text-slate-400 hover:bg-rose-50 hover:text-rose-500 hover:border-rose-100 flex items-center justify-center transition-all active:scale-95"><i data-lucide="x" class="w-5 h-5"></i></button>
         </div>
 
-        <div class="p-6 overflow-y-auto flex-1 custom-scrollbar w-full pb-32 sm:pb-6">
+        <div class="p-6 sm:p-8 overflow-y-auto flex-1 custom-scrollbar w-full pb-32 sm:pb-8 bg-slate-50/50">
            
-           <!-- Tab: Settings -->
-           <div id="tabSettings" class="block space-y-8">
+           <!-- Tab: Settings (Hardware/PI) -->
+           <div id="tabSettings" class="hidden space-y-6">
               
               <!-- PI section -->
-              <section class="bg-[#F2F6F9] rounded-[2rem] p-6 shadow-inner border border-slate-100">
-                <div class="flex justify-between items-center mb-6">
-                  <div class="flex items-center gap-3 text-slate-800 font-bold"><div class="w-8 h-8 rounded-xl bg-blue-500 text-white flex items-center justify-center shadow-[0_4px_10px_rgba(59,130,246,0.3)]"><i data-lucide="arrow-up-down" class="w-4 h-4"></i></div>PI Regler</div>
+              <section class="bg-white rounded-[2rem] p-6 sm:p-8 shadow-sm border border-slate-100">
+                <div class="flex justify-between items-center mb-8 border-b border-slate-100 pb-6">
+                  <div class="flex items-center gap-4 text-slate-800 font-bold text-lg"><div class="w-10 h-10 rounded-xl bg-blue-500 text-white flex items-center justify-center shadow-[0_4px_10px_rgba(59,130,246,0.3)]"><i data-lucide="arrow-up-down" class="w-5 h-5"></i></div>Regelung (PI) aktiv</div>
                   <label class="relative inline-flex items-center cursor-pointer">
                     <input type="checkbox" id="piEnabled" class="sr-only peer">
-                    <div class="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500 shadow-inner"></div>
+                    <div class="w-12 h-7 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-blue-500 shadow-inner"></div>
                   </label>
                 </div>
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm font-semibold">
-                   <div>
-                     <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5 ml-1">Soll Druck</label>
-                     <input type="number" id="piSetpoint" step="0.1" class="w-full bg-white rounded-xl px-4 py-2.5 border-0 outline-none shadow-sm text-slate-700 focus:ring-2 focus:ring-blue-500/20 transition-all font-bold">
+                
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">PI Parameter</h3>
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 text-sm font-semibold mb-6">
+                   <!-- Druck Rules -->
+                   <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                     <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Ein (bar)</label>
+                     <input type="number" id="piPon" step="0.1" class="w-full bg-white rounded-xl px-4 py-2 border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500/20 font-bold">
                    </div>
-                   <div>
-                     <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5 ml-1">Kp</label>
-                     <input type="number" id="piKp" step="0.1" class="w-full bg-white rounded-xl px-4 py-2.5 border-0 outline-none shadow-sm text-slate-700 focus:ring-2 focus:ring-blue-500/20 transition-all font-bold">
+                   <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                     <label class="block text-[10px] font-bold uppercase tracking-widest text-blue-500 mb-2">Sollwert (bar)</label>
+                     <input type="number" id="piSetpoint" step="0.1" class="w-full bg-white rounded-xl px-4 py-2 border border-blue-200 outline-none focus:ring-2 focus:ring-blue-500/20 text-blue-700 font-bold">
                    </div>
-                   <div>
-                     <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5 ml-1">Ki</label>
-                     <input type="number" id="piKi" step="0.1" class="w-full bg-white rounded-xl px-4 py-2.5 border-0 outline-none shadow-sm text-slate-700 focus:ring-2 focus:ring-blue-500/20 transition-all font-bold">
+                   <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                     <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Aus (bar)</label>
+                     <input type="number" id="piPoff" step="0.1" class="w-full bg-white rounded-xl px-4 py-2 border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500/20 font-bold">
                    </div>
-                   <div class="hidden">
-                     <!-- Other unused DOM inputs mapped by script: piPon, piPoff, piFmin, piFmax -->
-                     <input type="number" id="piPon"><input type="number" id="piPoff"><input type="number" id="piFmin"><input type="number" id="piFmax">
-                     <input type="checkbox" id="vacEnabled"><button id="saveVac"></button>
-                     <input type="checkbox" id="tgEnabled"><input type="number" id="tgDays"><input type="time" id="tgStart"><input type="time" id="tgEnd"><button id="saveTG"></button>
-                     <button id="resetDryrun"></button>
+                   
+                   <!-- Controller Setup -->
+                   <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                     <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Kp</label>
+                     <input type="number" id="piKp" step="0.1" class="w-full bg-white rounded-xl px-4 py-2 border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500/20 font-bold">
                    </div>
-                   <!-- Button uses flex to stretch fully if desired, put at end or custom -->
+                   <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                     <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Ki</label>
+                     <input type="number" id="piKi" step="0.1" class="w-full bg-white rounded-xl px-4 py-2 border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500/20 font-bold">
+                   </div>
+                   <!-- Freq setup -->
+                   <div class="col-span-2 md:col-span-1 grid grid-cols-2 gap-4">
+                       <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100 p-3 flex-1">
+                         <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 truncate">f-min (Hz)</label>
+                         <input type="number" id="piFmin" step="1" class="w-full bg-white rounded-xl px-3 py-2 border border-slate-200 outline-none font-bold text-sm">
+                       </div>
+                       <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100 p-3 flex-1">
+                         <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 truncate">f-max (Hz)</label>
+                         <input type="number" id="piFmax" step="1" class="w-full bg-white rounded-xl px-3 py-2 border border-slate-200 outline-none font-bold text-sm">
+                       </div>
+                   </div>
                 </div>
-                <button id="savePI" class="w-full mt-6 py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl shadow-lg shadow-blue-500/20 transition-colors uppercase tracking-widest text-xs"><i data-lucide="save" class="w-4 h-4 inline-block mb-0.5 mr-2"></i> Parameter Speichern</button>
+                <button id="savePI" class="w-full py-4 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-2xl shadow-lg transition-colors uppercase tracking-widest text-xs"><i data-lucide="check-circle" class="w-4 h-4 inline-block mb-0.5 mr-2"></i> Gespeichert</button>
               </section>
 
               <!-- Fan section -->
-              <section class="bg-[#F2F6F9] rounded-[2rem] p-6 shadow-inner border border-slate-100">
-                 <div class="flex items-center gap-3 text-slate-800 font-bold mb-6"><div class="w-8 h-8 rounded-xl bg-cyan-500 text-white flex items-center justify-center shadow-[0_4px_10px_rgba(6,182,212,0.3)]"><i data-lucide="fan" class="w-4 h-4"></i></div>Gehäuse Lüfter</div>
+              <section class="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100">
+                 <div class="flex items-center gap-3 text-slate-800 font-bold mb-6 text-lg"><div class="w-10 h-10 rounded-xl bg-cyan-500 text-white flex items-center justify-center shadow-[0_4px_10px_rgba(6,182,212,0.3)]"><i data-lucide="fan" class="w-5 h-5"></i></div>Gehäuse Lüfter</div>
                  
-                 <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5 ml-1">Modus</label>
-                 <select id="fanMode" class="w-full bg-white rounded-xl px-4 py-3 mb-6 shadow-sm border-0 font-bold text-slate-700 focus:ring-2 focus:ring-cyan-500/20 transition-all">
+                 <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 ml-1">Modus</label>
+                 <select id="fanMode" class="w-full bg-slate-50 rounded-xl px-4 py-3 mb-6 shadow-none border border-slate-200 font-bold text-slate-700 focus:ring-2 focus:ring-cyan-500/20 transition-all outline-none">
                    <option value="0">Automatik Temp-Regelung</option>
                    <option value="1">Manuell Override</option>
                  </select>
                  
-                 <div class="flex justify-between font-bold text-slate-600 mb-3 ml-1"><span class="text-[10px] uppercase text-slate-400 tracking-widest">Leistung (PWM)</span><span id="fanPwmVal" class="text-sm">100%</span></div>
+                 <div class="flex justify-between font-bold text-slate-600 mb-4 ml-1"><span class="text-[10px] uppercase text-slate-500 tracking-widest">Leistung (PWM)</span><span id="fanPwmVal" class="text-sm">100%</span></div>
                  <input type="range" id="fanPwm" min="0" max="100" class="w-full slider-apple mb-8 bg-cyan-200/50 block">
                  
-                 <button id="saveFan" class="w-full py-4 bg-white text-slate-700 hover:bg-slate-50 rounded-2xl shadow-sm border border-slate-100 font-bold uppercase tracking-widest text-xs transition-colors"><i data-lucide="upload-cloud" class="w-4 h-4 inline-block mr-2 mb-0.5 text-cyan-500"></i> Lüfter Setzen</button>
+                 <button id="saveFan" class="w-full py-4 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-2xl border border-slate-200 font-bold uppercase tracking-widest text-xs transition-colors"><i data-lucide="upload-cloud" class="w-4 h-4 inline-block mr-2 mb-0.5 text-cyan-600"></i> Lüfter Setzen</button>
               </section>
 
            </div>
            
            <!-- Tab: Presets -->
-           <div id="tabPresets" class="hidden space-y-4">
-               <div id="presetList" class="flex flex-col gap-3"></div>
+           <div id="tabPresets" class="hidden space-y-6">
+               
+               <!-- Active Presets List -->
+               <div class="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100">
+                   <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Gesp. Betriebsmodi</h3>
+                   <div id="presetList" class="flex flex-col gap-3"></div>
+               </div>
+
+               <!-- New Preset Form -->
+               <div class="bg-slate-800 text-white rounded-[2rem] p-6 shadow-xl relative overflow-hidden">
+                   <h3 class="text-xs font-bold text-emerald-400 uppercase tracking-widest mb-6">Neuer preset</h3>
+                   
+                   <div class="space-y-4 relative z-10">
+                       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                           <div>
+                               <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Name</label>
+                               <input type="text" id="presetNewName" placeholder="z.B. Garten vorn" class="w-full bg-slate-700/50 text-white rounded-xl px-4 py-3 border border-slate-600 outline-none focus:border-emerald-500 font-semibold placeholder:text-slate-500">
+                           </div>
+                           <div>
+                               <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Modus</label>
+                               <select id="presetNewMode" class="w-full bg-slate-700/50 text-white rounded-xl px-4 py-3 border border-slate-600 outline-none focus:border-emerald-500 font-semibold">
+                                   <option value="0">Druck (bar)</option>
+                                   <option value="1">Durchfluss (L/min)</option>
+                               </select>
+                           </div>
+                       </div>
+                       
+                       <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-2">
+                           <div class="col-span-2">
+                               <label id="lblPresetSet" class="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Sollwert</label>
+                               <input type="number" id="presetNewSet" step="0.1" class="w-full bg-slate-700/50 text-white rounded-xl px-4 py-3 border border-slate-600 outline-none focus:border-emerald-500 font-semibold text-lg">
+                           </div>
+                           <div class="col-span-1">
+                               <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Kp</label>
+                               <input type="number" id="presetNewKp" step="0.1" class="w-full bg-slate-700/50 text-white rounded-xl px-4 py-3 border border-slate-600 outline-none focus:border-emerald-500 font-semibold">
+                           </div>
+                           <div class="col-span-1">
+                               <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Ki</label>
+                               <input type="number" id="presetNewKi" step="0.01" class="w-full bg-slate-700/50 text-white rounded-xl px-4 py-3 border border-slate-600 outline-none focus:border-emerald-500 font-semibold">
+                           </div>
+                           <div class="col-span-1">
+                               <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">f-min Hz</label>
+                               <input type="number" id="presetNewFmin" step="1" class="w-full bg-slate-700/50 text-white rounded-xl px-4 py-3 border border-slate-600 outline-none focus:border-emerald-500 font-semibold">
+                           </div>
+                           <div class="col-span-1">
+                               <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">f-max Hz</label>
+                               <input type="number" id="presetNewFmax" step="1" class="w-full bg-slate-700/50 text-white rounded-xl px-4 py-3 border border-slate-600 outline-none focus:border-emerald-500 font-semibold">
+                           </div>
+                       </div>
+                   </div>
+
+                   <button id="btnCreatePreset" class="w-full mt-6 py-4 bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-2xl shadow-md transition-colors uppercase tracking-widest text-xs relative z-10"><i data-lucide="plus" class="w-4 h-4 inline-block mb-0.5 mr-2"></i> Preset hinzufügen</button>
+               </div>
            </div>
+
+           <!-- Tab: Logs -->
+           <div id="tabLogs" class="hidden space-y-4">
+              <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Debug Logs</h3>
+              <div class="bg-slate-900 rounded-[2rem] p-6 h-[60vh] overflow-y-auto">
+                 <div id="logBoxFull" class="text-[11px] text-emerald-400 font-mono tracking-tight leading-relaxed"></div>
+              </div>
+           </div>
+
         </div>
      </div>
   </div>
+
+  <style>
+      .drawer-animate { transform: translateY(100%); }
+      #drawer:not(.hidden) .drawer-animate { transform: translateY(0); animation: slideUpDrawer 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+      @keyframes slideUpDrawer { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  </style>
 
   <script src="/app.js"></script>
 </body>

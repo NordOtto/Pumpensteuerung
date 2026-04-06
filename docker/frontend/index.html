@@ -3,6 +3,10 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
+  <meta name="theme-color" content="#0f1417" media="(prefers-color-scheme: dark)"/>
+  <meta name="theme-color" content="#f0f9ff" media="(prefers-color-scheme: light)"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
   <link rel="manifest" href="/manifest.json"/>
   <title>Brunnenpumpe</title>
   <link rel="stylesheet" href="/styles.css"/>
@@ -12,7 +16,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
   <script src="/vendor/chart.js"></script>
 </head>
-<body class="bg-sky-50 dark:bg-[#0f1417] text-slate-800 dark:text-slate-100 min-h-screen flex items-center justify-center p-3 lg:p-8 antialiased transition-colors duration-300 font-[Space_Grotesk]">
+<body class="bg-sky-50 dark:bg-[#0f1417] text-slate-800 dark:text-slate-100 min-h-screen flex items-center justify-center p-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:p-8 antialiased transition-colors duration-300 font-[Space_Grotesk]">
 
   <!-- Login Overlay -->
   <div id="loginOverlay" class="fixed inset-0 z-[200] bg-sky-50 dark:bg-[#0f1417] flex items-center justify-center p-4 transition-opacity duration-300">

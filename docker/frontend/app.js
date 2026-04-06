@@ -9,7 +9,14 @@
 function updateThemeIcon() {
   const icon = document.getElementById('themeIcon');
   if (!icon) return;
-  icon.textContent = document.documentElement.classList.contains('dark') ? 'light_mode' : 'dark_mode';
+  const isDark = document.documentElement.classList.contains('dark');
+  icon.textContent = isDark ? 'light_mode' : 'dark_mode';
+  // Update status bar color
+  document.querySelectorAll('meta[name="theme-color"]').forEach(m => m.remove());
+  const meta = document.createElement('meta');
+  meta.name = 'theme-color';
+  meta.content = isDark ? '#0f1417' : '#f0f9ff';
+  document.head.appendChild(meta);
 }
 
 document.getElementById('btnTheme').onclick = () => {

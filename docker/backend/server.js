@@ -26,8 +26,8 @@ setInterval(() => {
 mqttClient.onCommand((topic, value) => {
   const BASE = 'pumpensteuerung';
   if (topic === `${BASE}/v20/running/set`) {
-    if (value === 'ON') mqttClient.sendCmd('v20/start', '1');
-    else                mqttClient.sendCmd('v20/stop', '1');
+    if (value === 'ON' && tg.isAllowed() && !state.vacation.enabled) mqttClient.sendCmd('v20/start', '1');
+    else if (value !== 'ON')                                         mqttClient.sendCmd('v20/stop', '1');
   }
   else if (topic === `${BASE}/v20/freq_set/set`) {
     const hz = parseFloat(value);

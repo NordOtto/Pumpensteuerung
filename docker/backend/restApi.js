@@ -33,6 +33,8 @@ router.post('/auth/change-password', (req, res) => {
 
 // ── V20 Steuerbefehle ──
 router.post('/v20/start', (_req, res) => {
+  if (!tg.isAllowed()) return res.status(403).json({ ok: false, error: 'Zeitsperre aktiv' });
+  if (state.vacation.enabled) return res.status(403).json({ ok: false, error: 'Urlaubsmodus aktiv' });
   mqttCli.sendCmd('v20/start', '1');
   res.json({ ok: true });
 });

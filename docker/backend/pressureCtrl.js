@@ -19,6 +19,7 @@ const fs     = require('fs').promises;
 const path   = require('path');
 const state  = require('./state');
 const mqtt   = require('./mqttClient');
+const tg     = require('./timeguard');
 
 const DATA_FILE = process.env.DATA_DIR
   ? path.join(process.env.DATA_DIR, 'pressure_ctrl.json')
@@ -136,6 +137,16 @@ function tick() {
     if (state.v20.running) {
       mqtt.sendCmd('v20/stop', '1');
       webLog('[PI] Urlaubsmodus – Pumpe gestoppt');
+    }
+    resetIntegral();
+    return;
+  }
+
+  // ── Zeitsperre ──
+  if (!tg.isAllowed()) {
+    if (state.v20.running) {
+      mqtt.sendCmd('v20/stop', '1');
+      webLog('[PI] Zeitsperre aktiv – Pumpe gestoppt');
     }
     resetIntegral();
     return;

@@ -51,7 +51,7 @@ router.post('/v20/reset', (_req, res) => {
 
 router.post('/v20/freq', (req, res) => {
   const hz = parseFloat(req.body?.hz);
-  if (isNaN(hz) || hz < 0 || hz > 50) {
+  if (isNaN(hz) || hz < 0 || hz > 60) {
     return res.status(400).json({ error: 'invalid hz' });
   }
   mqttCli.sendCmd('v20/freq', hz.toFixed(1));

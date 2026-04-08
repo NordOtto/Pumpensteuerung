@@ -518,21 +518,13 @@ $('btnReset').onclick = () => authFetch('/api/v20/reset', { method: 'POST' }).th
 let slTimer;
 let sliderDragging = false;
 
-function positionTooltip() {
+function updateSliderTip() {
   els.sliderTip.textContent = parseFloat(els.slider.value).toFixed(1) + ' Hz';
+  els.freqSet.textContent = parseFloat(els.slider.value).toFixed(1);
 }
 
-els.slider.addEventListener('input', () => {
-  sliderDragging = true;
-  els.sliderTip.classList.remove('hidden');
-  positionTooltip();
-  // Show value in the "Sollfrequenz" display as well
-  els.freqSet.textContent = parseFloat(els.slider.value).toFixed(1);
-});
-
-els.slider.addEventListener('change', (e) => {
-  const hz = parseFloat(e.target.value);
-  els.sliderTip.classList.add('hidden');
+function sendFreq() {
+  const hz = parseFloat(els.slider.value);
   clearTimeout(slTimer);
   slTimer = setTimeout(() => {
     sliderDragging = false;
@@ -544,7 +536,33 @@ els.slider.addEventListener('change', (e) => {
       if (o.ok) $toast.show(`Frequenz auf ${hz.toFixed(1)} Hz gesetzt`);
     });
   }, 300);
+}
+
+// Desktop + Mobile: input fires on every value change
+els.slider.addEventListener('input', () => {
+  sliderDragging = true;
+  els.sliderTip.classList.remove('hidden');
+  updateSliderTip();
 });
+
+// change fires when user releases
+els.slider.addEventListener('change', () => {
+  els.sliderTip.classList.add('hidden');
+  sendFreq();
+});
+
+// Touch fallback: some mobile browsers don't fire change reliably
+els.slider.addEventListener('touchstart', () => {
+  sliderDragging = true;
+  els.sliderTip.classList.remove('hidden');
+  updateSliderTip();
+}, { passive: true });
+
+els.slider.addEventListener('touchend', () => {
+  els.sliderTip.classList.add('hidden');
+  updateSliderTip();
+  sendFreq();
+}, { passive: true });
 
 // ─── Gear Button → Settings ───
 $('btnGear').onclick = () => window.showTab('settings');

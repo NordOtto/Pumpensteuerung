@@ -174,6 +174,7 @@ const els = {
   statusModbus:$('statusModbus'),
   uptime:      $('statusUptime'),
   slider:      $('freqSlider'),
+  sliderTip:   $('sliderTooltip'),
   presetPill:  $('activePresetPill'),
   piPon:       $('piPon'),
   piSetpoint:  $('piSetpoint'),
@@ -302,6 +303,10 @@ function updateUI(st) {
   if (st.v20) {
     animateValue(els.freq, st.v20.frequency || 0, 1);
     els.freqSet.textContent = (st.v20.freq_setpoint || 0).toFixed(1);
+    // Sync slider to current setpoint (unless user is dragging)
+    if (!sliderDragging) {
+      els.slider.value = st.v20.freq_setpoint || els.slider.min;
+    }
     animateValue(els.voltage, st.v20.voltage || 0, 1);
     animateValue(els.current, st.v20.current || 0, 2);
     animateValue(els.power, (st.v20.power || 0) * 1000, 0);
@@ -511,10 +516,30 @@ $('btnReset').onclick = () => authFetch('/api/v20/reset', { method: 'POST' }).th
 
 // ─── Freq Slider ───
 let slTimer;
-els.slider.addEventListener('input', (e) => {
-  // Show current slider value somewhere? We just update freq display transiently
+let sliderDragging = false;
+
+function positionTooltip() {
+  const s = els.slider;
+  const tip = els.sliderTip;
+  const pct = (s.value - s.min) / (s.max - s.min);
+  const thumbW = 18; // approx thumb width px
+  const trackW = s.offsetWidth - thumbW;
+  const px = thumbW / 2 + pct * trackW;
+  tip.style.left = px + 'px';
+  tip.textContent = parseFloat(s.value).toFixed(1) + ' Hz';
+}
+
+els.slider.addEventListener('input', () => {
+  sliderDragging = true;
+  els.sliderTip.classList.remove('hidden');
+  positionTooltip();
+  // Show value in the "Sollfrequenz" display as well
+  els.freqSet.textContent = parseFloat(els.slider.value).toFixed(1);
 });
+
 els.slider.addEventListener('change', (e) => {
+  els.sliderTip.classList.add('hidden');
+  sliderDragging = false;
   clearTimeout(slTimer);
   slTimer = setTimeout(() => {
     authFetch('/api/v20/freq', {
@@ -524,7 +549,7 @@ els.slider.addEventListener('change', (e) => {
     }).then(r => r.json()).then(o => {
       if (o.ok) $toast.show(`Frequenz auf ${e.target.value} Hz gesetzt`);
     });
-  }, 500);
+  }, 300);
 });
 
 // ─── Gear Button → Settings ───

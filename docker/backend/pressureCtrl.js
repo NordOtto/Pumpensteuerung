@@ -97,8 +97,8 @@ function setConfig(cfg) {
   if (cfg.p_off    !== undefined) state.pi.p_off    = clamp(parseFloat(cfg.p_off),     state.pi.setpoint, 8.0);
   if (cfg.kp       !== undefined) state.pi.kp       = parseFloat(cfg.kp);
   if (cfg.ki       !== undefined) state.pi.ki       = parseFloat(cfg.ki);
-  if (cfg.freq_min !== undefined) state.pi.freq_min = clamp(parseFloat(cfg.freq_min), 10, 50);
-  if (cfg.freq_max !== undefined) state.pi.freq_max = clamp(parseFloat(cfg.freq_max), 10, 50);
+  if (cfg.freq_min !== undefined) state.pi.freq_min = clamp(parseFloat(cfg.freq_min), 10, 60);
+  if (cfg.freq_max !== undefined) state.pi.freq_max = clamp(parseFloat(cfg.freq_max), 10, 60);
   if (state.pi.freq_min > state.pi.freq_max) state.pi.freq_min = state.pi.freq_max;
   save().catch(e => console.error('[PI] save error:', e.message));
 }

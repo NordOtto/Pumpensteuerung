@@ -538,16 +538,17 @@ els.slider.addEventListener('input', () => {
 });
 
 els.slider.addEventListener('change', (e) => {
+  const hz = parseFloat(e.target.value);
   els.sliderTip.classList.add('hidden');
-  sliderDragging = false;
   clearTimeout(slTimer);
   slTimer = setTimeout(() => {
+    sliderDragging = false;
     authFetch('/api/v20/freq', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ hz: parseFloat(e.target.value) })
+      body: JSON.stringify({ hz })
     }).then(r => r.json()).then(o => {
-      if (o.ok) $toast.show(`Frequenz auf ${e.target.value} Hz gesetzt`);
+      if (o.ok) $toast.show(`Frequenz auf ${hz.toFixed(1)} Hz gesetzt`);
     });
   }, 300);
 });

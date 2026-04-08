@@ -519,14 +519,7 @@ let slTimer;
 let sliderDragging = false;
 
 function positionTooltip() {
-  const s = els.slider;
-  const tip = els.sliderTip;
-  const pct = (s.value - s.min) / (s.max - s.min);
-  const thumbW = 18; // approx thumb width px
-  const trackW = s.offsetWidth - thumbW;
-  const px = thumbW / 2 + pct * trackW;
-  tip.style.left = px + 'px';
-  tip.textContent = parseFloat(s.value).toFixed(1) + ' Hz';
+  els.sliderTip.textContent = parseFloat(els.slider.value).toFixed(1) + ' Hz';
 }
 
 els.slider.addEventListener('input', () => {

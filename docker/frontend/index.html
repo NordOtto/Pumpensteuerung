@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
   <link rel="manifest" href="/manifest.json"/>
   <title>Brunnenpumpe</title>
-  <link rel="stylesheet" href="/styles.css?v=8"/>
+  <link rel="stylesheet" href="/styles.css?v=9"/>
   <link href="https://fonts.googleapis.com" rel="preconnect"/>
   <link crossorigin href="https://fonts.gstatic.com" rel="preconnect"/>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Manrope:wght@400;500;700&family=Inter:wght@400;500;700&display=swap" rel="stylesheet"/>
@@ -109,19 +109,18 @@
         <div class="skeuo-display rounded-[1rem] p-5 sm:p-6 pb-16 relative overflow-hidden flex flex-col items-center justify-center min-h-[240px] sm:min-h-[300px]">
           <!-- Highlight -->
           <div class="absolute inset-0 opacity-40 mix-blend-overlay pointer-events-none" style="background:radial-gradient(circle at 50% 120%,rgba(255,255,255,0.8) 0%,transparent 60%)"></div>
-          <!-- Shimmer -->
-          <div class="shimmer-overlay"></div>
+
 
           <!-- Status Pills top-left -->
-          <div class="absolute top-2 sm:top-4 left-2 sm:left-4 right-2 sm:right-4 flex flex-wrap gap-1 sm:gap-1.5 items-start">
-            <div id="statusBadge" class="bg-slate-500 text-white text-[10px] sm:text-xs font-bold px-2 sm:px-3 py-1 rounded-full flex items-center gap-1 sm:gap-1.5 shadow-md transition-all">
+          <div class="absolute top-2 sm:top-4 left-2 sm:left-4 right-2 sm:right-4 flex flex-wrap gap-1 sm:gap-1.5 items-center">
+            <div id="statusBadge" class="bg-slate-500 text-white text-[10px] sm:text-xs font-bold px-2 sm:px-3 py-0.5 rounded-full flex items-center gap-1 sm:gap-1.5 shadow-md transition-all leading-5">
               <span class="w-2 h-2 bg-white rounded-full" id="statusBadgeDot"></span>
               <span id="statusBadgeText">Lade...</span>
             </div>
-            <div id="pillTimeguard" class="hidden text-[10px] sm:text-xs font-bold px-2 sm:px-2.5 py-1 rounded-full flex items-center gap-1 shadow-md"></div>
-            <div id="pillPI" class="hidden text-[10px] sm:text-xs font-bold px-2 sm:px-2.5 py-1 rounded-full flex items-center gap-1 shadow-md"></div>
+            <div id="pillTimeguard" class="hidden text-[10px] sm:text-xs font-bold px-2 sm:px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-md leading-5"></div>
+            <div id="pillPI" class="hidden text-[10px] sm:text-xs font-bold px-2 sm:px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-md leading-5"></div>
             <div class="flex-1"></div>
-            <div id="activePresetPill" class="px-2 sm:px-3 py-1 bg-blue-900/40 text-blue-200 text-[10px] sm:text-xs font-medium rounded-full border border-blue-400/30 hidden"></div>
+            <div id="activePresetPill" class="px-2 sm:px-3 py-0.5 bg-blue-900/40 text-blue-200 text-[10px] sm:text-xs font-medium rounded-full border border-blue-400/30 hidden leading-5"></div>
           </div>
 
           <!-- Frequency Display -->
@@ -136,8 +135,7 @@
 
           <!-- Slider -->
           <div class="relative w-full max-w-md mt-5 z-10">
-            <input type="range" id="freqSlider" min="30" max="60" step="0.5" value="30" class="w-full slider-track"/>
-            <div id="sliderTooltip" class="hidden text-center text-white/90 text-sm font-bold mt-2 tracking-wide">30.0 Hz</div>
+            <input type="range" id="freqSlider" min="30" max="60" step="1" value="30" class="w-full slider-track"/>
           </div>
 
           <!-- Wave SVG -->
@@ -548,6 +546,6 @@
     </div>
   </div>
 
-  <script src="/app.js?v=8"></script>
+  <script src="/app.js?v=9"></script>
 </body>
 </html>

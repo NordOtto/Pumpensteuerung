@@ -174,7 +174,6 @@ const els = {
   statusModbus:$('statusModbus'),
   uptime:      $('statusUptime'),
   slider:      $('freqSlider'),
-  sliderTip:   $('sliderTooltip'),
   presetPill:  $('activePresetPill'),
   piPon:       $('piPon'),
   piSetpoint:  $('piSetpoint'),
@@ -302,9 +301,9 @@ function updateUI(st) {
   // V20 Pump
   if (st.v20) {
     animateValue(els.freq, st.v20.frequency || 0, 1);
-    els.freqSet.textContent = (st.v20.freq_setpoint || 0).toFixed(1);
-    // Sync slider to current setpoint (unless user is dragging)
+    // Sync slider + Sollfrequenz (unless user is dragging)
     if (!sliderDragging) {
+      els.freqSet.textContent = (st.v20.freq_setpoint || 0).toFixed(0);
       els.slider.value = st.v20.freq_setpoint || els.slider.min;
     }
     animateValue(els.voltage, st.v20.voltage || 0, 1);
@@ -519,8 +518,7 @@ let slTimer;
 let sliderDragging = false;
 
 function updateSliderTip() {
-  els.sliderTip.textContent = parseFloat(els.slider.value).toFixed(1) + ' Hz';
-  els.freqSet.textContent = parseFloat(els.slider.value).toFixed(1);
+  els.freqSet.textContent = parseInt(els.slider.value);
 }
 
 function sendFreq() {
@@ -533,7 +531,7 @@ function sendFreq() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ hz })
     }).then(r => r.json()).then(o => {
-      if (o.ok) $toast.show(`Frequenz auf ${hz.toFixed(1)} Hz gesetzt`);
+      if (o.ok) $toast.show(`Frequenz auf ${hz.toFixed(0)} Hz gesetzt`);
     });
   }, 300);
 }
@@ -541,25 +539,21 @@ function sendFreq() {
 // Desktop + Mobile: input fires on every value change
 els.slider.addEventListener('input', () => {
   sliderDragging = true;
-  els.sliderTip.classList.remove('hidden');
   updateSliderTip();
 });
 
 // change fires when user releases
 els.slider.addEventListener('change', () => {
-  els.sliderTip.classList.add('hidden');
   sendFreq();
 });
 
 // Touch fallback: some mobile browsers don't fire change reliably
 els.slider.addEventListener('touchstart', () => {
   sliderDragging = true;
-  els.sliderTip.classList.remove('hidden');
   updateSliderTip();
 }, { passive: true });
 
 els.slider.addEventListener('touchend', () => {
-  els.sliderTip.classList.add('hidden');
   updateSliderTip();
   sendFreq();
 }, { passive: true });

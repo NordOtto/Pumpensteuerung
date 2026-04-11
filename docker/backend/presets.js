@@ -20,7 +20,7 @@ const DEFAULT_PRESET = {
   kp:       8.0,
   ki:       1.0,
   freq_min: 35.0,
-  freq_max: 50.0,
+  freq_max: 52.0,
 };
 
 let presets = [{ ...DEFAULT_PRESET }];
@@ -63,7 +63,7 @@ function addOrUpdate(preset) {
     kp:       parseFloat(preset.kp)       || 8.0,
     ki:       parseFloat(preset.ki)       || 1.0,
     freq_min: parseFloat(preset.freq_min) || 35.0,
-    freq_max: parseFloat(preset.freq_max) || 50.0,
+    freq_max: parseFloat(preset.freq_max) || 52.0,
   };
   if (idx >= 0) {
     presets[idx] = entry;

@@ -115,7 +115,7 @@ function sendDiscovery(client) {
     name: 'V20 Frequenz Soll',
     stat_t: `${BASE}/v20/freq_set/state`,
     cmd_t:  `${BASE}/v20/freq_set/set`,
-    min: 0, max: 50, step: 0.5, unit_of_meas: 'Hz',
+    min: 0, max: 60, step: 1, unit_of_meas: 'Hz',
     uniq_id: 'pumpensteuerung_v20_freq_set', ic: 'mdi:sine-wave',
   });
   pub('number', 'pi_setpoint', {
@@ -129,14 +129,14 @@ function sendDiscovery(client) {
     name: 'PI Freq Min',
     stat_t: `${BASE}/pi/freq_min/state`,
     cmd_t:  `${BASE}/pi/freq_min/set`,
-    min: 10, max: 50, step: 1, unit_of_meas: 'Hz',
+    min: 10, max: 60, step: 1, unit_of_meas: 'Hz',
     uniq_id: 'pumpensteuerung_pi_freq_min',
   });
   pub('number', 'pi_freq_max', {
     name: 'PI Freq Max',
     stat_t: `${BASE}/pi/freq_max/state`,
     cmd_t:  `${BASE}/pi/freq_max/set`,
-    min: 10, max: 50, step: 1, unit_of_meas: 'Hz',
+    min: 10, max: 60, step: 1, unit_of_meas: 'Hz',
     uniq_id: 'pumpensteuerung_pi_freq_max',
   });
   pub('number', 'fan_pwm', {

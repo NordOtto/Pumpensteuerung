@@ -45,7 +45,7 @@ const state = {
     kp:             8.0,
     ki:             1.0,
     freq_min:       35.0,
-    freq_max:       50.0,
+    freq_max:       52.0,
     active:         false,
     pump_state:     0,      // 0=AUS, 1=STARTET, 2=LÄUFT
     dry_run_locked: false,

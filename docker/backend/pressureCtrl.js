@@ -100,6 +100,7 @@ function setConfig(cfg) {
   if (cfg.freq_min !== undefined) state.pi.freq_min = clamp(parseFloat(cfg.freq_min), 10, 60);
   if (cfg.freq_max !== undefined) state.pi.freq_max = clamp(parseFloat(cfg.freq_max), 10, 60);
   if (state.pi.freq_min > state.pi.freq_max) state.pi.freq_min = state.pi.freq_max;
+  webLog(`[PI] Config: SP=${state.pi.setpoint} p_on=${state.pi.p_on} p_off=${state.pi.p_off} fMin=${state.pi.freq_min} fMax=${state.pi.freq_max} kp=${state.pi.kp} ki=${state.pi.ki}`);
   save().catch(e => console.error('[PI] save error:', e.message));
 }
 
@@ -314,6 +315,12 @@ function tick() {
   const freqMid = (pi.freq_min + pi.freq_max) / 2;
   let freq_out  = pi.kp * error + pi.ki * integral + freqMid;
   freq_out      = clamp(freq_out, pi.freq_min, pi.freq_max);
+
+  // Debug-Log alle 30s
+  if (!tick._lastDebug || now - tick._lastDebug > 30000) {
+    tick._lastDebug = now;
+    webLog(`[PI] SP=${setpoint} PV=${measured.toFixed(2)} err=${error.toFixed(2)} I=${integral.toFixed(1)} fMin=${pi.freq_min} fMax=${pi.freq_max} fMid=${freqMid.toFixed(1)} → ${freq_out.toFixed(1)} Hz`);
+  }
 
   mqtt.sendCmd('v20/freq', freq_out.toFixed(1));
   state.v20.freq_setpoint = freq_out;

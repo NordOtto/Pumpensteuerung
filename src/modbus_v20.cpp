@@ -301,7 +301,7 @@ void modbus_v20_fault_reset()
 void modbus_v20_set_frequency(float hz)
 {
     if (hz < 0)  hz = 0;
-    if (hz > 50) hz = 50;
+    if (hz > 60) hz = 60;
 
     uint16_t raw = (uint16_t)(hz * V20_FREQ_WRITE_SCALE);
 

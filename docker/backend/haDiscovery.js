@@ -115,7 +115,7 @@ function sendDiscovery(client) {
     name: 'V20 Frequenz Soll',
     stat_t: `${BASE}/v20/freq_set/state`,
     cmd_t:  `${BASE}/v20/freq_set/set`,
-    min: 0, max: 60, step: 1, unit_of_meas: 'Hz',
+    min: 0, max: 60, step: 0.5, unit_of_meas: 'Hz',
     uniq_id: 'pumpensteuerung_v20_freq_set', ic: 'mdi:sine-wave',
   });
   pub('number', 'pi_setpoint', {

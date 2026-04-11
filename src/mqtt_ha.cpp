@@ -77,7 +77,7 @@ static void mqttCallback(char* t, byte* payload, unsigned int len)
     }
     else if (tp == cmdTopic("v20/freq")) {
         float hz = msg.toFloat();
-        if (hz >= 10.0f && hz <= 50.0f) {
+        if (hz >= 10.0f && hz <= 60.0f) {
             modbus_v20_set_frequency(hz);
         }
     }

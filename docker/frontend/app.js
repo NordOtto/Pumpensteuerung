@@ -531,7 +531,10 @@ function sendFreq() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ hz })
     }).then(r => r.json()).then(o => {
-      if (o.ok) $toast.show(`Frequenz auf ${hz.toFixed(0)} Hz gesetzt`);
+      if (o.ok) {
+        if (o.mode === 'pi_max') $toast.show(`PI freq_max → ${hz.toFixed(0)} Hz`);
+        else $toast.show(`Frequenz → ${hz.toFixed(0)} Hz`);
+      }
     });
   }, 300);
 }

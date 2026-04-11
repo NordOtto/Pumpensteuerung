@@ -54,9 +54,17 @@ router.post('/v20/freq', (req, res) => {
   if (isNaN(hz) || hz < 0 || hz > 60) {
     return res.status(400).json({ error: 'invalid hz' });
   }
-  mqttCli.sendCmd('v20/freq', hz.toFixed(1));
-  state.v20.freq_setpoint = hz;
-  res.json({ ok: true });
+  if (state.pi.active) {
+    // PI aktiv → Slider setzt freq_max
+    state.pi.freq_max = hz;
+    pi.save().catch(e => console.error('[PI] save error:', e.message));
+    res.json({ ok: true, mode: 'pi_max', freq_max: hz });
+  } else {
+    // PI inaktiv → Frequenz direkt setzen
+    mqttCli.sendCmd('v20/freq', hz.toFixed(1));
+    state.v20.freq_setpoint = hz;
+    res.json({ ok: true, mode: 'manual' });
+  }
 });
 
 // ── PI-Druckregelung ──

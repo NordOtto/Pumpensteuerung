@@ -32,7 +32,9 @@ let startSentAt = 0;
 
 // ── No-demand / Dry-run Timer ──
 let noFlowSince      = 0;
+let dryRunNoFlowSince = 0;   // separater Timer für Dry-run
 let dryRunLockUntil  = 0;
+let dryRunGraceUntil = 0;    // Grace-Period nach Reset/Start
 
 // ── Letzter Druckwert-Zeitstempel (Druck-Timeout) ──
 let lastPressureTs   = 0;
@@ -40,8 +42,9 @@ let lastKnownPressure = 0;
 
 const DT             = 0.5;          // Regelzyklus 500 ms
 const NO_DEMAND_S    = 5;
-const DRY_RUN_S      = 30;
+const DRY_RUN_S      = 60;            // 60s statt 30s
 const DRY_RUN_LOCK_S = 300;          // 5 Minuten
+const DRY_RUN_GRACE_S = 90;          // 90s Grace-Period nach Reset/Start
 const PRESSURE_TIMEOUT_MS = 5000;
 
 function webLog(msg) {
@@ -116,8 +119,11 @@ function setVacation(enabled) {
 
 function resetDryrun() {
   dryRunLockUntil     = 0;
+  dryRunNoFlowSince   = 0;
+  noFlowSince         = 0;
+  dryRunGraceUntil    = Date.now() + DRY_RUN_GRACE_S * 1000;
   state.pi.dry_run_locked = false;
-  webLog('[PI] Trockenlauf-Sperre manuell aufgehoben');
+  webLog(`[PI] Trockenlauf-Sperre manuell aufgehoben – ${DRY_RUN_GRACE_S}s Grace-Period`);
 }
 
 function resetIntegral() {
@@ -226,9 +232,14 @@ function tick() {
 
   // ── Dry-run Protection ──
   // Echten Sensorwert nutzen – effectiveFlow würde Trockenlauf verdecken
-  if (flow < 1.0 && running && pressure < pi.setpoint) {
-    if (noFlowSince === 0) noFlowSince = now;
-    if ((now - noFlowSince) > DRY_RUN_S * 1000) {
+  // Grace-Period nach Start/Reset überspringen
+  if (dryRunGraceUntil > 0 && now >= dryRunGraceUntil) {
+    dryRunGraceUntil = 0;
+    webLog('[PI] Trockenlauf Grace-Period abgelaufen');
+  }
+  if (dryRunGraceUntil === 0 && flow < 1.0 && running && pressure < pi.setpoint) {
+    if (dryRunNoFlowSince === 0) dryRunNoFlowSince = now;
+    if ((now - dryRunNoFlowSince) > DRY_RUN_S * 1000) {
       webLog(`[PI] TROCKENLAUF! ${DRY_RUN_S}s kein Durchfluss → Pumpe STOP + Sperre ${DRY_RUN_LOCK_S/60} min`);
       mqtt.sendCmd('v20/stop', '1');
       dryRunLockUntil     = now + DRY_RUN_LOCK_S * 1000;
@@ -236,6 +247,8 @@ function tick() {
       resetIntegral();
       return;
     }
+  } else {
+    dryRunNoFlowSince = 0;
   }
 
   // ── Pumpenlogik (Druck-Modus) ──
@@ -258,6 +271,8 @@ function tick() {
       if (running) {
         pumpState = 2;
         webLog('[PI] Pumpe läuft – PI aktiv');
+        dryRunGraceUntil = now + DRY_RUN_GRACE_S * 1000;
+        dryRunNoFlowSince = 0;
       } else if (now - startSentAt > 10000) {
         webLog('[PI] START Timeout – V20 nicht gestartet');
         pumpState = 0;

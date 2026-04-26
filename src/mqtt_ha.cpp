@@ -11,6 +11,7 @@
 // ============================================================
 #include "mqtt_ha.h"
 #include "modbus_v20.h"
+#include "fallback_ctrl.h"
 #include "sensors.h"
 #include <WiFiClient.h>
 #include <PubSubClient.h>
@@ -88,6 +89,15 @@ static void mqttCallback(char* t, byte* payload, unsigned int len)
     else if (tp == cmdTopic("fan/mode")) {
         state.fan_mode = fanModeFromStr(msg.c_str());
         Serial.printf("[MQTT] Fan-Mode → %s\n", fanModeStr(state.fan_mode));
+    }
+    else if (tp == cmdTopic("fallback/p_on")) {
+        fallback_ctrl_set_p_on(msg.toFloat());
+    }
+    else if (tp == cmdTopic("fallback/p_off")) {
+        fallback_ctrl_set_p_off(msg.toFloat());
+    }
+    else if (tp == cmdTopic("fallback/freq")) {
+        fallback_ctrl_set_freq(msg.toFloat());
     }
 }
 
@@ -197,4 +207,8 @@ void mqtt_publish()
                  String(state.fan_pwm).c_str());
     mqtt.publish(rawTopic("fan/mode").c_str(),
                  fanModeStr(state.fan_mode));
+
+    // ── Fallback-Status ──
+    mqtt.publish(rawTopic("fallback").c_str(),
+                 state.fallback_mode ? "ON" : "OFF");
 }

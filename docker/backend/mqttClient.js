@@ -81,6 +81,16 @@ function sendCmd(suffix, value) {
   client.publish(topic, String(value), { retain: false });
 }
 
+// ── Fallback-Konfiguration mit retain=true senden ──
+// ESP32 empfängt sie sofort beim Connect und speichert sie in LittleFS
+function publishFallbackConfig(p_on, p_off, freq) {
+  if (!client || !client.connected) return;
+  client.publish(CMD + '/fallback/p_on',  p_on.toFixed(2),  { retain: true });
+  client.publish(CMD + '/fallback/p_off', p_off.toFixed(2), { retain: true });
+  client.publish(CMD + '/fallback/freq',  freq.toFixed(1),  { retain: true });
+  console.log(`[MQTT] Fallback-Config: p_on=${p_on} p_off=${p_off} freq=${freq}`);
+}
+
 // ── HA Topics publishen (alle 2s vom server.js aufgerufen) ──
 function publishHA() {
   if (!client || !client.connected) return;
@@ -157,6 +167,10 @@ function connect() {
     // raw Sensordaten vom ESP32
     client.subscribe(RAW + '/#', { qos: 0 });
 
+    // Fallback-Konfiguration sofort mit retain senden, damit der ESP32
+    // sie auch nach einem Neustart ohne Server kennt
+    publishFallbackConfig(state.pi.p_on, state.pi.p_off, state.pi.freq_max);
+
     // HA Set-Topics (Befehle von HA oder Browser via alten Topics)
     const haSetTopics = [
       BASE + '/v20/running/set',
@@ -200,4 +214,4 @@ function isConnected() {
   return client && client.connected;
 }
 
-module.exports = { connect, sendCmd, publishHA, onCommand, isConnected };
+module.exports = { connect, sendCmd, publishHA, publishFallbackConfig, onCommand, isConnected };

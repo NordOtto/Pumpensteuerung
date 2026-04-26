@@ -105,6 +105,8 @@ function setConfig(cfg) {
   if (state.pi.freq_min > state.pi.freq_max) state.pi.freq_min = state.pi.freq_max;
   webLog(`[PI] Config: SP=${state.pi.setpoint} p_on=${state.pi.p_on} p_off=${state.pi.p_off} fMin=${state.pi.freq_min} fMax=${state.pi.freq_max} kp=${state.pi.kp} ki=${state.pi.ki}`);
   save().catch(e => console.error('[PI] save error:', e.message));
+  // Fallback-Config auf ESP32 aktualisieren (mit retain, überlebt Neustart)
+  mqtt.publishFallbackConfig(state.pi.p_on, state.pi.p_off, state.pi.freq_max);
 }
 
 function setVacation(enabled) {

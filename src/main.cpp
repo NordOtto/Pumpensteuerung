@@ -21,6 +21,7 @@
 #include "mqtt_ha.h"
 #include "sensors.h"
 #include "webserver.h"
+#include "fallback_ctrl.h"
 
 // ── Globaler Zustand ──
 AppState state;
@@ -59,7 +60,7 @@ static void onWiFiEvent(WiFiEvent_t event, WiFiEventInfo_t info)
     }
 }
 
-// ── Watchdog ──
+// ── Watchdog / Fallback ──
 static void checkWatchdog()
 {
     unsigned long now = millis();
@@ -69,19 +70,23 @@ static void checkWatchdog()
     // Uptime aktualisieren
     state.uptime_s = (now - boot_time) / 1000;
 
-    // Watchdog: V20 stoppen wenn MQTT-Verbindung verloren geht
-    // Steuerungslogik läuft im Docker-Backend – ohne MQTT kein Kommando möglich
-    static unsigned long mqtt_lost_since = 0;
+    static unsigned long mqtt_lost_since  = 0;
+    static bool          fallback_active  = false;
+
     if (!state.mqtt_connected) {
         if (mqtt_lost_since == 0) mqtt_lost_since = now;
-        if (state.v20_running &&
+        // Nach WATCHDOG_TIMEOUT_S Sekunden: Fallback-Regelung aktivieren
+        if (!fallback_active &&
             (now - mqtt_lost_since > (unsigned long)WATCHDOG_TIMEOUT_S * 1000))
         {
-            Serial.println("[WD] ⚠ MQTT-Timeout! V20 wird gestoppt.");
-            web_log("[WD] MQTT-Verbindung verloren – V20 gestoppt");
-            modbus_v20_stop();
+            fallback_ctrl_enter();
+            fallback_active = true;
         }
     } else {
+        if (fallback_active) {
+            fallback_ctrl_exit();
+            fallback_active = false;
+        }
         mqtt_lost_since = 0;
     }
 }
@@ -145,6 +150,9 @@ void setup()
     } else {
         Serial.println("[FS]  ⚠ LittleFS Fehler");
     }
+
+    // ── Fallback-Konfiguration laden ──
+    fallback_ctrl_load();
 
     // ── Modbus RTU  (V20) ──
     modbus_v20_init();
@@ -213,6 +221,9 @@ void loop()
     // ── WebSocket Broadcast ──
     webserver_task();
     webserver_broadcast();      // intern auf 1000 ms getimed
+
+    // ── Fallback-Regelung ──
+    fallback_ctrl_tick();
 
     // ── Watchdog ──
     checkWatchdog();

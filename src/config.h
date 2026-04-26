@@ -124,9 +124,15 @@
 #define FAN_PWM_MAX       255
 
 // =============================================================
-//  Watchdog
+//  Watchdog / Fallback-Regelung
 // =============================================================
-#define WATCHDOG_TIMEOUT_S  5     // Sekunden ohne STW von LOGO → V20 Stop
+#define WATCHDOG_TIMEOUT_S  5     // Sekunden ohne MQTT → Fallback aktiv
+
+// Lokaler Druckschalter-Fallback (läuft ohne Server/Netzwerk)
+#define FALLBACK_P_ON_DEFAULT   2.2f   // Einschaltdruck [bar]
+#define FALLBACK_P_OFF_DEFAULT  4.0f   // Ausschaltdruck [bar]
+#define FALLBACK_FREQ_DEFAULT   50.0f  // Festfrequenz   [Hz]
+#define FALLBACK_FILE           "/fallback.cfg"
 
 // =============================================================
 //  Webserver
@@ -176,6 +182,12 @@ struct AppState {
     uint16_t fan_rpm          = 0;
     uint8_t  fan_pwm          = 0;
     uint8_t  fan_mode         = FAN_MODE_AUTO;
+
+    // ── Lokale Fallback-Regelung (bei Netzwerkausfall) ──
+    bool  fallback_mode    = false;
+    float fallback_p_on    = FALLBACK_P_ON_DEFAULT;
+    float fallback_p_off   = FALLBACK_P_OFF_DEFAULT;
+    float fallback_freq    = FALLBACK_FREQ_DEFAULT;
 
     // ── System ──
     unsigned long uptime_s    = 0;

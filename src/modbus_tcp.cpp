@@ -83,14 +83,8 @@ void modbus_tcp_check_writes()
     uint16_t raw_flow = mb_tcp.Hreg(TCP_REG_FLOW);
     if (raw_flow >= 200) {
         float sensor_flow = (raw_flow - 200) * 0.10626f;
-        if (sensor_flow < 1.0f && state.v20_running && state.v20_frequency > 0) {
-            // Sensor im Totbereich (<5 L/min) – Schätzung aus VFD-Frequenz
-            state.flow_rate      = (state.v20_frequency / 50.0f) * 4.0f;
-            state.flow_estimated = true;
-        } else {
-            state.flow_rate      = sensor_flow;
-            state.flow_estimated = false;
-        }
+        state.flow_rate      = sensor_flow;
+        state.flow_estimated = false;
         state.last_flow_update = millis();
     } else if (raw_flow > 0 && raw_flow < 200) {
         state.flow_rate        = 0.0f;

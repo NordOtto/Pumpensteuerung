@@ -50,7 +50,10 @@ const state = {
     pump_state:     0,      // 0=AUS, 1=STARTET, 2=LÄUFT
     dry_run_locked: false,
     flow_setpoint:  0,      // L/min (nur CTRL_FLOW Modus)
-    ctrl_mode:      0,      // 0=Druck, 1=Durchfluss
+    ctrl_mode:      0,      // 0=Druck, 1=Durchfluss, 2=FixFrequenz
+    spike_enabled:  true,   // Hahn-zu Druckspitzen-Erkennung
+    spike_threshold: 0.4,   // bar Anstieg innerhalb spike_window_s → sauberer Stop
+    spike_window_s: 3,      // Sekunden Beobachtungsfenster
   },
 
   // ── Zeitsperre (Backend-State) ──
@@ -68,7 +71,16 @@ const state = {
 
   // ── Presets (Backend-State) ──
   active_preset: 'Normal',
-  ctrl_mode:     0,           // 0=Druck, 1=Durchfluss
+  ctrl_mode:     0,           // 0=Druck, 1=Durchfluss, 2=FixFrequenz
+  preset_setpoint_hz:        0,    // bei mode=2 aktive Frequenz
+  preset_expected_pressure:  0,    // bei mode=2 erwarteter Druck
+
+  // ── HA Heartbeat-Lock ──
+  preset_lock: {
+    active:        false,
+    locked_preset: '',
+    remaining_s:   0,
+  },
 
   // ── System ──
   sys: {

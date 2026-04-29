@@ -15,15 +15,29 @@ const DATA_FILE = process.env.DATA_DIR
 
 const DEFAULT_PRESET = {
   name:     'Normal',
-  mode:     0,      // 0=Druck, 1=Durchfluss
+  mode:     0,      // 0=Druck, 1=Durchfluss, 2=FixFrequenz
   setpoint: 3.0,
   kp:       8.0,
   ki:       1.0,
   freq_min: 35.0,
   freq_max: 52.0,
+  setpoint_hz:       0,    // nur mode=2: feste Frequenz
+  expected_pressure: 0,    // nur mode=2: erwarteter Druck (für Trockenlauf-/Überdruck-Schutz)
 };
 
 let presets = [{ ...DEFAULT_PRESET }];
+let _onChanged = null;
+function onPresetsChanged(cb) { _onChanged = cb; }
+function _notifyChanged() { if (_onChanged) try { _onChanged(); } catch {} }
+
+function clampHz(v) {
+  if (!Number.isFinite(v) || v <= 0) return 0;
+  return Math.max(10, Math.min(60, v));
+}
+function clampPressure(v) {
+  if (!Number.isFinite(v) || v <= 0) return 0;
+  return Math.max(0.1, Math.min(8.0, v));
+}
 
 async function load() {
   try {
@@ -56,14 +70,17 @@ function list() {
 function addOrUpdate(preset) {
   if (!preset.name || preset.name.length > 32) return false;
   const idx = presets.findIndex(p => p.name === preset.name);
+  const mode = parseInt(preset.mode);
   const entry = {
     name:     preset.name,
-    mode:     parseInt(preset.mode)     || 0,
+    mode:     (mode === 1 || mode === 2) ? mode : 0,
     setpoint: parseFloat(preset.setpoint) || 3.0,
     kp:       parseFloat(preset.kp)       || 8.0,
     ki:       parseFloat(preset.ki)       || 1.0,
     freq_min: parseFloat(preset.freq_min) || 35.0,
     freq_max: parseFloat(preset.freq_max) || 52.0,
+    setpoint_hz:       clampHz(parseFloat(preset.setpoint_hz)),
+    expected_pressure: clampPressure(parseFloat(preset.expected_pressure)),
   };
   if (idx >= 0) {
     presets[idx] = entry;
@@ -72,6 +89,7 @@ function addOrUpdate(preset) {
     presets.push(entry);
   }
   saveToDisk().catch(e => console.error('[Presets] save error:', e.message));
+  _notifyChanged();
   return true;
 }
 
@@ -81,6 +99,7 @@ function deletePreset(name) {
   if (idx < 0) return false;
   presets.splice(idx, 1);
   saveToDisk().catch(e => console.error('[Presets] save error:', e.message));
+  _notifyChanged();
   return true;
 }
 
@@ -88,9 +107,30 @@ function apply(name) {
   const preset = presets.find(p => p.name === name);
   if (!preset) return false;
 
-  // PI zurücksetzen und neu konfigurieren
   pi.resetIntegral();
+
+  if (preset.mode === 2) {
+    // Fix-Frequenz-Preset: PI deaktivieren, Frequenz direkt setzen
+    state.pi.enabled = false;
+    state.pi.ctrl_mode      = 2;
+    state.pi.flow_setpoint  = 0;
+    state.active_preset     = name;
+    state.ctrl_mode         = 2;
+    state.preset_expected_pressure = preset.expected_pressure || 0;
+    state.preset_setpoint_hz       = preset.setpoint_hz || 0;
+    // Frequenz und Start an V20 senden — pressureCtrl.tick() refresht regelmäßig
+    if (preset.setpoint_hz > 0) {
+      mqtt.sendCmd('v20/start', '1');
+      mqtt.sendCmd('v20/freq', preset.setpoint_hz.toFixed(1));
+      state.v20.freq_setpoint = preset.setpoint_hz;
+    }
+    console.log('[Presets] Aktiviert (FixHz):', name, preset.setpoint_hz, 'Hz');
+    return true;
+  }
+
+  // mode 0/1: PI re-konfigurieren und aktivieren
   pi.setConfig({
+    enabled:  true,
     setpoint: preset.setpoint,
     kp:       preset.kp,
     ki:       preset.ki,
@@ -98,13 +138,15 @@ function apply(name) {
     freq_max: preset.freq_max,
   });
 
-  state.pi.ctrl_mode    = preset.mode;
-  state.pi.flow_setpoint = preset.mode === 1 ? preset.setpoint : 0;
-  state.active_preset   = name;
-  state.ctrl_mode       = preset.mode;
+  state.pi.ctrl_mode      = preset.mode;
+  state.pi.flow_setpoint  = preset.mode === 1 ? preset.setpoint : 0;
+  state.active_preset     = name;
+  state.ctrl_mode         = preset.mode;
+  state.preset_expected_pressure = 0;
+  state.preset_setpoint_hz       = 0;
 
   console.log('[Presets] Aktiviert:', name);
   return true;
 }
 
-module.exports = { load, list, addOrUpdate, deletePreset, apply };
+module.exports = { load, list, addOrUpdate, deletePreset, apply, onPresetsChanged };

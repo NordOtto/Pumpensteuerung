@@ -11,6 +11,7 @@ const mqttClient   = require('./mqttClient');
 const pi           = require('./pressureCtrl');
 const tg           = require('./timeguard');
 const presets      = require('./presets');
+const presetLock   = require('./presetLock');
 const ha           = require('./haDiscovery');
 const ws           = require('./websocketServer');
 const auth         = require('./auth');
@@ -55,7 +56,26 @@ mqttClient.onCommand((topic, value) => {
     tg.setConfig({ enabled: value === 'ON' });
   }
   else if (topic === `${BASE}/preset/set`) {
-    presets.apply(value);
+    if (presetLock.isActive()) {
+      console.warn('[MQTT] preset/set ignoriert – HA-Lock aktiv:', presetLock.getStatus().locked_preset);
+    } else {
+      presets.apply(value);
+    }
+  }
+  else if (topic === `${BASE}/preset/lock/heartbeat`) {
+    let presetName = value;
+    let ttl;
+    try {
+      const obj = JSON.parse(value);
+      if (obj && typeof obj === 'object') {
+        presetName = obj.preset || obj.name;
+        ttl = obj.ttl;
+      }
+    } catch { /* einfacher String */ }
+    presetLock.heartbeat(presetName, ttl);
+  }
+  else if (topic === `${BASE}/preset/lock/clear`) {
+    presetLock.clear();
   }
   else if (topic === `${BASE}/fan/pwm/set`) {
     mqttClient.sendCmd('fan/pwm', value);
@@ -65,6 +85,17 @@ mqttClient.onCommand((topic, value) => {
   }
   else if (topic === `${BASE}/dryrun/reset`) {
     pi.resetDryrun();
+  }
+  else if (topic === `${BASE}/pi/spike/enabled/set`) {
+    pi.setConfig({ spike_enabled: value === 'ON' });
+  }
+  else if (topic === `${BASE}/pi/spike/threshold/set`) {
+    const v = parseFloat(value);
+    if (!isNaN(v)) pi.setConfig({ spike_threshold: v });
+  }
+  else if (topic === `${BASE}/pi/spike/window/set`) {
+    const v = parseFloat(value);
+    if (!isNaN(v)) pi.setConfig({ spike_window_s: v });
   }
   else if (topic === `${BASE}/vacation/set`) {
     pi.setVacation(value === 'ON');
@@ -76,6 +107,9 @@ async function main() {
   await presets.load();
   await tg.load();
   await pi.load();
+
+  // Preset-Änderungen → HA Discovery automatisch aktualisieren
+  presets.onPresetsChanged(() => ha.refreshPresetSelect());
 
   // ── MQTT verbinden ──
   mqttClient.connect();
@@ -120,6 +154,7 @@ async function main() {
 
   // ── Intervall-Tasks ──
   setInterval(() => pi.tick(),         500);   // PI-Regelung
+  setInterval(() => presetLock.tick(), 1000);  // HA-Lock TTL prüfen
   setInterval(() => tg.tick(),         10000); // Zeitsperre prüfen
   setInterval(() => ws.broadcast(),    1000);  // Browser WS
   setInterval(() => mqttClient.publishHA(), 2000); // HA Topics

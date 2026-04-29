@@ -8,6 +8,23 @@
 const mqttClient = require('./mqttClient');
 const presets    = require('./presets');
 
+// Wird nach Preset-CRUD aufgerufen – aktualisiert nur die Select-Optionen in HA
+function refreshPresetSelect() {
+  const presetList = presets.list();
+  const topic = `homeassistant/select/pumpensteuerung/preset/config`;
+  const payload = JSON.stringify({
+    name: 'Betriebsmodus',
+    stat_t: `${BASE}/preset/state`,
+    cmd_t:  `${BASE}/preset/set`,
+    options: presetList.presets.map(p => p.name),
+    uniq_id: 'pumpensteuerung_preset',
+    ic: 'mdi:water-pump',
+    dev: DEV,
+  });
+  mqttClient.publish(topic, payload, { retain: true });
+  console.log('[HA] Preset-Select aktualisiert:', presetList.presets.map(p => p.name).join(', '));
+}
+
 const BASE   = 'pumpensteuerung';
 const DEV    = {
   ids:  'pumpensteuerung',
@@ -197,6 +214,29 @@ function sendDiscovery(client) {
     uniq_id: 'pumpensteuerung_uptime', ic: 'mdi:timer-outline',
   });
 
+  // ── Spike-Konfiguration ──
+  pub('switch', 'pi_spike_enabled', {
+    name: 'Hahn-zu Erkennung',
+    stat_t: `${BASE}/pi/spike/enabled/state`,
+    cmd_t:  `${BASE}/pi/spike/enabled/set`,
+    payload_on: 'ON', payload_off: 'OFF',
+    uniq_id: 'pumpensteuerung_pi_spike_enabled', ic: 'mdi:water-alert',
+  });
+  pub('number', 'pi_spike_threshold', {
+    name: 'Hahn-zu Druckanstieg',
+    stat_t: `${BASE}/pi/spike/threshold/state`,
+    cmd_t:  `${BASE}/pi/spike/threshold/set`,
+    min: 0.05, max: 5.0, step: 0.05, unit_of_meas: 'bar',
+    uniq_id: 'pumpensteuerung_pi_spike_threshold', ic: 'mdi:gauge-full',
+  });
+  pub('number', 'pi_spike_window', {
+    name: 'Hahn-zu Zeitfenster',
+    stat_t: `${BASE}/pi/spike/window/state`,
+    cmd_t:  `${BASE}/pi/spike/window/set`,
+    min: 1, max: 10, step: 0.5, unit_of_meas: 's',
+    uniq_id: 'pumpensteuerung_pi_spike_window', ic: 'mdi:timer',
+  });
+
   // ── Selects: Fan Mode / Preset ──
   pub('select', 'fan_mode', {
     name: 'Lüfter Modus',
@@ -220,7 +260,29 @@ function sendDiscovery(client) {
     uniq_id: 'pumpensteuerung_ctrl_mode', ic: 'mdi:tune',
   });
 
+  // ── HA Preset-Lock ──
+  pub('binary_sensor', 'preset_lock', {
+    name: 'HA Preset-Lock aktiv', stat_t: `${BASE}/preset/lock/state`,
+    payload_on: 'ON', payload_off: 'OFF',
+    uniq_id: 'pumpensteuerung_preset_lock', ic: 'mdi:lock-clock',
+  });
+  pub('sensor', 'preset_lock_remaining', {
+    name: 'HA Preset-Lock Restzeit', stat_t: `${BASE}/preset/lock/remaining_s`,
+    unit_of_meas: 's', dev_cla: 'duration', ent_cat: 'diagnostic',
+    uniq_id: 'pumpensteuerung_preset_lock_remaining', ic: 'mdi:timer-sand',
+  });
+  pub('sensor', 'preset_lock_locked', {
+    name: 'HA Preset-Lock Preset', stat_t: `${BASE}/preset/lock/locked`,
+    ent_cat: 'diagnostic',
+    uniq_id: 'pumpensteuerung_preset_lock_locked', ic: 'mdi:water-pump',
+  });
+  pub('button', 'preset_lock_clear', {
+    name: 'HA Preset-Lock löschen',
+    cmd_t: `${BASE}/preset/lock/clear`,
+    uniq_id: 'pumpensteuerung_preset_lock_clear', ic: 'mdi:lock-open-variant',
+  });
+
   console.log('[HA] Auto-Discovery gesendet');
 }
 
-module.exports = { sendDiscovery };
+module.exports = { sendDiscovery, refreshPresetSelect };

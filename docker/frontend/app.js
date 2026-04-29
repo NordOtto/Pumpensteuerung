@@ -446,11 +446,12 @@ function updateUI(st) {
       els.piFmax.value = st.pi.freq_max || 50;
       els.piEnabled.checked = st.pi.enabled;
 
-      // Prefill preset form
-      if (document.activeElement.id !== 'presetNewSet' && document.activeElement.id !== 'presetNewMode') {
-        $('presetNewSet').value = st.pi.setpoint;
-        $('presetNewKp').value = st.pi.kp;
-        $('presetNewKi').value = st.pi.ki;
+      // Prefill preset form (nur PI-Modus, nicht wenn Fix-Hz gewählt oder Nutzer gerade tippt)
+      const pMode = parseInt($('presetNewMode').value);
+      if (pMode !== 2 && document.activeElement.id !== 'presetNewSet' && document.activeElement.id !== 'presetNewMode') {
+        $('presetNewSet').value  = st.pi.setpoint;
+        $('presetNewKp').value   = st.pi.kp;
+        $('presetNewKi').value   = st.pi.ki;
         $('presetNewFmin').value = st.pi.freq_min || 30;
         $('presetNewFmax').value = st.pi.freq_max || 50;
       }
@@ -631,15 +632,21 @@ async function loadPresets() {
       const isActive = p.name === activePreset;
       const safeName = p.name.replace(/'/g, "\\'");
       const safeJson = JSON.stringify(p).replace(/'/g, "&#39;").replace(/"/g, '&quot;');
+      const modeLabel = p.mode === 2
+        ? `<span class="text-[9px] bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-300 px-1.5 py-0.5 rounded font-bold uppercase">Fix-Hz</span>`
+        : `<span class="text-[9px] bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-1.5 py-0.5 rounded font-bold uppercase">${p.mode === 1 ? 'Flow' : 'Druck'}</span>`;
+      const paramLine = p.mode === 2
+        ? `${p.setpoint_hz || '?'} Hz | Erw. ${p.expected_pressure || '?'} bar`
+        : `SP:${p.setpoint} | Kp:${p.kp} Ki:${p.ki} | ${p.freq_min}–${p.freq_max}Hz`;
       lst.innerHTML += `
       <div class="flex items-center justify-between p-3 ${isActive ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-600/50' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700/50'} border rounded-xl gap-2">
         <div class="min-w-0 flex-1">
           <div class="font-bold text-slate-800 dark:text-white flex items-center gap-2 text-sm">
-            ${p.name}
+            ${p.name} ${modeLabel}
             ${isActive ? '<span class="text-[8px] bg-blue-500 text-white px-1.5 py-0.5 rounded-full font-bold uppercase shrink-0">Aktiv</span>' : ''}
           </div>
           <div class="text-[9px] text-slate-400 uppercase tracking-wider font-bold mt-0.5 truncate">
-            ${p.mode == 1 ? 'Flow' : 'Druck'} ${p.setpoint} | Kp:${p.kp} Ki:${p.ki} | ${p.freq_min}–${p.freq_max}Hz
+            ${paramLine}
           </div>
         </div>
         <div class="flex gap-1 shrink-0">
@@ -673,11 +680,19 @@ window.editP = (jsonStr) => {
   const p = JSON.parse(jsonStr);
   $('presetNewName').value = p.name;
   $('presetNewMode').value = p.mode;
-  $('presetNewSet').value = p.setpoint;
-  $('presetNewKp').value = p.kp;
-  $('presetNewKi').value = p.ki;
-  $('presetNewFmin').value = p.freq_min;
-  $('presetNewFmax').value = p.freq_max;
+  const isFixed = p.mode === 2;
+  $('presetPiFields').classList.toggle('hidden', isFixed);
+  $('presetFixFields').classList.toggle('hidden', !isFixed);
+  if (isFixed) {
+    $('presetNewHz').value   = p.setpoint_hz || '';
+    $('presetNewExpP').value = p.expected_pressure || '';
+  } else {
+    $('presetNewSet').value  = p.setpoint;
+    $('presetNewKp').value   = p.kp;
+    $('presetNewKi').value   = p.ki;
+    $('presetNewFmin').value = p.freq_min;
+    $('presetNewFmax').value = p.freq_max;
+  }
   $('btnCreatePreset').querySelector('span:last-child')?.remove();
   $('btnCreatePreset').innerHTML = '<span class="material-symbols-outlined text-base">save</span> Speichern';
   // Scroll to form
@@ -687,22 +702,36 @@ window.editP = (jsonStr) => {
 $('btnCreatePreset').onclick = async () => {
   const name = $('presetNewName').value.trim();
   if (!name) return $toast.show('Name erforderlich', 'error');
+  const mode = parseInt($('presetNewMode').value);
 
-  const body = {
-    name,
-    mode: parseInt($('presetNewMode').value),
-    setpoint: parseFloat($('presetNewSet').value),
-    kp: parseFloat($('presetNewKp').value),
-    ki: parseFloat($('presetNewKi').value),
-    freq_min: parseInt($('presetNewFmin').value),
-    freq_max: parseInt($('presetNewFmax').value)
-  };
+  let body;
+  if (mode === 2) {
+    const hz   = parseFloat($('presetNewHz').value);
+    const expP = parseFloat($('presetNewExpP').value);
+    if (!hz || hz < 10 || hz > 60) return $toast.show('Frequenz 10–60 Hz erforderlich', 'error');
+    body = { name, mode, setpoint_hz: hz, expected_pressure: expP || 0,
+             setpoint: 0, kp: 0, ki: 0, freq_min: hz, freq_max: hz };
+  } else {
+    body = {
+      name, mode,
+      setpoint: parseFloat($('presetNewSet').value),
+      kp:       parseFloat($('presetNewKp').value),
+      ki:       parseFloat($('presetNewKi').value),
+      freq_min: parseInt($('presetNewFmin').value),
+      freq_max: parseInt($('presetNewFmax').value),
+    };
+  }
 
   const res = await authFetch('/api/presets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const d = await res.json();
   if (d.success || d.ok) {
-    $toast.show(name === $('presetNewName').value.trim() ? 'Preset gespeichert' : 'Preset angelegt');
+    $toast.show('Preset gespeichert');
     $('presetNewName').value = '';
+    $('presetNewHz').value   = '';
+    $('presetNewExpP').value = '';
+    $('presetNewMode').value = '0';
+    $('presetPiFields').classList.remove('hidden');
+    $('presetFixFields').classList.add('hidden');
     $('btnCreatePreset').innerHTML = '<span class="material-symbols-outlined text-base">add</span> Erstellen';
     loadPresets();
   } else {
@@ -711,7 +740,10 @@ $('btnCreatePreset').onclick = async () => {
 };
 
 $('presetNewMode').onchange = (e) => {
-  $('lblPresetSet').textContent = e.target.value == '1' ? 'Sollwert (L/Min)' : 'Sollwert (bar)';
+  const mode = parseInt(e.target.value);
+  $('presetPiFields').classList.toggle('hidden', mode === 2);
+  $('presetFixFields').classList.toggle('hidden', mode !== 2);
+  $('lblPresetSet').textContent = mode === 1 ? 'Soll (L/min)' : 'Soll (bar)';
 };
 
 // ─── Save PI Form ───

@@ -11,6 +11,7 @@ const mqttCli  = require('./mqttClient');
 const pi       = require('./pressureCtrl');
 const tg       = require('./timeguard');
 const presets  = require('./presets');
+const presetLock = require('./presetLock');
 const auth     = require('./auth');
 
 const router = express.Router();
@@ -71,17 +72,20 @@ router.post('/v20/freq', (req, res) => {
 router.get('/pressure', (_req, res) => {
   const p = state.pi;
   res.json({
-    enabled:    p.enabled,
-    setpoint:   p.setpoint,
-    p_on:       p.p_on,
-    p_off:      p.p_off,
-    kp:         p.kp,
-    ki:         p.ki,
-    freq_min:   p.freq_min,
-    freq_max:   p.freq_max,
-    pressure:   state.pressure_bar,
-    active:     p.active,
-    pump_state: p.pump_state,
+    enabled:         p.enabled,
+    setpoint:        p.setpoint,
+    p_on:            p.p_on,
+    p_off:           p.p_off,
+    kp:              p.kp,
+    ki:              p.ki,
+    freq_min:        p.freq_min,
+    freq_max:        p.freq_max,
+    spike_enabled:   p.spike_enabled,
+    spike_threshold: p.spike_threshold,
+    spike_window_s:  p.spike_window_s,
+    pressure:        state.pressure_bar,
+    active:          p.active,
+    pump_state:      p.pump_state,
   });
 });
 
@@ -153,9 +157,32 @@ router.delete('/presets/:name', (req, res) => {
 router.post('/preset/apply', (req, res) => {
   const name = req.body?.name;
   if (!name) return res.status(400).json({ error: 'name required' });
+  if (presetLock.isActive()) {
+    return res.status(409).json({ error: 'HA-Lock aktiv', lock: presetLock.getStatus() });
+  }
   if (!presets.apply(name)) {
     return res.status(404).json({ error: 'preset not found' });
   }
+  res.json({ ok: true });
+});
+
+// ── HA Preset-Lock ──
+router.get('/preset/lock', (_req, res) => {
+  res.json(presetLock.getStatus());
+});
+
+router.post('/preset/lock', (req, res) => {
+  const name = req.body?.name || req.body?.preset;
+  const ttl  = parseInt(req.body?.ttl);
+  if (!name) return res.status(400).json({ error: 'name required' });
+  if (!presetLock.heartbeat(name, Number.isFinite(ttl) ? ttl : undefined)) {
+    return res.status(404).json({ error: 'preset not found' });
+  }
+  res.json({ ok: true, lock: presetLock.getStatus() });
+});
+
+router.delete('/preset/lock', (_req, res) => {
+  presetLock.clear();
   res.json({ ok: true });
 });
 
@@ -218,6 +245,7 @@ router.get('/status', (_req, res) => {
     },
     active_preset: state.active_preset,
     ctrl_mode: state.ctrl_mode,
+    preset_lock: state.preset_lock,
     vacation: { enabled: state.vacation.enabled },
     sys: state.sys,
   });

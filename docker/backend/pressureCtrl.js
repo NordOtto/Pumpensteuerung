@@ -35,6 +35,21 @@ let noFlowSince      = 0;
 let dryRunNoFlowSince = 0;   // separater Timer für Dry-run
 let dryRunLockUntil  = 0;
 let dryRunGraceUntil = 0;    // Grace-Period nach Reset/Start
+let dryRunRetryCount = 0;    // Auto-Retry-Zähler nach Trockenlauf
+let dryRunRetryWindowEnd = 0; // Fenster für Retry-Zähler (1h)
+let dryRunHardLocked = false; // nach max retries: nur manueller Reset
+
+// ── Min-Freq-Timeout (Stop wenn PI auf freq_min hängt + Druck nicht erreicht) ──
+let minFreqSince = 0;
+
+// ── Fix-Frequenz Refresh ──
+let lastFixedFreqSent = 0;
+
+// ── Druckspitzen-Erkennung: Ring-Buffer (max 10s bei 500ms Takt = 20 Slots) ──
+const SPIKE_SLOTS = 22;
+const spikeBuf    = new Array(SPIKE_SLOTS).fill(0);
+let spikeBufIdx   = 0;
+let spikeBufFilled = false;
 
 // ── Letzter Druckwert-Zeitstempel (Druck-Timeout) ──
 let lastPressureTs   = 0;
@@ -42,10 +57,15 @@ let lastKnownPressure = 0;
 
 const DT             = 0.5;          // Regelzyklus 500 ms
 const NO_DEMAND_S    = 5;
-const DRY_RUN_S      = 60;            // 60s statt 30s
-const DRY_RUN_LOCK_S = 300;          // 5 Minuten
+const DRY_RUN_S      = 60;
+const DRY_RUN_LOCK_S = 120;          // 2 Minuten – danach Auto-Retry
 const DRY_RUN_GRACE_S = 90;          // 90s Grace-Period nach Reset/Start
+const DRY_RUN_MAX_RETRIES = 3;       // max Auto-Retries pro Stunde
+const DRY_RUN_RETRY_WINDOW_MS = 60 * 60 * 1000;
+const MIN_FREQ_TIMEOUT_S = 60;       // PI freq_min + Druck unter Sollwert
+const OVERPRESSURE_HYSTERESIS = 0.3; // bar über Sollwert → sofort Stop
 const PRESSURE_TIMEOUT_MS = 5000;
+const FIXED_FREQ_REFRESH_MS = 2000;
 
 function webLog(msg) {
   const now = new Date();
@@ -88,6 +108,9 @@ async function save() {
     ki:               state.pi.ki,
     freq_min:         state.pi.freq_min,
     freq_max:         state.pi.freq_max,
+    spike_enabled:    state.pi.spike_enabled,
+    spike_threshold:  state.pi.spike_threshold,
+    spike_window_s:   state.pi.spike_window_s,
     vacation_enabled: state.vacation.enabled,
   };
   await fs.writeFile(DATA_FILE, JSON.stringify(cfg, null, 2));
@@ -103,7 +126,10 @@ function setConfig(cfg) {
   if (cfg.freq_min !== undefined) state.pi.freq_min = clamp(parseFloat(cfg.freq_min), 10, 60);
   if (cfg.freq_max !== undefined) state.pi.freq_max = clamp(parseFloat(cfg.freq_max), 10, 60);
   if (state.pi.freq_min > state.pi.freq_max) state.pi.freq_min = state.pi.freq_max;
-  webLog(`[PI] Config: SP=${state.pi.setpoint} p_on=${state.pi.p_on} p_off=${state.pi.p_off} fMin=${state.pi.freq_min} fMax=${state.pi.freq_max} kp=${state.pi.kp} ki=${state.pi.ki}`);
+  if (cfg.spike_enabled   !== undefined) state.pi.spike_enabled   = !!cfg.spike_enabled;
+  if (cfg.spike_threshold !== undefined) state.pi.spike_threshold = clamp(parseFloat(cfg.spike_threshold), 0.05, 5.0);
+  if (cfg.spike_window_s  !== undefined) state.pi.spike_window_s  = clamp(parseFloat(cfg.spike_window_s), 1, 10);
+  webLog(`[PI] Config: SP=${state.pi.setpoint} p_on=${state.pi.p_on} p_off=${state.pi.p_off} fMin=${state.pi.freq_min} fMax=${state.pi.freq_max} kp=${state.pi.kp} ki=${state.pi.ki} spike=${state.pi.spike_enabled}(${state.pi.spike_threshold}bar/${state.pi.spike_window_s}s)`);
   save().catch(e => console.error('[PI] save error:', e.message));
   // Fallback-Config auf ESP32 aktualisieren (mit retain, überlebt Neustart)
   mqtt.publishFallbackConfig(state.pi.p_on, state.pi.p_off, state.pi.freq_max);
@@ -119,13 +145,19 @@ function setVacation(enabled) {
   save().catch(e => console.error('[PI] save error:', e.message));
 }
 
-function resetDryrun() {
+function resetDryrun(reason = 'manuell') {
   dryRunLockUntil     = 0;
   dryRunNoFlowSince   = 0;
   noFlowSince         = 0;
+  minFreqSince        = 0;
   dryRunGraceUntil    = Date.now() + DRY_RUN_GRACE_S * 1000;
+  dryRunHardLocked    = false;
+  if (reason === 'manuell' || reason === 'lock') {
+    dryRunRetryCount  = 0;
+    dryRunRetryWindowEnd = 0;
+  }
   state.pi.dry_run_locked = false;
-  webLog(`[PI] Trockenlauf-Sperre manuell aufgehoben – ${DRY_RUN_GRACE_S}s Grace-Period`);
+  webLog(`[PI] Trockenlauf-Sperre aufgehoben (${reason}) – ${DRY_RUN_GRACE_S}s Grace-Period`);
 }
 
 function resetIntegral() {
@@ -168,6 +200,15 @@ function tick() {
   }
 
   // ── Trockenlauf-Sperre aktiv? ──
+  if (dryRunHardLocked) {
+    pi.dry_run_locked = true;
+    if (state.v20.running) {
+      mqtt.sendCmd('v20/stop', '1');
+      webLog('[PI] Trockenlauf HARD-LOCK – V20 gestoppt (manueller Reset nötig)');
+    }
+    resetIntegral();
+    return;
+  }
   if (dryRunLockUntil > 0 && now < dryRunLockUntil) {
     pi.dry_run_locked = true;
     if (state.v20.running) {
@@ -179,10 +220,82 @@ function tick() {
   } else if (dryRunLockUntil > 0 && now >= dryRunLockUntil) {
     dryRunLockUntil     = 0;
     pi.dry_run_locked   = false;
-    webLog('[PI] Trockenlauf-Sperre abgelaufen');
+    // Auto-Retry: Counter im 1h-Fenster
+    if (dryRunRetryWindowEnd === 0 || now > dryRunRetryWindowEnd) {
+      dryRunRetryCount = 0;
+      dryRunRetryWindowEnd = now + DRY_RUN_RETRY_WINDOW_MS;
+    }
+    dryRunRetryCount++;
+    if (dryRunRetryCount > DRY_RUN_MAX_RETRIES) {
+      dryRunHardLocked  = true;
+      pi.dry_run_locked = true;
+      webLog(`[PI] Max Auto-Retries (${DRY_RUN_MAX_RETRIES}/h) erreicht – HARD-LOCK, manueller Reset nötig`);
+      resetIntegral();
+      return;
+    }
+    dryRunGraceUntil = now + DRY_RUN_GRACE_S * 1000;
+    dryRunNoFlowSince = 0;
+    minFreqSince      = 0;
+    webLog(`[PI] Trockenlauf-Sperre abgelaufen – Auto-Retry ${dryRunRetryCount}/${DRY_RUN_MAX_RETRIES} – ${DRY_RUN_GRACE_S}s Grace`);
   }
 
   pi.dry_run_locked = false;
+
+  // ── Fix-Frequenz-Modus (mode=2) ──
+  if (state.ctrl_mode === 2) {
+    const hz = state.preset_setpoint_hz || 0;
+    const expected = state.preset_expected_pressure || 0;
+    if (hz <= 0) return; // ungültig konfiguriert
+
+    // Druckwert vorhanden?
+    if (lastPressureTs > 0 && (now - lastPressureTs) > PRESSURE_TIMEOUT_MS) {
+      if (state.v20.running) {
+        webLog('[PI] Druck-Timeout (Fix-Hz) – V20 gestoppt');
+        mqtt.sendCmd('v20/stop', '1');
+      }
+      lastPressureTs = 0;
+      return;
+    }
+
+    // Überdruck-Stop bei Fix-Hz
+    if (expected > 0 && state.v20.running &&
+        state.pressure_bar > expected + OVERPRESSURE_HYSTERESIS && state.flow_rate < 1.0) {
+      webLog(`[PI] Überdruck-Stop (Fix-Hz): ${state.pressure_bar.toFixed(2)} > ${expected}+${OVERPRESSURE_HYSTERESIS} bar – Stop`);
+      mqtt.sendCmd('v20/stop', '1');
+      return;
+    }
+
+    // Trockenlauf bei Fix-Hz: kein Fluss + Druck weit unter Erwartung
+    if (expected > 0 && dryRunGraceUntil === 0 &&
+        state.flow_rate < 1.0 && state.v20.running && state.pressure_bar < expected * 0.5) {
+      if (dryRunNoFlowSince === 0) dryRunNoFlowSince = now;
+      if ((now - dryRunNoFlowSince) > DRY_RUN_S * 1000) {
+        webLog(`[PI] TROCKENLAUF (Fix-Hz)! ${DRY_RUN_S}s kein Fluss + p<${expected*0.5} – Stop + Sperre ${DRY_RUN_LOCK_S}s`);
+        mqtt.sendCmd('v20/stop', '1');
+        dryRunLockUntil = now + DRY_RUN_LOCK_S * 1000;
+        pi.dry_run_locked = true;
+        return;
+      }
+    } else {
+      dryRunNoFlowSince = 0;
+    }
+    if (dryRunGraceUntil > 0 && now >= dryRunGraceUntil) {
+      dryRunGraceUntil = 0;
+    }
+
+    // Frequenz periodisch refreshen + Pumpe ggf. starten
+    if (!state.v20.running) {
+      mqtt.sendCmd('v20/start', '1');
+      lastFixedFreqSent = 0;
+      dryRunGraceUntil = now + DRY_RUN_GRACE_S * 1000;
+    }
+    if (now - lastFixedFreqSent > FIXED_FREQ_REFRESH_MS) {
+      mqtt.sendCmd('v20/freq', hz.toFixed(1));
+      state.v20.freq_setpoint = hz;
+      lastFixedFreqSent = now;
+    }
+    return;
+  }
 
   // ── PI deaktiviert ──
   if (!pi.enabled) {
@@ -205,6 +318,37 @@ function tick() {
   const flow      = state.flow_rate;
   const running   = state.v20.running;
   const freq      = state.v20.frequency;
+
+  // ── Druckspitzen-Erkennung (Hahn zu) – Ring-Buffer aktualisieren ──
+  spikeBuf[spikeBufIdx] = pressure;
+  spikeBufIdx = (spikeBufIdx + 1) % SPIKE_SLOTS;
+  if (spikeBufIdx === 0) spikeBufFilled = true;
+
+  if (running && pumpState === 2 && pi.spike_enabled && (spikeBufFilled || spikeBufIdx > 0)) {
+    const windowSlots = Math.min(Math.round(pi.spike_window_s / DT), SPIKE_SLOTS - 1);
+    // Ältester Wert im Fenster: SPIKE_SLOTS Slots zurück vom aktuellen Schreibzeiger
+    const oldIdx = (spikeBufIdx - 1 - windowSlots + SPIKE_SLOTS * 2) % SPIKE_SLOTS;
+    const oldPressure = spikeBuf[oldIdx];
+    const rise = pressure - oldPressure;
+    if (rise >= pi.spike_threshold) {
+      webLog(`[PI] Hahn-zu erkannt: +${rise.toFixed(2)} bar in ${pi.spike_window_s}s (Schwelle ${pi.spike_threshold} bar) – sauberer Stop`);
+      mqtt.sendCmd('v20/stop', '1');
+      resetIntegral();
+      spikeBufFilled = false;
+      spikeBufIdx    = 0;
+      spikeBuf.fill(0);
+      return;
+    }
+  }
+
+  // ── Überdruck-Stop (sofort) ──
+  if (running && pumpState === 2 &&
+      pressure > pi.setpoint + OVERPRESSURE_HYSTERESIS && flow < 1.0) {
+    webLog(`[PI] Überdruck-Stop: ${pressure.toFixed(2)} > ${pi.setpoint}+${OVERPRESSURE_HYSTERESIS} bar bei flow<1 – V20 STOP`);
+    mqtt.sendCmd('v20/stop', '1');
+    resetIntegral();
+    return;
+  }
 
   // ── Flow-Schätzung im Totbereich ──
   let effectiveFlow = flow;
@@ -341,6 +485,23 @@ function tick() {
 
   mqtt.sendCmd('v20/freq', freq_out.toFixed(1));
   state.v20.freq_setpoint = freq_out;
+
+  // ── Min-Freq-Timeout (nur Druck-Modus): PI hängt auf freq_min, Druck wird nicht erreicht ──
+  if (pi.ctrl_mode === 0 && dryRunGraceUntil === 0 &&
+      freq_out <= pi.freq_min + 0.5 && pressure < pi.setpoint - 0.2) {
+    if (minFreqSince === 0) minFreqSince = now;
+    if ((now - minFreqSince) > MIN_FREQ_TIMEOUT_S * 1000) {
+      webLog(`[PI] Min-Freq-Timeout: ${MIN_FREQ_TIMEOUT_S}s auf ${pi.freq_min} Hz, Druck ${pressure.toFixed(2)} < SP – Stop + Sperre ${DRY_RUN_LOCK_S}s`);
+      mqtt.sendCmd('v20/stop', '1');
+      dryRunLockUntil   = now + DRY_RUN_LOCK_S * 1000;
+      pi.dry_run_locked = true;
+      minFreqSince      = 0;
+      resetIntegral();
+      return;
+    }
+  } else {
+    minFreqSince = 0;
+  }
 
   pi.active     = true;
   pi.pump_state = pumpState;

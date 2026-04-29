@@ -131,6 +131,9 @@ function publishHA() {
   if (f(state.pi.freq_min, 1) != null) pub('pi/freq_min/state', f(state.pi.freq_min, 1), true);
   if (f(state.pi.freq_max, 1) != null) pub('pi/freq_max/state', f(state.pi.freq_max, 1), true);
   pub('dryrun/locked',       state.pi.dry_run_locked ? 'ON' : 'OFF', true);
+  pub('pi/spike/enabled/state',    state.pi.spike_enabled ? 'ON' : 'OFF', true);
+  if (f(state.pi.spike_threshold, 2) != null) pub('pi/spike/threshold/state', f(state.pi.spike_threshold, 2), true);
+  if (f(state.pi.spike_window_s,  1) != null) pub('pi/spike/window/state',    f(state.pi.spike_window_s,  1), true);
 
   // Zeitsperre
   pub('timeguard/enabled/state', state.timeguard.enabled ? 'ON' : 'OFF', true);
@@ -141,7 +144,13 @@ function publishHA() {
 
   // Preset
   pub('preset/state',    state.active_preset, true);
-  pub('ctrl_mode/state', state.ctrl_mode === 1 ? 'Durchfluss' : 'Druck', true);
+  const ctrlLabel = state.ctrl_mode === 2 ? 'FixFrequenz' : (state.ctrl_mode === 1 ? 'Durchfluss' : 'Druck');
+  pub('ctrl_mode/state', ctrlLabel, true);
+
+  // HA Preset-Lock
+  pub('preset/lock/state',       state.preset_lock?.active ? 'ON' : 'OFF', true);
+  pub('preset/lock/remaining_s', state.preset_lock?.remaining_s ?? 0, true);
+  pub('preset/lock/locked',      state.preset_lock?.locked_preset || '', true);
 
   // System
   pub('sys/uptime', state.sys.uptime);
@@ -186,6 +195,11 @@ function connect() {
       BASE + '/fan/mode/set',
       BASE + '/dryrun/reset',
       BASE + '/vacation/set',
+      BASE + '/preset/lock/heartbeat',
+      BASE + '/preset/lock/clear',
+      BASE + '/pi/spike/enabled/set',
+      BASE + '/pi/spike/threshold/set',
+      BASE + '/pi/spike/window/set',
     ];
     haSetTopics.forEach(t => client.subscribe(t, { qos: 0 }));
     console.log('[MQTT] Topics abonniert');
@@ -214,4 +228,9 @@ function isConnected() {
   return client && client.connected;
 }
 
-module.exports = { connect, sendCmd, publishHA, publishFallbackConfig, onCommand, isConnected };
+function publish(topic, payload, opts) {
+  if (!client || !client.connected) return;
+  client.publish(topic, String(payload), opts || {});
+}
+
+module.exports = { connect, sendCmd, publishHA, publishFallbackConfig, onCommand, isConnected, publish };

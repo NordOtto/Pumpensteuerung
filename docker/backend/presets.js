@@ -8,6 +8,7 @@ const fs    = require('fs').promises;
 const path  = require('path');
 const state = require('./state');
 const pi    = require('./pressureCtrl');
+const mqtt  = require('./mqttClient');
 
 const DATA_FILE = process.env.DATA_DIR
   ? path.join(process.env.DATA_DIR, 'presets.json')
@@ -129,6 +130,10 @@ function apply(name) {
   }
 
   // mode 0/1: PI re-konfigurieren und aktivieren
+  // Wenn von Fix-Frequenz-Modus gewechselt wird: Pumpe sofort stoppen
+  if (state.ctrl_mode === 2) {
+    mqtt.sendCmd('v20/stop', '1');
+  }
   pi.setConfig({
     enabled:  true,
     setpoint: preset.setpoint,

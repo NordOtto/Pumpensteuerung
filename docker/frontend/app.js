@@ -330,7 +330,7 @@ function updateUI(st) {
     if ($('topFreq')) $('topFreq').textContent = Number(st.v20.frequency || 0).toFixed(1);
     // Sync slider + Sollfrequenz (unless user is dragging)
     if (!sliderDragging) {
-      els.freqSet.textContent = (st.v20.freq_setpoint || 0).toFixed(0);
+      if (els.freqSet) els.freqSet.textContent = (st.v20.freq_setpoint || 0).toFixed(0);
       els.slider.value = st.v20.freq_setpoint || els.slider.min;
     }
     animateValue(els.voltage, st.v20.voltage || 0, 1);
@@ -423,10 +423,12 @@ function updateUI(st) {
 
   // Active preset pill
   if (st.active_preset) {
-    els.presetPill.textContent = st.active_preset;
-    els.presetPill.classList.remove('hidden');
+    if (els.presetPill) {
+      els.presetPill.textContent = st.active_preset;
+      els.presetPill.classList.remove('hidden');
+    }
   } else {
-    els.presetPill.classList.add('hidden');
+    if (els.presetPill) els.presetPill.classList.add('hidden');
   }
 
   if (st.irrigation) {
@@ -546,7 +548,6 @@ function pushChart(val) {
 $('btnStart').onclick = () => authFetch('/api/v20/start', { method: 'POST' }).then(() => $toast.show('Start gesendet'));
 $('btnStop').onclick = () => authFetch('/api/v20/stop', { method: 'POST' }).then(() => $toast.show('Stop gesendet'));
 $('btnReset').onclick = () => authFetch('/api/v20/reset', { method: 'POST' }).then(() => $toast.show('Reset gesendet'));
-if ($('deckStart')) $('deckStart').onclick = () => $('btnStart').click();
 if ($('deckStop')) $('deckStop').onclick = () => $('btnStop').click();
 if ($('deckIrrigation')) $('deckIrrigation').onclick = () => window.showTab('irrigation');
 
@@ -555,7 +556,7 @@ let slTimer;
 let sliderDragging = false;
 
 function updateSliderTip() {
-  els.freqSet.textContent = parseInt(els.slider.value);
+  if (els.freqSet) els.freqSet.textContent = parseInt(els.slider.value);
 }
 
 function sendFreq() {
@@ -1322,6 +1323,158 @@ $('saveTG').onclick = async () => {
   });
 
   applySavedOrder();
+})();
+
+// ─── Dashboard Tiles ───
+(function initDashboardTiles() {
+  const grid = $('dashboardTiles');
+  const list = $('tileVisibilityList');
+  if (!grid) return;
+
+  const defaults = ['pressure', 'flow', 'water_temp', 'case_temp', 'fan'];
+  const labels = {
+    pressure: 'Druck',
+    flow: 'Durchfluss',
+    water_temp: 'Wassertemperatur',
+    case_temp: 'Gehäusetemperatur',
+    fan: 'Lüfter'
+  };
+  const defaultVisibility = {
+    pressure: false,
+    flow: false,
+    water_temp: true,
+    case_temp: true,
+    fan: true
+  };
+  const tileMap = new Map(Array.from(grid.querySelectorAll('.dashboard-tile[data-tile]')).map(tile => [tile.dataset.tile, tile]));
+  let draggedTileId = null;
+
+  function readOrder() {
+    try {
+      const saved = JSON.parse(localStorage.getItem('dashboardTileOrder') || '[]');
+      return defaults.filter(id => saved.includes(id)).sort((a, b) => saved.indexOf(a) - saved.indexOf(b))
+        .concat(defaults.filter(id => !saved.includes(id)));
+    } catch {
+      return [...defaults];
+    }
+  }
+
+  function readVisibility() {
+    try {
+      return { ...defaultVisibility, ...JSON.parse(localStorage.getItem('dashboardTileVisibility') || '{}') };
+    } catch {
+      return { ...defaultVisibility };
+    }
+  }
+
+  function saveOrder(order) {
+    localStorage.setItem('dashboardTileOrder', JSON.stringify(order));
+  }
+
+  function saveVisibility(visibility) {
+    localStorage.setItem('dashboardTileVisibility', JSON.stringify(visibility));
+  }
+
+  function currentOrder() {
+    return Array.from(grid.querySelectorAll('.dashboard-tile[data-tile]')).map(tile => tile.dataset.tile);
+  }
+
+  function renderControls() {
+    if (!list) return;
+    const visibility = readVisibility();
+    list.innerHTML = readOrder().map((id, index) => `
+      <div class="flex items-center justify-between gap-3 rounded-xl bg-white/50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60 px-3 py-2">
+        <label class="flex items-center gap-3 min-w-0 cursor-pointer">
+          <input type="checkbox" data-tile-visible="${id}" ${visibility[id] ? 'checked' : ''} class="w-4 h-4 rounded accent-blue-500">
+          <span class="text-sm font-bold text-slate-700 dark:text-slate-200 truncate">${labels[id] || id}</span>
+        </label>
+        <div class="flex items-center gap-1">
+          <button type="button" data-tile-move="${id}" data-direction="-1" ${index === 0 ? 'disabled' : ''} class="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 disabled:opacity-35 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors" title="Nach links/oben">
+            <span class="material-symbols-outlined text-base">keyboard_arrow_up</span>
+          </button>
+          <button type="button" data-tile-move="${id}" data-direction="1" ${index === defaults.length - 1 ? 'disabled' : ''} class="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 disabled:opacity-35 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors" title="Nach rechts/unten">
+            <span class="material-symbols-outlined text-base">keyboard_arrow_down</span>
+          </button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function applyTiles() {
+    const visibility = readVisibility();
+    readOrder().forEach(id => {
+      const tile = tileMap.get(id);
+      if (!tile) return;
+      tile.classList.toggle('hidden', visibility[id] === false);
+      tile.draggable = true;
+      grid.appendChild(tile);
+    });
+    renderControls();
+  }
+
+  function moveTile(id, direction) {
+    const order = readOrder();
+    const from = order.indexOf(id);
+    const to = from + Number(direction);
+    if (from < 0 || to < 0 || to >= order.length) return;
+    [order[from], order[to]] = [order[to], order[from]];
+    saveOrder(order);
+    applyTiles();
+  }
+
+  grid.addEventListener('dragstart', (ev) => {
+    const tile = ev.target.closest('.dashboard-tile[data-tile]');
+    if (!tile) return;
+    draggedTileId = tile.dataset.tile;
+    tile.classList.add('opacity-50');
+    ev.dataTransfer.effectAllowed = 'move';
+  });
+  grid.addEventListener('dragend', (ev) => {
+    ev.target.closest?.('.dashboard-tile[data-tile]')?.classList.remove('opacity-50');
+    draggedTileId = null;
+  });
+  grid.addEventListener('dragover', (ev) => {
+    if (draggedTileId) ev.preventDefault();
+  });
+  grid.addEventListener('drop', (ev) => {
+    ev.preventDefault();
+    const target = ev.target.closest('.dashboard-tile[data-tile]');
+    if (!target || !draggedTileId || target.dataset.tile === draggedTileId) return;
+    const order = currentOrder();
+    const from = order.indexOf(draggedTileId);
+    const to = order.indexOf(target.dataset.tile);
+    if (from < 0 || to < 0) return;
+    order.splice(to, 0, order.splice(from, 1)[0]);
+    saveOrder(order);
+    applyTiles();
+  });
+
+  if (list) {
+    list.addEventListener('change', (ev) => {
+      const id = ev.target.dataset.tileVisible;
+      if (!id) return;
+      const visibility = readVisibility();
+      visibility[id] = ev.target.checked;
+      saveVisibility(visibility);
+      applyTiles();
+    });
+    list.addEventListener('click', (ev) => {
+      const btn = ev.target.closest('[data-tile-move]');
+      if (!btn) return;
+      moveTile(btn.dataset.tileMove, btn.dataset.direction);
+    });
+  }
+
+  if ($('btnTilesReset')) {
+    $('btnTilesReset').onclick = () => {
+      localStorage.removeItem('dashboardTileOrder');
+      localStorage.removeItem('dashboardTileVisibility');
+      applyTiles();
+      $toast.show('Dashboard-Kacheln zurückgesetzt');
+    };
+  }
+
+  applyTiles();
 })();
 
 // ─── Zoom ───

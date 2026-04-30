@@ -51,6 +51,9 @@ const spikeBuf    = new Array(SPIKE_SLOTS).fill(0);
 let spikeBufIdx   = 0;
 let spikeBufFilled = false;
 
+// ── Manueller Stop-Flag (Pumpe bleibt aus bis manueller Start) ──
+let manualStopped = false;
+
 // ── Letzter Druckwert-Zeitstempel (Druck-Timeout) ──
 let lastPressureTs   = 0;
 let lastKnownPressure = 0;
@@ -283,6 +286,9 @@ function tick() {
       dryRunGraceUntil = 0;
     }
 
+    // Manueller Stop: nicht auto-starten
+    if (manualStopped) return;
+
     // Frequenz periodisch refreshen + Pumpe ggf. starten
     if (!state.v20.running) {
       mqtt.sendCmd('v20/start', '1');
@@ -401,7 +407,7 @@ function tick() {
   if (pi.ctrl_mode === 0) {
     if (pumpState === 0) {
       // Warte auf Einschaltdruck
-      if (pressure > 0 && pressure < pi.p_on) {
+      if (!manualStopped && pressure > 0 && pressure < pi.p_on) {
         webLog(`[PI] Einschaltdruck unterschritten (${pressure.toFixed(2)} bar < ${pi.p_on} bar) – START`);
         mqtt.sendCmd('v20/start', '1');
         pumpState   = 1;
@@ -509,4 +515,12 @@ function tick() {
   state.pi.pump_state = pumpState;
 }
 
-module.exports = { load, save, setConfig, resetDryrun, setVacation, tick, resetIntegral };
+function setManualStop(v) {
+  manualStopped = v;
+  if (v) {
+    resetIntegral();
+    pumpState = 0;
+  }
+}
+
+module.exports = { load, save, setConfig, resetDryrun, setVacation, tick, resetIntegral, setManualStop };

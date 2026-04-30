@@ -108,6 +108,7 @@ function apply(name) {
   const preset = presets.find(p => p.name === name);
   if (!preset) return false;
 
+  pi.setManualStop(false);
   pi.resetIntegral();
 
   if (preset.mode === 2) {

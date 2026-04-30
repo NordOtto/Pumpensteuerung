@@ -11,3 +11,4 @@ src/secrets.h
 # Frontend Build Tools
 docker/frontend/tailwindcss.exe
 docker/frontend/node_modules/
+docker/backend/node_modules/

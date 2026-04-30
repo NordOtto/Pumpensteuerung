@@ -11,6 +11,7 @@ const path   = require('path');
 const DATA_DIR  = process.env.DATA_DIR || '/data';
 const AUTH_FILE = path.join(DATA_DIR, 'auth.json');
 const AUTH_USER = process.env.AUTH_USER || 'admin';
+const AUTH_DISABLED = ['1', 'true', 'yes', 'on'].includes(String(process.env.AUTH_DISABLED || '').toLowerCase());
 
 // Default password (first login forces change)
 const DEFAULT_PASS = 'admin';
@@ -59,6 +60,11 @@ function generateToken() {
 }
 
 function login(user, pass) {
+  if (AUTH_DISABLED) {
+    const token = generateToken();
+    tokens.set(token, { user: user || AUTH_USER, mustChangePass: false });
+    return { token, mustChangePass: false };
+  }
   if (user !== AUTH_USER) return null;
 
   const stored = getStoredAuth();
@@ -98,6 +104,7 @@ function changePassword(token, oldPass, newPass) {
 }
 
 function verify(token) {
+  if (AUTH_DISABLED) return true;
   return tokens.has(token);
 }
 
@@ -115,6 +122,7 @@ function extractToken(req) {
 
 // Express middleware
 function requireAuth(req, res, next) {
+  if (AUTH_DISABLED) return next();
   if (req.path === '/auth/login' || req.path === '/auth/change-password') return next();
   const token = extractToken(req);
   if (!token || !verify(token)) {
@@ -125,6 +133,7 @@ function requireAuth(req, res, next) {
 
 // WebSocket upgrade check
 function verifyWsUpgrade(req) {
+  if (AUTH_DISABLED) return true;
   const token = extractToken(req);
   return token && verify(token);
 }

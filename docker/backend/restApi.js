@@ -12,6 +12,7 @@ const pi       = require('./pressureCtrl');
 const tg       = require('./timeguard');
 const presets  = require('./presets');
 const presetLock = require('./presetLock');
+const irrigation = require('./irrigation');
 const auth     = require('./auth');
 
 const router = express.Router();
@@ -202,6 +203,45 @@ router.post('/vacation', (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Bewässerungscomputer ──
+router.get('/irrigation/programs', (_req, res) => {
+  res.json(irrigation.getPrograms());
+});
+
+router.post('/irrigation/programs', (req, res) => {
+  try {
+    res.json(irrigation.setPrograms(req.body));
+  } catch (e) {
+    res.status(e.statusCode || 500).json({ error: e.message || 'Fehler' });
+  }
+});
+
+router.post('/irrigation/programs/:id/run', (req, res) => {
+  const result = irrigation.runProgram(req.params.id, {
+    manual: true,
+    forceWeather: req.body?.forceWeather !== false,
+  });
+  res.status(result.ok ? 200 : 409).json(result);
+});
+
+router.post('/irrigation/programs/:id/stop', (req, res) => {
+  const result = irrigation.stopProgram(req.params.id);
+  res.status(result.ok ? 200 : 409).json(result);
+});
+
+router.get('/irrigation/weather', (_req, res) => {
+  res.json(irrigation.getWeather());
+});
+
+router.post('/irrigation/weather', (req, res) => {
+  const ok = irrigation.ingestWeather(req.body);
+  res.status(ok ? 200 : 400).json({ ok });
+});
+
+router.get('/irrigation/history', (_req, res) => {
+  res.json(irrigation.getHistory());
+});
+
 // ── Fan ──
 router.post('/fan/pwm', (req, res) => {
   const pwm = parseInt(req.body?.pwm);
@@ -249,6 +289,7 @@ router.get('/status', (_req, res) => {
     ctrl_mode: state.ctrl_mode,
     preset_lock: state.preset_lock,
     vacation: { enabled: state.vacation.enabled },
+    irrigation: state.irrigation,
     sys: state.sys,
   });
 });

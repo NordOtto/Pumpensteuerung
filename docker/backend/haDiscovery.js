@@ -282,6 +282,38 @@ function sendDiscovery(client) {
     uniq_id: 'pumpensteuerung_preset_lock_clear', ic: 'mdi:lock-open-variant',
   });
 
+  // Bewässerungscomputer
+  pub('binary_sensor', 'irrigation_running', {
+    name: 'Bewässerung aktiv', stat_t: `${BASE}/irrigation/running`,
+    payload_on: 'ON', payload_off: 'OFF',
+    uniq_id: 'pumpensteuerung_irrigation_running', ic: 'mdi:sprinkler',
+  });
+  pub('sensor', 'irrigation_active_program', {
+    name: 'Bewässerung Programm', stat_t: `${BASE}/irrigation/active_program`,
+    uniq_id: 'pumpensteuerung_irrigation_active_program', ic: 'mdi:calendar-clock',
+  });
+  pub('sensor', 'irrigation_active_zone', {
+    name: 'Bewässerung Zone', stat_t: `${BASE}/irrigation/active_zone`,
+    uniq_id: 'pumpensteuerung_irrigation_active_zone', ic: 'mdi:sprinkler-variant',
+  });
+  pub('sensor', 'irrigation_skip_reason', {
+    name: 'Bewässerung Entscheidung', stat_t: `${BASE}/irrigation/skip_reason`,
+    uniq_id: 'pumpensteuerung_irrigation_skip_reason', ic: 'mdi:information-outline',
+  });
+  pub('sensor', 'irrigation_water_budget', {
+    name: 'Bewässerung Wasserbudget', stat_t: `${BASE}/irrigation/water_budget_mm`,
+    unit_of_meas: 'mm',
+    uniq_id: 'pumpensteuerung_irrigation_water_budget', ic: 'mdi:water-percent',
+  });
+  pub('sensor', 'irrigation_runtime_factor', {
+    name: 'Bewässerung Laufzeitfaktor', stat_t: `${BASE}/irrigation/runtime_factor`,
+    uniq_id: 'pumpensteuerung_irrigation_runtime_factor', ic: 'mdi:timer-cog-outline',
+  });
+  pub('sensor', 'irrigation_next_start', {
+    name: 'Bewässerung nächster Start', stat_t: `${BASE}/irrigation/next_start`,
+    uniq_id: 'pumpensteuerung_irrigation_next_start', ic: 'mdi:calendar-start',
+  });
+
   console.log('[HA] Auto-Discovery gesendet');
 }
 

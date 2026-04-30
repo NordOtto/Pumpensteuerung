@@ -142,6 +142,17 @@ function publishHA() {
   // Urlaubsmodus
   pub('vacation/state', state.vacation.enabled ? 'ON' : 'OFF', true);
 
+  // Bewässerungscomputer
+  const irr = state.irrigation || {};
+  const dec = irr.decision || {};
+  pub('irrigation/running', dec.running ? 'ON' : 'OFF', true);
+  pub('irrigation/active_program', dec.active_program || '', true);
+  pub('irrigation/active_zone', dec.active_zone || '', true);
+  pub('irrigation/skip_reason', dec.reason || '', true);
+  pub('irrigation/water_budget_mm', dec.water_budget_mm ?? 0, true);
+  pub('irrigation/runtime_factor', dec.runtime_factor ?? 0, true);
+  pub('irrigation/next_start', dec.next_start || '', true);
+
   // Preset
   pub('preset/state',    state.active_preset, true);
   const ctrlLabel = state.ctrl_mode === 2 ? 'FixFrequenz' : (state.ctrl_mode === 1 ? 'Durchfluss' : 'Druck');
@@ -200,6 +211,7 @@ function connect() {
       BASE + '/pi/spike/enabled/set',
       BASE + '/pi/spike/threshold/set',
       BASE + '/pi/spike/window/set',
+      BASE + '/irrigation/#',
     ];
     haSetTopics.forEach(t => client.subscribe(t, { qos: 0 }));
     console.log('[MQTT] Topics abonniert');

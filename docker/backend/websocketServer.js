@@ -70,6 +70,13 @@ function buildStatusJson() {
     active_preset: state.active_preset,
     ctrl_mode:     state.ctrl_mode,
     vacation:      { enabled: state.vacation.enabled },
+    irrigation: {
+      programs: state.irrigation.programs,
+      weather: state.irrigation.weather,
+      decision: state.irrigation.decision,
+      zones: state.irrigation.zones,
+      history: state.irrigation.history.slice(-25),
+    },
     sys: {
       ip:            state.sys.ip || 'backend',
       uptime:        state.sys.uptime,

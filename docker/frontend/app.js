@@ -41,7 +41,26 @@ function authFetch(url, opts = {}) {
 }
 
 async function tryAutoLogin() {
-  if (!authToken) return showLogin();
+  if (new URLSearchParams(location.search).get('preview') === '1') {
+    authToken = 'preview';
+    showApp();
+    updateUI(buildPreviewState());
+    renderIrrigation();
+    return;
+  }
+  if (!authToken) {
+    try {
+      const probe = await fetch('/api/status');
+      if (probe.ok) {
+        authToken = 'auth-disabled';
+        localStorage.setItem('authToken', authToken);
+        showApp();
+        connectWS();
+        return;
+      }
+    } catch { /* normal login flow */ }
+    return showLogin();
+  }
   try {
     const r = await fetch('/api/presets', { headers: { 'Authorization': 'Bearer ' + authToken } });
     if (r.ok) { showApp(); connectWS(); }
@@ -301,6 +320,11 @@ function updateUI(st) {
   // V20 Pump
   if (st.v20) {
     animateValue(els.freq, st.v20.frequency || 0, 1);
+    if ($('deckPumpBadge')) {
+      const label = st.v20.fault ? 'Störung' : st.v20.running ? 'Läuft' : !st.v20.connected ? 'Offline' : 'Bereit';
+      $('deckPumpBadge').textContent = label;
+      $('deckPumpBadge').className = `px-3 py-1 rounded-full text-xs font-bold ${st.v20.fault ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-300' : st.v20.running ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-200'}`;
+    }
     // Sync slider + Sollfrequenz (unless user is dragging)
     if (!sliderDragging) {
       els.freqSet.textContent = (st.v20.freq_setpoint || 0).toFixed(0);
@@ -331,6 +355,9 @@ function updateUI(st) {
   if (st.pi) {
     animateValue(els.pressure, st.pi.pressure || 0, 2);
     animateValue(els.flow, st.pi.flow || 0, 1);
+    if ($('deckPressure')) $('deckPressure').textContent = Number(st.pi.pressure || 0).toFixed(2);
+    if ($('deckPressureSet')) $('deckPressureSet').textContent = `${st.pi.setpoint || '--'} bar`;
+    if ($('deckFlow')) $('deckFlow').textContent = Number(st.pi.flow || 0).toFixed(1);
     pushChart(st.pi.pressure);
 
     // Water temp KPI card
@@ -398,6 +425,10 @@ function updateUI(st) {
     els.presetPill.classList.remove('hidden');
   } else {
     els.presetPill.classList.add('hidden');
+  }
+
+  if (st.irrigation) {
+    updateIrrigationStatus(st.irrigation);
   }
 
   // Timeguard live status
@@ -513,6 +544,9 @@ function pushChart(val) {
 $('btnStart').onclick = () => authFetch('/api/v20/start', { method: 'POST' }).then(() => $toast.show('Start gesendet'));
 $('btnStop').onclick = () => authFetch('/api/v20/stop', { method: 'POST' }).then(() => $toast.show('Stop gesendet'));
 $('btnReset').onclick = () => authFetch('/api/v20/reset', { method: 'POST' }).then(() => $toast.show('Reset gesendet'));
+if ($('deckStart')) $('deckStart').onclick = () => $('btnStart').click();
+if ($('deckStop')) $('deckStop').onclick = () => $('btnStop').click();
+if ($('deckIrrigation')) $('deckIrrigation').onclick = () => window.showTab('irrigation');
 
 // ─── Freq Slider ───
 let slTimer;
@@ -571,6 +605,7 @@ const tabMeta = {
   fan:       { title: 'Gehäuse Lüfter', sub: 'Modus & PWM' },
   presets:   { title: 'Presets', sub: 'Betriebsmodi verwalten' },
   timeguard: { title: 'Zeitsperre', sub: 'Betriebszeitfenster' },
+  irrigation:{ title: 'Bewässerung', sub: 'Programme & Wetterlogik' },
   logs:      { title: 'System Logs', sub: 'Debug-Ausgabe' },
   display:   { title: 'Anzeige', sub: 'Zoom & Darstellung' },
 };
@@ -585,7 +620,7 @@ window.showTab = (tab) => {
   }, 10);
 
   // Hide all tabs
-  ['tabSettings', 'tabFan', 'tabPresets', 'tabTimeguard', 'tabLogs', 'tabDisplay'].forEach(t => $(t).classList.add('hidden'));
+  ['tabSettings', 'tabFan', 'tabPresets', 'tabTimeguard', 'tabIrrigation', 'tabLogs', 'tabDisplay'].forEach(t => $(t).classList.add('hidden'));
 
   // Show selected
   const tabId = tab === 'fan' ? 'tabFan' : `tab${tab.charAt(0).toUpperCase() + tab.slice(1)}`;
@@ -605,6 +640,7 @@ window.showTab = (tab) => {
   // Load data
   if (tab === 'presets') loadPresets();
   if (tab === 'timeguard') loadTimeguard();
+  if (tab === 'irrigation') loadIrrigation();
 };
 
 $('closeDrawer').onclick = () => {
@@ -777,6 +813,246 @@ $('saveFan').onclick = async () => {
 $('fanPwm').addEventListener('input', (e) => {
   $('fanPwmVal').textContent = Math.round(e.target.value / 255 * 100) + '%';
 });
+
+// ─── Irrigation ───
+let irrigationState = null;
+
+function fmtDateTime(iso) {
+  if (!iso) return '--';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '--';
+  return d.toLocaleString('de-DE', { weekday: 'short', hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
+}
+
+function updateIrrigationStatus(irr) {
+  irrigationState = irr;
+  const d = irr.decision || {};
+  const w = irr.weather || {};
+  const running = !!d.running;
+  if ($('irrDecisionLine')) $('irrDecisionLine').textContent = `${d.reason || 'Bereit'} · ${d.program_id || 'kein Programm'}`;
+  if ($('irrRunState')) {
+    $('irrRunState').textContent = running ? 'Aktiv' : (d.allowed ? 'Bereit' : 'Gesperrt');
+    $('irrRunState').className = `text-lg font-bold mt-1 ${running ? 'text-emerald-500' : d.allowed ? 'text-slate-800 dark:text-white' : 'text-amber-500'}`;
+  }
+  if ($('irrActiveZone')) $('irrActiveZone').textContent = d.active_zone || '--';
+  if ($('irrBudget')) $('irrBudget').textContent = Number(d.water_budget_mm || 0).toFixed(1);
+  if ($('irrFactor')) $('irrFactor').textContent = Number(d.runtime_factor || 0).toFixed(2);
+  if ($('irrNextStart')) $('irrNextStart').textContent = fmtDateTime(d.next_start);
+  if ($('irrDrawerDecision')) $('irrDrawerDecision').textContent = `${running ? 'Läuft' : d.allowed ? 'Freigegeben' : 'Wird übersprungen'} · ${d.reason || '--'}`;
+  if ($('irrRain')) $('irrRain').textContent = (Number(w.forecast_rain_mm || 0) + Number(w.rain_24h_mm || 0)).toFixed(1);
+  if ($('irrWind')) $('irrWind').textContent = Number(w.wind_kmh || 0).toFixed(0);
+  if ($('irrEt')) $('irrEt').textContent = w.et0_mm == null ? '--' : Number(w.et0_mm).toFixed(1);
+  if ($('deckIrrTitle')) $('deckIrrTitle').textContent = running ? 'Bewässert jetzt' : (d.allowed ? 'Automatik bereit' : 'Lauf gesperrt');
+  if ($('deckIrrReason')) $('deckIrrReason').textContent = d.reason || '--';
+  if ($('deckIrrState')) {
+    $('deckIrrState').textContent = running ? 'Aktiv' : d.allowed ? 'Freigegeben' : 'Skip';
+    $('deckIrrState').className = `px-3 py-1 rounded-full text-xs font-bold ${running ? 'bg-emerald-500 text-white' : d.allowed ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'}`;
+  }
+  if ($('deckProgram')) $('deckProgram').textContent = d.active_program || d.program_id || '--';
+  if ($('deckZone')) $('deckZone').textContent = d.active_zone || '--';
+  if ($('deckNext')) $('deckNext').textContent = fmtDateTime(d.next_start);
+  if ($('deckRain')) $('deckRain').textContent = (Number(w.forecast_rain_mm || 0) + Number(w.rain_24h_mm || 0)).toFixed(1);
+  if ($('deckWind')) $('deckWind').textContent = Number(w.wind_kmh || 0).toFixed(0);
+  if ($('deckBudget')) $('deckBudget').textContent = Number(d.water_budget_mm || 0).toFixed(1);
+  if ($('deckFactor')) $('deckFactor').textContent = Number(d.runtime_factor || 0).toFixed(2);
+}
+
+async function loadIrrigation() {
+  try {
+    const [programRes, weatherRes, historyRes] = await Promise.all([
+      authFetch('/api/irrigation/programs'),
+      authFetch('/api/irrigation/weather'),
+      authFetch('/api/irrigation/history'),
+    ]);
+    const programs = await programRes.json();
+    const weather = await weatherRes.json();
+    const history = await historyRes.json();
+    irrigationState = Object.assign({}, irrigationState || {}, {
+      programs: programs.programs || [],
+      weather,
+      decision: weather.decision || irrigationState?.decision || {},
+      history: history.history || [],
+    });
+    renderIrrigation();
+    updateIrrigationStatus(irrigationState);
+  } catch (err) {
+    log('Bewässerung laden fehlgeschlagen: ' + err.message);
+  }
+}
+
+function buildPreviewState() {
+  return {
+    v20: {
+      frequency: 42.5, freq_setpoint: 43, voltage: 231, current: 4.2, power: 0.92,
+      fault: 0, fault_code: 0, running: true, connected: true,
+    },
+    pi: {
+      pressure: 3.1, flow: 24.5, water_temp: 11.8, setpoint: 3.0, p_on: 2.2, p_off: 4.0,
+      active: true, enabled: true, pump_state: 2, kp: 8, ki: 1, freq_min: 35, freq_max: 52,
+      dry_run_locked: false, flow_setpoint: 0, ctrl_mode: 0,
+    },
+    temp: 28.4,
+    fan: { rpm: 920, pwm: 120, mode: 'Auto' },
+    active_preset: 'Rasen',
+    ctrl_mode: 0,
+    timeguard: {
+      enabled: true, allowed: true, synced: true, time: '14:30',
+      start: '06:00', end: '22:00', days: [true, true, true, true, true, true, true],
+    },
+    irrigation: {
+      weather: { forecast_rain_mm: 1.2, rain_24h_mm: 0.4, wind_kmh: 12, et0_mm: 3.4 },
+      decision: {
+        allowed: true, reason: 'ET Freigabe', program_id: 'garten',
+        water_budget_mm: 1.8, runtime_factor: 0.72,
+        next_start: new Date(Date.now() + 18 * 3600 * 1000).toISOString(),
+        active_zone: 'rasen_sued', active_program: 'garten', running: true,
+      },
+      programs: [{
+        id: 'garten', name: 'Garten', enabled: true,
+        days: [true, true, true, true, true, false, false],
+        start_hour: 6, start_min: 0, seasonal_factor: 1,
+        thresholds: { skip_rain_mm: 6, wind_max_kmh: 35 },
+        zones: [
+          { id: 'rasen_sued', name: 'Rasen Süd', duration_min: 18, preset: 'Rasen' },
+          { id: 'beete', name: 'Beete', duration_min: 12, preset: 'Tropfschlauch' },
+        ],
+        last_run_at: new Date(Date.now() - 86400000).toISOString(),
+      }],
+      history: [
+        { at: new Date().toISOString(), type: 'run', result: 'running', program_name: 'Garten' },
+        { at: new Date(Date.now() - 86400000).toISOString(), type: 'run', result: 'completed', program_name: 'Garten' },
+      ],
+    },
+    sys: { mqtt: true, uptime: 3600 },
+  };
+}
+
+function renderIrrigation() {
+  const list = $('irrProgramList');
+  if (!list || !irrigationState) return;
+  const programs = irrigationState.programs || [];
+  if (!programs.length) {
+    list.innerHTML = '<div class="text-sm text-slate-400 text-center py-4">Noch keine Programme</div>';
+  } else {
+    list.innerHTML = programs.map(p => {
+      const zones = (p.zones || []).map(z => `${z.name} · ${z.duration_min} min · ${z.preset || 'Normal'}`).join('<br>');
+      const days = ['Mo','Di','Mi','Do','Fr','Sa','So'].filter((_, i) => p.days?.[i]).join(' ');
+      return `
+        <div class="rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 p-3">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <div class="font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                <span class="material-symbols-outlined text-emerald-500 text-lg">sprinkler</span>${p.name}
+              </div>
+              <div class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-1">${days || 'keine Tage'} · ${String(p.start_hour).padStart(2,'0')}:${String(p.start_min).padStart(2,'0')}</div>
+              <div class="text-xs text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">${zones || 'Keine Zone'}</div>
+            </div>
+            <div class="flex gap-1 shrink-0">
+              <button onclick="runIrrigation('${p.id}')" class="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-300 flex items-center justify-center" title="Start"><span class="material-symbols-outlined text-base">play_arrow</span></button>
+              <button onclick="stopIrrigation('${p.id}')" class="w-8 h-8 rounded-lg bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-300 flex items-center justify-center" title="Stop"><span class="material-symbols-outlined text-base">stop</span></button>
+              <button onclick="editIrrigation('${p.id}')" class="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 flex items-center justify-center" title="Bearbeiten"><span class="material-symbols-outlined text-base">edit</span></button>
+            </div>
+          </div>
+          <div class="mt-3 flex items-center justify-between text-[10px] text-slate-400">
+            <span>${p.enabled ? 'Automatik aktiv' : 'Automatik aus'}</span>
+            <span>${p.last_skip_reason || p.last_run_at ? fmtDateTime(p.last_run_at) : 'Noch kein Lauf'}</span>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  const history = $('irrHistory');
+  if (history) {
+    const rows = (irrigationState.history || []).slice(-8).reverse();
+    history.innerHTML = rows.length ? rows.map(h => `
+      <div class="rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 px-3 py-2 flex justify-between gap-3 text-xs">
+        <span class="font-bold text-slate-700 dark:text-slate-200">${h.program_name || h.program_id || h.type}</span>
+        <span class="text-slate-400 text-right">${h.result || h.type} · ${h.reason || fmtDateTime(h.at)}</span>
+      </div>`).join('') : '<div class="text-xs text-slate-400">Noch keine Historie</div>';
+  }
+}
+
+window.runIrrigation = async (id) => {
+  const r = await authFetch(`/api/irrigation/programs/${encodeURIComponent(id)}/run`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ forceWeather: true })
+  });
+  const d = await r.json();
+  $toast.show(d.ok ? 'Bewässerung gestartet' : (d.error || 'Start gesperrt'), d.ok ? 'info' : 'error');
+  loadIrrigation();
+};
+
+window.stopIrrigation = async (id) => {
+  const r = await authFetch(`/api/irrigation/programs/${encodeURIComponent(id)}/stop`, { method: 'POST' });
+  const d = await r.json();
+  $toast.show(d.ok ? 'Bewässerung gestoppt' : (d.error || 'Stop fehlgeschlagen'), d.ok ? 'info' : 'error');
+  loadIrrigation();
+};
+
+window.editIrrigation = (id) => {
+  const p = irrigationState?.programs?.find(x => x.id === id);
+  if (!p) return;
+  $('irrName').value = p.name;
+  $('irrStart').value = `${String(p.start_hour).padStart(2,'0')}:${String(p.start_min).padStart(2,'0')}`;
+  (p.days || []).forEach((d, i) => { if ($('irrDay' + i)) $('irrDay' + i).checked = !!d; });
+  $('irrSeason').value = p.seasonal_factor || 1;
+  $('irrSkipRain').value = p.thresholds?.skip_rain_mm ?? 6;
+  $('irrMaxWind').value = p.thresholds?.wind_max_kmh ?? 35;
+  const z = p.zones?.[0] || {};
+  $('irrZoneName').value = z.name || '';
+  $('irrZoneMin').value = z.duration_min || 10;
+  $('irrZonePreset').value = z.preset || 'Normal';
+};
+
+async function saveIrrigationProgram() {
+  const current = irrigationState?.programs || [];
+  const name = $('irrName').value.trim() || 'Garten';
+  const [h, m] = ($('irrStart').value || '06:00').split(':').map(v => parseInt(v));
+  const id = name.toLowerCase().replace(/[^a-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '') || 'garten';
+  const program = {
+    id,
+    name,
+    enabled: true,
+    days: Array.from({ length: 7 }, (_, i) => $('irrDay' + i).checked),
+    start_hour: h || 0,
+    start_min: m || 0,
+    seasonal_factor: parseFloat($('irrSeason').value) || 1,
+    weather_enabled: true,
+    thresholds: {
+      skip_rain_mm: parseFloat($('irrSkipRain').value) || 6,
+      reduce_rain_mm: 2,
+      wind_max_kmh: parseFloat($('irrMaxWind').value) || 35,
+      soil_moisture_skip_pct: 70,
+      et0_default_mm: 3,
+    },
+    zones: [{
+      id: ($('irrZoneName').value || 'Zone 1').toLowerCase().replace(/[^a-z0-9_-]+/g, '_') || 'zone_1',
+      name: $('irrZoneName').value.trim() || 'Zone 1',
+      enabled: true,
+      duration_min: parseFloat($('irrZoneMin').value) || 10,
+      water_mm: 6,
+      preset: $('irrZonePreset').value.trim() || 'Normal',
+    }]
+  };
+  const next = current.filter(p => p.id !== id).concat(program);
+  const r = await authFetch('/api/irrigation/programs', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ programs: next })
+  });
+  const d = await r.json();
+  if (r.ok) {
+    $toast.show('Bewässerungsprogramm gespeichert');
+    irrigationState.programs = d.programs || next;
+    renderIrrigation();
+  } else {
+    $toast.show(d.error || 'Speichern fehlgeschlagen', 'error');
+  }
+}
+
+$('btnIrrRefresh').onclick = loadIrrigation;
+$('btnIrrSave').onclick = saveIrrigationProgram;
 
 // ─── Timeguard ───
 async function loadTimeguard() {

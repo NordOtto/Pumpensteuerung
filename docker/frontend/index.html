@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
   <link rel="manifest" href="/manifest.json"/>
   <title>Brunnenpumpe</title>
-  <link rel="stylesheet" href="/styles.css?v=10"/>
+  <link rel="stylesheet" href="/styles.css?v=12"/>
   <link href="https://fonts.googleapis.com" rel="preconnect"/>
   <link crossorigin href="https://fonts.gstatic.com" rel="preconnect"/>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Manrope:wght@400;500;700&family=Inter:wght@400;500;700&display=swap" rel="stylesheet"/>
@@ -95,13 +95,86 @@
     <div class="relative z-10 flex flex-col gap-5 sm:gap-6">
 
       <!-- Header -->
-      <div class="flex justify-end items-center gap-1.5 sm:gap-2">
+      <div class="flex justify-between items-center gap-3">
+        <div>
+          <div class="text-[10px] sm:text-xs font-bold text-emerald-500 uppercase tracking-widest">Brunnensteuerung Pro</div>
+          <h1 class="text-xl sm:text-3xl font-bold text-slate-800 dark:text-white">Pumpe & Bewässerung</h1>
+        </div>
+        <div class="flex items-center gap-1.5 sm:gap-2">
         <button id="btnGear" class="glass-card w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-white/60 dark:hover:bg-slate-700/60 transition-colors shadow-sm" title="Einstellungen">
           <span class="material-symbols-outlined text-lg sm:text-xl">settings</span>
         </button>
         <button id="btnLogout" class="glass-card w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-rose-100/60 dark:hover:bg-rose-900/30 transition-colors shadow-sm" title="Abmelden">
           <span class="material-symbols-outlined text-lg sm:text-xl">logout</span>
         </button>
+        </div>
+      </div>
+
+      <!-- ===== SMART CONTROL DECK ===== -->
+      <section class="grid grid-cols-1 xl:grid-cols-[1.05fr_1.3fr_0.9fr] gap-4">
+        <div class="glass-card rounded-[1rem] p-5 sm:p-6 border-l-4 border-l-sky-500">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Brunnen</div>
+              <h2 class="text-2xl font-bold text-slate-800 dark:text-white mt-1"><span id="deckPressure">--</span> bar</h2>
+              <p class="text-xs text-slate-400 mt-1">Soll <span id="deckPressureSet">--</span> · Flow <span id="deckFlow">--</span> l/min</p>
+            </div>
+            <div id="deckPumpBadge" class="px-3 py-1 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-200 text-xs font-bold">--</div>
+          </div>
+          <div class="mt-5 grid grid-cols-3 gap-2">
+            <button id="deckStart" class="h-11 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center" title="Start"><span class="material-symbols-outlined">play_arrow</span></button>
+            <button id="deckStop" class="h-11 rounded-xl bg-rose-600 hover:bg-rose-500 text-white flex items-center justify-center" title="Stop"><span class="material-symbols-outlined">stop</span></button>
+            <button id="deckIrrigation" class="h-11 rounded-xl bg-slate-800 dark:bg-slate-700 hover:bg-slate-700 dark:hover:bg-slate-600 text-white flex items-center justify-center" title="Bewässerung"><span class="material-symbols-outlined">sprinkler</span></button>
+          </div>
+        </div>
+
+        <div class="glass-card rounded-[1rem] p-5 sm:p-6 overflow-hidden relative border-l-4 border-l-emerald-500">
+          <div class="absolute inset-x-0 bottom-0 h-16 wave-bg opacity-60 pointer-events-none"></div>
+          <div class="relative z-10 flex items-start justify-between gap-4">
+            <div>
+              <div class="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Bewässerungscomputer</div>
+              <h2 id="deckIrrTitle" class="text-2xl sm:text-3xl font-bold text-slate-800 dark:text-white mt-1">Bereit</h2>
+              <p id="deckIrrReason" class="text-sm text-slate-500 dark:text-slate-400 mt-1">Wetterentscheidung wird geladen</p>
+            </div>
+            <div id="deckIrrState" class="px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 text-xs font-bold">Auto</div>
+          </div>
+          <div class="relative z-10 mt-5 grid grid-cols-3 gap-3">
+            <div>
+              <div class="text-[9px] text-slate-400 uppercase tracking-widest font-bold">Programm</div>
+              <div id="deckProgram" class="text-sm font-bold text-slate-800 dark:text-white mt-1 truncate">--</div>
+            </div>
+            <div>
+              <div class="text-[9px] text-slate-400 uppercase tracking-widest font-bold">Zone</div>
+              <div id="deckZone" class="text-sm font-bold text-slate-800 dark:text-white mt-1 truncate">--</div>
+            </div>
+            <div>
+              <div class="text-[9px] text-slate-400 uppercase tracking-widest font-bold">Nächster Lauf</div>
+              <div id="deckNext" class="text-sm font-bold text-slate-800 dark:text-white mt-1 truncate">--</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="glass-card rounded-[1rem] p-5 sm:p-6 border-l-4 border-l-amber-500">
+          <div class="text-[10px] font-bold text-amber-500 uppercase tracking-widest">Wetterfreigabe</div>
+          <div class="mt-4 grid grid-cols-2 gap-3">
+            <div>
+              <div class="text-[9px] text-slate-400 uppercase tracking-widest font-bold">Regen</div>
+              <div class="text-xl font-bold text-slate-800 dark:text-white"><span id="deckRain">--</span> mm</div>
+            </div>
+            <div>
+              <div class="text-[9px] text-slate-400 uppercase tracking-widest font-bold">Wind</div>
+              <div class="text-xl font-bold text-slate-800 dark:text-white"><span id="deckWind">--</span> km/h</div>
+            </div>
+            <div>
+              <div class="text-[9px] text-slate-400 uppercase tracking-widest font-bold">Budget</div>
+              <div class="text-xl font-bold text-slate-800 dark:text-white"><span id="deckBudget">--</span> mm</div>
+            </div>
+            <div>
+              <div class="text-[9px] text-slate-400 uppercase tracking-widest font-bold">Faktor</div>
+              <div class="text-xl font-bold text-slate-800 dark:text-white"><span id="deckFactor">--</span>x</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- ===== SKEUO DISPLAY ===== -->
@@ -242,6 +315,41 @@
       <!-- ===== HARDWARE DETAILS ===== -->
       <div class="glass-card rounded-[1rem] p-0 overflow-hidden shadow-sm">
         <div class="px-5 sm:px-6 py-3 border-b border-slate-200/50 dark:border-slate-700/50 bg-white/40 dark:bg-slate-800/40 flex justify-between items-center">
+          <div>
+            <h3 class="font-bold text-slate-700 dark:text-slate-200 text-sm sm:text-base">Smarter Bewässerungscomputer</h3>
+            <p id="irrDecisionLine" class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-0.5">Lade Entscheidung...</p>
+          </div>
+          <button onclick="window.showTab('irrigation')" class="h-9 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 transition-colors">
+            <span class="material-symbols-outlined text-base">sprinkler</span> Programme
+          </button>
+        </div>
+        <div class="grid grid-cols-2 lg:grid-cols-5 divide-x divide-y lg:divide-y-0 divide-slate-200/50 dark:divide-slate-700/50">
+          <div class="p-4">
+            <div class="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Status</div>
+            <div id="irrRunState" class="text-lg font-bold text-slate-800 dark:text-white mt-1">--</div>
+          </div>
+          <div class="p-4">
+            <div class="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Aktive Zone</div>
+            <div id="irrActiveZone" class="text-lg font-bold text-slate-800 dark:text-white mt-1">--</div>
+          </div>
+          <div class="p-4">
+            <div class="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Wasserbudget</div>
+            <div class="text-lg font-bold text-slate-800 dark:text-white mt-1"><span id="irrBudget">--</span> <span class="text-xs text-slate-400">mm</span></div>
+          </div>
+          <div class="p-4">
+            <div class="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Faktor</div>
+            <div class="text-lg font-bold text-slate-800 dark:text-white mt-1"><span id="irrFactor">--</span>x</div>
+          </div>
+          <div class="p-4 col-span-2 lg:col-span-1">
+            <div class="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Nächster Start</div>
+            <div id="irrNextStart" class="text-sm font-bold text-slate-800 dark:text-white mt-1">--</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== HARDWARE DETAILS ===== -->
+      <div class="glass-card rounded-[1rem] p-0 overflow-hidden shadow-sm">
+        <div class="px-5 sm:px-6 py-3 border-b border-slate-200/50 dark:border-slate-700/50 bg-white/40 dark:bg-slate-800/40 flex justify-between items-center">
           <h3 class="font-bold text-slate-700 dark:text-slate-200 text-sm sm:text-base">Hardware Details</h3>
           <span class="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Sinamics V20</span>
         </div>
@@ -333,6 +441,7 @@
   <nav id="mobileNav" class="hidden lg:hidden fixed bottom-0 left-3 right-3 z-40 bg-white/90 dark:bg-slate-800/95 backdrop-blur-2xl border border-slate-200 dark:border-slate-700 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] dark:shadow-[0_-4px_20px_rgba(0,0,0,0.3)] px-4 py-3 rounded-t-2xl flex justify-around items-center mb-[env(safe-area-inset-bottom)]">
     <button onclick="window.scrollTo({top:0,behavior:'smooth'})" class="mob-nav-btn text-blue-500"><span class="material-symbols-outlined">dashboard</span></button>
     <button onclick="window.showTab('settings')" class="mob-nav-btn"><span class="material-symbols-outlined">tune</span></button>
+    <button onclick="window.showTab('irrigation')" class="mob-nav-btn"><span class="material-symbols-outlined">sprinkler</span></button>
     <button onclick="window.showTab('presets')" class="mob-nav-btn"><span class="material-symbols-outlined">bookmarks</span></button>
     <button onclick="window.showTab('timeguard')" class="mob-nav-btn"><span class="material-symbols-outlined">schedule</span></button>
   </nav>
@@ -358,6 +467,9 @@
         </button>
         <button onclick="window.showTab('timeguard')" data-tab="timeguard" class="sidebar-nav-btn" title="Zeitsperre">
           <span class="material-symbols-outlined text-xl">schedule</span>
+        </button>
+        <button onclick="window.showTab('irrigation')" data-tab="irrigation" class="sidebar-nav-btn" title="Bewässerung">
+          <span class="material-symbols-outlined text-xl">sprinkler</span>
         </button>
         <button onclick="window.showTab('display')" data-tab="display" class="sidebar-nav-btn" title="Anzeige">
           <span class="material-symbols-outlined text-xl">zoom_in</span>
@@ -524,6 +636,80 @@
             </button>
           </div>
 
+          <!-- Tab: Irrigation -->
+          <div id="tabIrrigation" class="hidden space-y-5">
+            <div class="rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 p-4">
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <div class="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Bewässerungscomputer</div>
+                  <div id="irrDrawerDecision" class="text-sm font-bold text-slate-800 dark:text-white mt-1">--</div>
+                </div>
+                <button id="btnIrrRefresh" class="w-9 h-9 rounded-lg bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-200 flex items-center justify-center border border-slate-200 dark:border-slate-600" title="Aktualisieren">
+                  <span class="material-symbols-outlined text-base">refresh</span>
+                </button>
+              </div>
+              <div class="grid grid-cols-3 gap-2 mt-4">
+                <div class="rounded-lg bg-white/70 dark:bg-slate-900/50 p-3">
+                  <div class="text-[9px] text-slate-400 uppercase tracking-widest font-bold">Regen</div>
+                  <div class="text-lg font-bold text-slate-800 dark:text-white"><span id="irrRain">--</span> mm</div>
+                </div>
+                <div class="rounded-lg bg-white/70 dark:bg-slate-900/50 p-3">
+                  <div class="text-[9px] text-slate-400 uppercase tracking-widest font-bold">Wind</div>
+                  <div class="text-lg font-bold text-slate-800 dark:text-white"><span id="irrWind">--</span> km/h</div>
+                </div>
+                <div class="rounded-lg bg-white/70 dark:bg-slate-900/50 p-3">
+                  <div class="text-[9px] text-slate-400 uppercase tracking-widest font-bold">ET</div>
+                  <div class="text-lg font-bold text-slate-800 dark:text-white"><span id="irrEt">--</span> mm</div>
+                </div>
+              </div>
+            </div>
+
+            <div id="irrProgramList" class="space-y-3"></div>
+
+            <div class="flex items-center gap-3 pt-1">
+              <div class="flex-1 h-px bg-slate-200 dark:bg-slate-700"></div>
+              <span class="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Programme bearbeiten</span>
+              <div class="flex-1 h-px bg-slate-200 dark:bg-slate-700"></div>
+            </div>
+
+            <div class="rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 p-4 space-y-3">
+              <div class="grid grid-cols-2 gap-2">
+                <div class="sidebar-field"><label class="sidebar-label">Name</label><input id="irrName" class="sidebar-input" placeholder="Garten"></div>
+                <div class="sidebar-field"><label class="sidebar-label">Start</label><input id="irrStart" class="sidebar-input" type="time" value="06:00"></div>
+              </div>
+              <div class="grid grid-cols-3 gap-2">
+                <div class="sidebar-field"><label class="sidebar-label">Zone</label><input id="irrZoneName" class="sidebar-input" placeholder="Rasen"></div>
+                <div class="sidebar-field"><label class="sidebar-label">Minuten</label><input id="irrZoneMin" class="sidebar-input" type="number" min="1" value="10"></div>
+                <div class="sidebar-field"><label class="sidebar-label">Preset</label><input id="irrZonePreset" class="sidebar-input" placeholder="Normal"></div>
+              </div>
+              <div>
+                <label class="sidebar-label mb-2 block">Tage</label>
+                <div class="grid grid-cols-7 gap-1.5">
+                  <label class="tg-day-btn"><input type="checkbox" id="irrDay0" class="sr-only peer" checked><div class="tg-day-label">Mo</div></label>
+                  <label class="tg-day-btn"><input type="checkbox" id="irrDay1" class="sr-only peer" checked><div class="tg-day-label">Di</div></label>
+                  <label class="tg-day-btn"><input type="checkbox" id="irrDay2" class="sr-only peer" checked><div class="tg-day-label">Mi</div></label>
+                  <label class="tg-day-btn"><input type="checkbox" id="irrDay3" class="sr-only peer" checked><div class="tg-day-label">Do</div></label>
+                  <label class="tg-day-btn"><input type="checkbox" id="irrDay4" class="sr-only peer" checked><div class="tg-day-label">Fr</div></label>
+                  <label class="tg-day-btn"><input type="checkbox" id="irrDay5" class="sr-only peer"><div class="tg-day-label">Sa</div></label>
+                  <label class="tg-day-btn"><input type="checkbox" id="irrDay6" class="sr-only peer"><div class="tg-day-label">So</div></label>
+                </div>
+              </div>
+              <div class="grid grid-cols-3 gap-2">
+                <div class="sidebar-field"><label class="sidebar-label">Saison</label><input id="irrSeason" class="sidebar-input" type="number" step="0.1" min="0.1" max="2" value="1"></div>
+                <div class="sidebar-field"><label class="sidebar-label">Skip Regen</label><input id="irrSkipRain" class="sidebar-input" type="number" step="0.5" value="6"></div>
+                <div class="sidebar-field"><label class="sidebar-label">Max Wind</label><input id="irrMaxWind" class="sidebar-input" type="number" step="1" value="35"></div>
+              </div>
+              <button id="btnIrrSave" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-md text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-colors">
+                <span class="material-symbols-outlined text-base">save</span> Programm speichern
+              </button>
+            </div>
+
+            <div>
+              <div class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-2">Historie</div>
+              <div id="irrHistory" class="space-y-2"></div>
+            </div>
+          </div>
+
           <!-- Tab: Logs -->
           <div id="tabLogs" class="hidden">
             <div class="bg-slate-900 rounded-xl p-4 h-[calc(100vh-140px)] overflow-y-auto border border-slate-700/50">
@@ -560,6 +746,6 @@
     </div>
   </div>
 
-  <script src="/app.js?v=10"></script>
+  <script src="/app.js?v=12"></script>
 </body>
 </html>

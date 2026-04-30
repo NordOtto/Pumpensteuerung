@@ -12,6 +12,7 @@ const pi           = require('./pressureCtrl');
 const tg           = require('./timeguard');
 const presets      = require('./presets');
 const presetLock   = require('./presetLock');
+const irrigation   = require('./irrigation');
 const ha           = require('./haDiscovery');
 const ws           = require('./websocketServer');
 const auth         = require('./auth');
@@ -100,6 +101,9 @@ mqttClient.onCommand((topic, value) => {
   else if (topic === `${BASE}/vacation/set`) {
     pi.setVacation(value === 'ON');
   }
+  else if (topic.startsWith(`${BASE}/irrigation/`)) {
+    irrigation.handleMqtt(topic, value);
+  }
 });
 
 async function main() {
@@ -107,6 +111,7 @@ async function main() {
   await presets.load();
   await tg.load();
   await pi.load();
+  await irrigation.load();
 
   // Preset-Änderungen → HA Discovery automatisch aktualisieren
   presets.onPresetsChanged(() => ha.refreshPresetSelect());
@@ -155,6 +160,7 @@ async function main() {
   // ── Intervall-Tasks ──
   setInterval(() => pi.tick(),         500);   // PI-Regelung
   setInterval(() => presetLock.tick(), 1000);  // HA-Lock TTL prüfen
+  setInterval(() => irrigation.tick(), 5000);  // Bewässerungsprogramme
   setInterval(() => tg.tick(),         10000); // Zeitsperre prüfen
   setInterval(() => ws.broadcast(),    1000);  // Browser WS
   setInterval(() => mqttClient.publishHA(), 2000); // HA Topics

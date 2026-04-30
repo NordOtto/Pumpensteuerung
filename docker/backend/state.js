@@ -97,6 +97,34 @@ const state = {
     enabled: false,
   },
 
+  // ── Bewässerungscomputer ──
+  irrigation: {
+    programs: [],
+    weather: {
+      forecast_rain_mm: 0,
+      rain_24h_mm: 0,
+      temp_c: null,
+      humidity_pct: null,
+      wind_kmh: 0,
+      et0_mm: null,
+      soil_moisture_pct: null,
+      updated_at: null,
+    },
+    decision: {
+      allowed: true,
+      reason: 'Bereit',
+      program_id: '',
+      water_budget_mm: 0,
+      runtime_factor: 1,
+      next_start: null,
+      active_zone: '',
+      active_program: '',
+      running: false,
+    },
+    zones: {},
+    history: [],
+  },
+
   // ── Log-Puffer (für WebSocket) ──
   logBuffer: [],
   logSeq:    0,

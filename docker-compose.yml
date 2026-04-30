@@ -14,6 +14,7 @@ services:
       - TZ=${TZ:-Europe/Berlin}
       - DATA_DIR=/data
       - AUTH_USER=${AUTH_USER:-admin}
+      - AUTH_DISABLED=${AUTH_DISABLED:-false}
     volumes:
       - app-data:/data
     networks:

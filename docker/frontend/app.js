@@ -45,6 +45,7 @@ async function tryAutoLogin() {
     authToken = 'preview';
     showApp();
     updateUI(buildPreviewState());
+    irrigationState = buildPreviewState().irrigation;
     renderIrrigation();
     return;
   }
@@ -325,6 +326,8 @@ function updateUI(st) {
       $('deckPumpBadge').textContent = label;
       $('deckPumpBadge').className = `px-3 py-1 rounded-full text-xs font-bold ${st.v20.fault ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-300' : st.v20.running ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-200'}`;
     }
+    if ($('topSystemState')) $('topSystemState').textContent = st.v20.fault ? 'Störung' : st.v20.running ? 'Läuft' : st.v20.connected ? 'Bereit' : 'Offline';
+    if ($('topFreq')) $('topFreq').textContent = Number(st.v20.frequency || 0).toFixed(1);
     // Sync slider + Sollfrequenz (unless user is dragging)
     if (!sliderDragging) {
       els.freqSet.textContent = (st.v20.freq_setpoint || 0).toFixed(0);
@@ -355,9 +358,8 @@ function updateUI(st) {
   if (st.pi) {
     animateValue(els.pressure, st.pi.pressure || 0, 2);
     animateValue(els.flow, st.pi.flow || 0, 1);
-    if ($('deckPressure')) $('deckPressure').textContent = Number(st.pi.pressure || 0).toFixed(2);
-    if ($('deckPressureSet')) $('deckPressureSet').textContent = `${st.pi.setpoint || '--'} bar`;
-    if ($('deckFlow')) $('deckFlow').textContent = Number(st.pi.flow || 0).toFixed(1);
+    if ($('topPressure')) $('topPressure').textContent = Number(st.pi.pressure || 0).toFixed(2);
+    if ($('topFlow')) $('topFlow').textContent = Number(st.pi.flow || 0).toFixed(1);
     pushChart(st.pi.pressure);
 
     // Water temp KPI card
@@ -816,6 +818,7 @@ $('fanPwm').addEventListener('input', (e) => {
 
 // ─── Irrigation ───
 let irrigationState = null;
+let irrigationPresetNames = ['Normal'];
 
 function fmtDateTime(iso) {
   if (!iso) return '--';
@@ -855,18 +858,30 @@ function updateIrrigationStatus(irr) {
   if ($('deckWind')) $('deckWind').textContent = Number(w.wind_kmh || 0).toFixed(0);
   if ($('deckBudget')) $('deckBudget').textContent = Number(d.water_budget_mm || 0).toFixed(1);
   if ($('deckFactor')) $('deckFactor').textContent = Number(d.runtime_factor || 0).toFixed(2);
+  if ($('topIrrigation')) $('topIrrigation').textContent = running ? `Aktiv ${d.active_zone || ''}`.trim() : (d.reason || '--');
+  if ($('topEt')) $('topEt').textContent = w.et0_mm == null ? '--' : Number(w.et0_mm).toFixed(1);
+  if ($('topBudget')) $('topBudget').textContent = Number(d.water_budget_mm || 0).toFixed(1);
+  if ($('topRain')) $('topRain').textContent = (Number(w.forecast_rain_mm || 0) + Number(w.rain_24h_mm || 0)).toFixed(1);
+  if ($('topWind')) $('topWind').textContent = Number(w.wind_kmh || 0).toFixed(0);
 }
 
 async function loadIrrigation() {
   try {
-    const [programRes, weatherRes, historyRes] = await Promise.all([
+    const [programRes, weatherRes, historyRes, presetsRes] = await Promise.all([
       authFetch('/api/irrigation/programs'),
       authFetch('/api/irrigation/weather'),
       authFetch('/api/irrigation/history'),
+      authFetch('/api/presets'),
     ]);
     const programs = await programRes.json();
     const weather = await weatherRes.json();
     const history = await historyRes.json();
+    const presets = await presetsRes.json();
+    irrigationPresetNames = (presets.presets || presets || [])
+      .map(p => p.name || p)
+      .filter(Boolean);
+    if (!irrigationPresetNames.length) irrigationPresetNames = ['Normal'];
+    renderIrrigationPresetOptions();
     irrigationState = Object.assign({}, irrigationState || {}, {
       programs: programs.programs || [],
       weather,
@@ -875,9 +890,20 @@ async function loadIrrigation() {
     });
     renderIrrigation();
     updateIrrigationStatus(irrigationState);
+    updateIrrigationRuntimePreview();
   } catch (err) {
     log('Bewässerung laden fehlgeschlagen: ' + err.message);
   }
+}
+
+function renderIrrigationPresetOptions(selected) {
+  const el = $('irrZonePreset');
+  if (!el) return;
+  const current = selected || el.value || 'Normal';
+  el.innerHTML = irrigationPresetNames
+    .map(name => `<option value="${name.replace(/"/g, '&quot;')}">${name}</option>`)
+    .join('');
+  if (irrigationPresetNames.includes(current)) el.value = current;
 }
 
 function buildPreviewState() {
@@ -931,6 +957,7 @@ function renderIrrigation() {
   const list = $('irrProgramList');
   if (!list || !irrigationState) return;
   const programs = irrigationState.programs || [];
+  renderQuickPrograms(programs);
   if (!programs.length) {
     list.innerHTML = '<div class="text-sm text-slate-400 text-center py-4">Noch keine Programme</div>';
   } else {
@@ -974,11 +1001,31 @@ function renderIrrigation() {
   }
 }
 
+function renderQuickPrograms(programs) {
+  const box = $('deckQuickPrograms');
+  if (!box) return;
+  const quick = programs.slice(0, 3).map(p => ({
+    id: p.id,
+    label: p.name,
+    icon: 'sprinkler',
+    cls: 'bg-emerald-600 hover:bg-emerald-500',
+  }));
+  quick.push({ id: '__normal__', label: 'Normal', icon: 'water_pump', cls: 'bg-blue-600 hover:bg-blue-500' });
+  box.innerHTML = quick.map(item => `
+    <button onclick="${item.id === '__normal__' ? 'applyNormalPreset()' : `runIrrigation('${item.id}')`}"
+      class="h-11 rounded-xl ${item.cls} text-white flex items-center justify-center gap-1.5 text-xs font-bold min-w-0"
+      title="${item.label}">
+      <span class="material-symbols-outlined text-base">${item.icon}</span>
+      <span class="truncate">${item.label}</span>
+    </button>
+  `).join('');
+}
+
 window.runIrrigation = async (id) => {
   const r = await authFetch(`/api/irrigation/programs/${encodeURIComponent(id)}/run`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ forceWeather: true })
+    body: JSON.stringify({ forceWeather: false })
   });
   const d = await r.json();
   $toast.show(d.ok ? 'Bewässerung gestartet' : (d.error || 'Start gesperrt'), d.ok ? 'info' : 'error');
@@ -990,6 +1037,16 @@ window.stopIrrigation = async (id) => {
   const d = await r.json();
   $toast.show(d.ok ? 'Bewässerung gestoppt' : (d.error || 'Stop fehlgeschlagen'), d.ok ? 'info' : 'error');
   loadIrrigation();
+};
+
+window.applyNormalPreset = async () => {
+  const res = await authFetch('/api/preset/apply', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: 'Normal' })
+  });
+  const d = await res.json();
+  $toast.show(d.ok || d.success ? 'Normal geladen' : (d.error || 'Preset nicht verfügbar'), d.ok || d.success ? 'info' : 'error');
 };
 
 window.editIrrigation = (id) => {
@@ -1006,11 +1063,28 @@ window.editIrrigation = (id) => {
   const z = p.zones?.[0] || {};
   $('irrZoneName').value = z.name || '';
   $('irrZoneMin').value = z.duration_min || 10;
-  $('irrZonePreset').value = z.preset || 'Normal';
+  renderIrrigationPresetOptions(z.preset || 'Normal');
   $('irrZoneWater').value = z.water_mm || 6;
   $('irrMinDeficit').value = z.min_deficit_mm || 8;
   $('irrTargetMm').value = z.target_mm || 12;
+  updateIrrigationRuntimePreview();
 };
+
+function updateIrrigationRuntimePreview() {
+  const el = $('irrRuntimePreview');
+  if (!el) return;
+  const mode = $('irrMode')?.value || 'smart_et';
+  const baseMin = parseFloat($('irrZoneMin')?.value) || 10;
+  const baseMm = parseFloat($('irrZoneWater')?.value) || 6;
+  const minDef = parseFloat($('irrMinDeficit')?.value) || 8;
+  const target = parseFloat($('irrTargetMm')?.value) || 12;
+  const calcMin = Math.max(1, Math.round(baseMin * Math.min(target, Math.max(target, minDef)) / Math.max(baseMm, 0.1)));
+  if (mode === 'smart_et') {
+    el.textContent = `Smart ET: ${baseMin} min liefern ca. ${baseMm} mm. Start ab ${minDef} mm Defizit, Ziel ${target} mm => typischer Lauf ca. ${calcMin} min.`;
+  } else {
+    el.textContent = `Festprogramm: läuft an den gewählten Tagen mit ${baseMin} min Basisdauer.`;
+  }
+}
 
 async function saveIrrigationProgram() {
   const current = irrigationState?.programs || [];
@@ -1064,6 +1138,11 @@ async function saveIrrigationProgram() {
 
 $('btnIrrRefresh').onclick = loadIrrigation;
 $('btnIrrSave').onclick = saveIrrigationProgram;
+['irrMode', 'irrZoneMin', 'irrZoneWater', 'irrMinDeficit', 'irrTargetMm'].forEach(id => {
+  const el = $(id);
+  if (el) el.addEventListener('input', updateIrrigationRuntimePreview);
+  if (el) el.addEventListener('change', updateIrrigationRuntimePreview);
+});
 
 // ─── Timeguard ───
 async function loadTimeguard() {

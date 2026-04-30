@@ -219,7 +219,7 @@ router.post('/irrigation/programs', (req, res) => {
 router.post('/irrigation/programs/:id/run', (req, res) => {
   const result = irrigation.runProgram(req.params.id, {
     manual: true,
-    forceWeather: req.body?.forceWeather !== false,
+    forceWeather: req.body?.forceWeather === true,
   });
   res.status(result.ok ? 200 : 409).json(result);
 });

@@ -335,7 +335,7 @@ function evaluateProgram(program, opts = {}) {
   if (!opts.manual && !program.enabled) {
     return { allowed: false, reason: 'Programm deaktiviert', runtime_factor: 0, water_budget_mm: 0 };
   }
-  if (!opts.manual && !opts.forceWeather && program.mode === 'smart_et') {
+  if (!opts.forceWeather && program.mode === 'smart_et') {
     updateWaterBalance(program);
     const count = weeklyRunCount(program);
     if (count >= program.max_runs_per_week) {

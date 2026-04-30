@@ -937,6 +937,8 @@ function renderIrrigation() {
     list.innerHTML = programs.map(p => {
       const zones = (p.zones || []).map(z => `${z.name} · ${z.duration_min} min · ${z.preset || 'Normal'}`).join('<br>');
       const days = ['Mo','Di','Mi','Do','Fr','Sa','So'].filter((_, i) => p.days?.[i]).join(' ');
+      const modeLabel = p.mode === 'smart_et' ? `Smart ET · max ${p.max_runs_per_week || 3}x/Woche` : 'Festprogramm';
+      const maxDeficit = Math.max(0, ...(p.zones || []).map(z => Number(z.deficit_mm || 0)));
       return `
         <div class="rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 p-3">
           <div class="flex items-start justify-between gap-3">
@@ -944,7 +946,7 @@ function renderIrrigation() {
               <div class="font-bold text-slate-800 dark:text-white flex items-center gap-2">
                 <span class="material-symbols-outlined text-emerald-500 text-lg">sprinkler</span>${p.name}
               </div>
-              <div class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-1">${days || 'keine Tage'} · ${String(p.start_hour).padStart(2,'0')}:${String(p.start_min).padStart(2,'0')}</div>
+              <div class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-1">${modeLabel} · ${days || 'keine Tage'} · ${String(p.start_hour).padStart(2,'0')}:${String(p.start_min).padStart(2,'0')}</div>
               <div class="text-xs text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">${zones || 'Keine Zone'}</div>
             </div>
             <div class="flex gap-1 shrink-0">
@@ -955,7 +957,7 @@ function renderIrrigation() {
           </div>
           <div class="mt-3 flex items-center justify-between text-[10px] text-slate-400">
             <span>${p.enabled ? 'Automatik aktiv' : 'Automatik aus'}</span>
-            <span>${p.last_skip_reason || p.last_run_at ? fmtDateTime(p.last_run_at) : 'Noch kein Lauf'}</span>
+            <span>${p.mode === 'smart_et' ? `${maxDeficit.toFixed(1)} mm Defizit` : (p.last_skip_reason || p.last_run_at ? fmtDateTime(p.last_run_at) : 'Noch kein Lauf')}</span>
           </div>
         </div>`;
     }).join('');
@@ -995,6 +997,8 @@ window.editIrrigation = (id) => {
   if (!p) return;
   $('irrName').value = p.name;
   $('irrStart').value = `${String(p.start_hour).padStart(2,'0')}:${String(p.start_min).padStart(2,'0')}`;
+  $('irrMode').value = p.mode || 'fixed';
+  $('irrMaxRuns').value = p.max_runs_per_week || 3;
   (p.days || []).forEach((d, i) => { if ($('irrDay' + i)) $('irrDay' + i).checked = !!d; });
   $('irrSeason').value = p.seasonal_factor || 1;
   $('irrSkipRain').value = p.thresholds?.skip_rain_mm ?? 6;
@@ -1003,6 +1007,9 @@ window.editIrrigation = (id) => {
   $('irrZoneName').value = z.name || '';
   $('irrZoneMin').value = z.duration_min || 10;
   $('irrZonePreset').value = z.preset || 'Normal';
+  $('irrZoneWater').value = z.water_mm || 6;
+  $('irrMinDeficit').value = z.min_deficit_mm || 8;
+  $('irrTargetMm').value = z.target_mm || 12;
 };
 
 async function saveIrrigationProgram() {
@@ -1014,11 +1021,13 @@ async function saveIrrigationProgram() {
     id,
     name,
     enabled: true,
+    mode: $('irrMode').value || 'smart_et',
     days: Array.from({ length: 7 }, (_, i) => $('irrDay' + i).checked),
     start_hour: h || 0,
     start_min: m || 0,
     seasonal_factor: parseFloat($('irrSeason').value) || 1,
     weather_enabled: true,
+    max_runs_per_week: parseInt($('irrMaxRuns').value) || 3,
     thresholds: {
       skip_rain_mm: parseFloat($('irrSkipRain').value) || 6,
       reduce_rain_mm: 2,
@@ -1031,7 +1040,9 @@ async function saveIrrigationProgram() {
       name: $('irrZoneName').value.trim() || 'Zone 1',
       enabled: true,
       duration_min: parseFloat($('irrZoneMin').value) || 10,
-      water_mm: 6,
+      water_mm: parseFloat($('irrZoneWater').value) || 6,
+      min_deficit_mm: parseFloat($('irrMinDeficit').value) || 8,
+      target_mm: parseFloat($('irrTargetMm').value) || 12,
       preset: $('irrZonePreset').value.trim() || 'Normal',
     }]
   };

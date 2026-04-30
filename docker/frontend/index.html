@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
   <link rel="manifest" href="/manifest.json"/>
   <title>Brunnenpumpe</title>
-  <link rel="stylesheet" href="/styles.css?v=12"/>
+  <link rel="stylesheet" href="/styles.css?v=13"/>
   <link href="https://fonts.googleapis.com" rel="preconnect"/>
   <link crossorigin href="https://fonts.gstatic.com" rel="preconnect"/>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Manrope:wght@400;500;700&family=Inter:wght@400;500;700&display=swap" rel="stylesheet"/>
@@ -677,10 +677,24 @@
                 <div class="sidebar-field"><label class="sidebar-label">Name</label><input id="irrName" class="sidebar-input" placeholder="Garten"></div>
                 <div class="sidebar-field"><label class="sidebar-label">Start</label><input id="irrStart" class="sidebar-input" type="time" value="06:00"></div>
               </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div class="sidebar-field"><label class="sidebar-label">Modus</label>
+                  <select id="irrMode" class="sidebar-input">
+                    <option value="smart_et">Smart ET · tief & selten</option>
+                    <option value="fixed">Fest · Tage & Dauer</option>
+                  </select>
+                </div>
+                <div class="sidebar-field"><label class="sidebar-label">Max/Woche</label><input id="irrMaxRuns" class="sidebar-input" type="number" min="1" max="7" value="3"></div>
+              </div>
               <div class="grid grid-cols-3 gap-2">
                 <div class="sidebar-field"><label class="sidebar-label">Zone</label><input id="irrZoneName" class="sidebar-input" placeholder="Rasen"></div>
                 <div class="sidebar-field"><label class="sidebar-label">Minuten</label><input id="irrZoneMin" class="sidebar-input" type="number" min="1" value="10"></div>
                 <div class="sidebar-field"><label class="sidebar-label">Preset</label><input id="irrZonePreset" class="sidebar-input" placeholder="Normal"></div>
+              </div>
+              <div class="grid grid-cols-3 gap-2">
+                <div class="sidebar-field"><label class="sidebar-label">Basis mm</label><input id="irrZoneWater" class="sidebar-input" type="number" min="0.1" step="0.5" value="6"></div>
+                <div class="sidebar-field"><label class="sidebar-label">Start ab mm</label><input id="irrMinDeficit" class="sidebar-input" type="number" min="0.1" step="0.5" value="8"></div>
+                <div class="sidebar-field"><label class="sidebar-label">Ziel mm</label><input id="irrTargetMm" class="sidebar-input" type="number" min="0.1" step="0.5" value="12"></div>
               </div>
               <div>
                 <label class="sidebar-label mb-2 block">Tage</label>
@@ -746,6 +760,6 @@
     </div>
   </div>
 
-  <script src="/app.js?v=12"></script>
+  <script src="/app.js?v=13"></script>
 </body>
 </html>

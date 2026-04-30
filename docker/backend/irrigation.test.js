@@ -21,6 +21,7 @@ function resetState() {
     et0_mm: 3,
     soil_moisture_pct: null,
   });
+  state.irrigation.history = [];
 }
 
 function program(overrides = {}) {
@@ -41,6 +42,25 @@ function program(overrides = {}) {
     },
     zones: [],
   }, overrides);
+}
+
+function smartProgram(overrides = {}) {
+  return program(Object.assign({
+    mode: 'smart_et',
+    max_runs_per_week: 3,
+    last_balance_date: new Date().toISOString().slice(0, 10),
+    zones: [{
+      id: 'garten',
+      name: 'Garten',
+      enabled: true,
+      duration_min: 30,
+      water_mm: 10,
+      min_deficit_mm: 8,
+      target_mm: 12,
+      deficit_mm: 9,
+      preset: 'Rasen',
+    }],
+  }, overrides));
 }
 
 test('skips when rain forecast and measured rain exceed threshold', () => {
@@ -84,4 +104,51 @@ test('blocks when safety layer reports vacation mode', () => {
 
   assert.equal(decision.allowed, false);
   assert.equal(decision.reason, 'Urlaubsmodus');
+});
+
+test('smart ET waits until zone deficit reaches minimum threshold', () => {
+  resetState();
+
+  const decision = irrigation.evaluateProgram(smartProgram({
+    zones: [{
+      id: 'garten',
+      name: 'Garten',
+      enabled: true,
+      duration_min: 30,
+      water_mm: 10,
+      min_deficit_mm: 8,
+      target_mm: 12,
+      deficit_mm: 6,
+      preset: 'Rasen',
+    }],
+  }));
+
+  assert.equal(decision.allowed, false);
+  assert.equal(decision.reason, 'Defizit zu gering');
+});
+
+test('smart ET allows deep watering and returns zone runtime', () => {
+  resetState();
+
+  const decision = irrigation.evaluateProgram(smartProgram());
+
+  assert.equal(decision.allowed, true);
+  assert.equal(decision.reason, 'Smart ET Freigabe');
+  assert.deepEqual(decision.zone_ids, ['garten']);
+  assert.ok(decision.zone_runtimes.garten.runtime_s > 0);
+});
+
+test('smart ET blocks when weekly run limit is reached', () => {
+  resetState();
+  const p = smartProgram({ max_runs_per_week: 2 });
+  const thisWeek = new Date();
+  state.irrigation.history = [
+    { type: 'run', result: 'completed', program_id: p.id, at: thisWeek.toISOString() },
+    { type: 'run', result: 'completed', program_id: p.id, at: thisWeek.toISOString() },
+  ];
+
+  const decision = irrigation.evaluateProgram(p);
+
+  assert.equal(decision.allowed, false);
+  assert.equal(decision.reason, 'Wochenlimit erreicht');
 });

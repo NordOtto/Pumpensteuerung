@@ -13,7 +13,10 @@
       "Bash(cmd /c \"reg query HKLM\\\\HARDWARE\\\\DEVICEMAP\\\\SERIALCOMM 2>/dev/null\")",
       "Bash(ls /c/Users/otto1/.platformio/penv/Scripts/pio*)",
       "Bash(ls /c/Users/otto1/AppData/Local/Programs/platformio/penv/Scripts/pio*)",
-      "Bash(~/.platformio/penv/Scripts/pio.exe run:*)"
+      "Bash(~/.platformio/penv/Scripts/pio.exe run:*)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
     ]
   }
 }

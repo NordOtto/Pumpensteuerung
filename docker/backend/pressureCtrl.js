@@ -523,4 +523,10 @@ function setManualStop(v) {
   }
 }
 
-module.exports = { load, save, setConfig, resetDryrun, setVacation, tick, resetIntegral, setManualStop };
+function forceStop() {
+  pumpState = 0;
+  resetIntegral();
+  mqtt.sendCmd('v20/stop', '1');
+}
+
+module.exports = { load, save, setConfig, resetDryrun, setVacation, tick, resetIntegral, setManualStop, forceStop };

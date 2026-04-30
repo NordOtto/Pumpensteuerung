@@ -131,9 +131,9 @@ function apply(name) {
   }
 
   // mode 0/1: PI re-konfigurieren und aktivieren
-  // Wenn von Fix-Frequenz-Modus gewechselt wird: Pumpe sofort stoppen
+  // Wenn von Fix-Frequenz-Modus gewechselt wird: Pumpe stoppen + internen State sync
   if (state.ctrl_mode === 2) {
-    mqtt.sendCmd('v20/stop', '1');
+    pi.forceStop();
   }
   pi.setConfig({
     enabled:  true,

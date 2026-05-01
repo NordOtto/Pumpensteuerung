@@ -285,6 +285,20 @@ class PressureController:
         running = st.v20.running
         freq = st.v20.frequency
 
+        # ── Flow-Schätzung im Totbereich ──
+        # Muss VOR den flow-basierten Stop-Checks (Überdruck, No-demand, Dry-run)
+        # berechnet werden. Sensor-Untergrenze ist 5 L/min — bei niedriger
+        # Echtentnahme (3–4 L/min) liefert er 0, was die Stop-Checks fälschlich
+        # triggert ("Pumpe pendelt bei kleiner Wasserentnahme"). effective_flow
+        # nutzt stattdessen die V20-Frequenz als Schätzwert: bei 35–50 Hz
+        # ergibt das 2.8–4 L/min, was über der 1 L/min-Schwelle liegt.
+        effective_flow = flow
+        if flow < 1.0 and running and freq > 0:
+            effective_flow = (freq / 50.0) * 4.0
+            st.flow_estimated = True
+        else:
+            st.flow_estimated = False
+
         # ── Spike-Detect ──
         self._spike_buf[self._spike_idx] = pressure
         self._spike_idx = (self._spike_idx + 1) % SPIKE_SLOTS
@@ -310,7 +324,7 @@ class PressureController:
 
         # ── Überdruck-Stop ──
         if (running and self._pump_state == 2
-                and pressure > pi.setpoint + OVERPRESSURE_HYSTERESIS and flow < 1.0):
+                and pressure > pi.setpoint + OVERPRESSURE_HYSTERESIS and effective_flow < 1.0):
             web_log(
                 f"[PI] Überdruck-Stop: {pressure:.2f} > {pi.setpoint}+"
                 f"{OVERPRESSURE_HYSTERESIS} bar bei flow<1 – V20 STOP"
@@ -319,36 +333,28 @@ class PressureController:
             self._reset_integral()
             return
 
-        # ── Flow-Schätzung im Totbereich ──
-        effective_flow = flow
-        if flow < 1.0 and running and freq > 0:
-            effective_flow = (freq / 50.0) * 4.0
-            st.flow_estimated = True
-        else:
-            st.flow_estimated = False
-
         # ── No-demand Shutdown ──
-        if flow < 1.0 and pressure >= pi.setpoint:
+        if effective_flow < 1.0 and pressure >= pi.setpoint:
             if self._no_flow_since == 0:
                 self._no_flow_since = now
             if (now - self._no_flow_since) > NO_DEMAND_S * 1000:
                 if running:
                     web_log(
-                        f"[PI] No-demand: flow={flow:.1f} + Druck {pressure:.2f} bar "
+                        f"[PI] No-demand: flow={effective_flow:.1f} + Druck {pressure:.2f} bar "
                         f"≥ SP → Pumpe STOP"
                     )
                     self._on_stop()
                 self._reset_integral()
                 self._no_flow_since = 0
                 return
-        elif flow >= 1.0:
+        elif effective_flow >= 1.0:
             self._no_flow_since = 0
 
         # ── Dry-run Protection ──
         if self._dry_run_grace_until > 0 and now >= self._dry_run_grace_until:
             self._dry_run_grace_until = 0
             web_log("[PI] Trockenlauf Grace-Period abgelaufen")
-        if (self._dry_run_grace_until == 0 and flow < 1.0
+        if (self._dry_run_grace_until == 0 and effective_flow < 1.0
                 and running and pressure < pi.setpoint):
             if self._dry_run_no_flow_since == 0:
                 self._dry_run_no_flow_since = now
@@ -490,8 +496,13 @@ class PressureController:
             self._last_pressure_ts = 0
             return
 
+        # effective_flow auch im Fix-Hz-Modus, Begründung siehe tick().
+        eff_flow = st.flow_rate
+        if st.flow_rate < 1.0 and st.v20.running and st.v20.frequency > 0:
+            eff_flow = (st.v20.frequency / 50.0) * 4.0
+
         if (expected > 0 and st.v20.running
-                and st.pressure_bar > expected + OVERPRESSURE_HYSTERESIS and st.flow_rate < 1.0):
+                and st.pressure_bar > expected + OVERPRESSURE_HYSTERESIS and eff_flow < 1.0):
             web_log(
                 f"[PI] Überdruck-Stop (Fix-Hz): {st.pressure_bar:.2f} > "
                 f"{expected}+{OVERPRESSURE_HYSTERESIS} bar – Stop"
@@ -500,7 +511,7 @@ class PressureController:
             return
 
         if (expected > 0 and self._dry_run_grace_until == 0
-                and st.flow_rate < 1.0 and st.v20.running
+                and eff_flow < 1.0 and st.v20.running
                 and st.pressure_bar < expected * 0.5):
             if self._dry_run_no_flow_since == 0:
                 self._dry_run_no_flow_since = now

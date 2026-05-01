@@ -86,6 +86,15 @@ function clamp(val, min, max) {
   return Math.max(min, Math.min(max, val));
 }
 
+// Aktive Bewässerung? Während ein Programm läuft, sollen die "harten"
+// Stop-Mechanismen (Überdruck p_off, Hahn-zu-Spike, No-demand-Timer)
+// pausiert oder entschärft werden — sonst pendelt die Pumpe bei jedem
+// Magnetventil-Wechsel zwischen den Zonen. Sicherheitsnetz: Trockenlauf,
+// Druck-Timeout, der Setpoint+Hysterese-Stop mit flow<1 bleiben aktiv.
+function irrigationActive() {
+  return !!(state.irrigation && state.irrigation.decision && state.irrigation.decision.running);
+}
+
 // ── Konfiguration lesen/schreiben ──
 async function load() {
   try {
@@ -330,7 +339,7 @@ function tick() {
   spikeBufIdx = (spikeBufIdx + 1) % SPIKE_SLOTS;
   if (spikeBufIdx === 0) spikeBufFilled = true;
 
-  if (running && pumpState === 2 && pi.spike_enabled && (spikeBufFilled || spikeBufIdx > 0)) {
+  if (running && pumpState === 2 && pi.spike_enabled && !irrigationActive() && (spikeBufFilled || spikeBufIdx > 0)) {
     const windowSlots = Math.min(Math.round(pi.spike_window_s / DT), SPIKE_SLOTS - 1);
     // Ältester Wert im Fenster: SPIKE_SLOTS Slots zurück vom aktuellen Schreibzeiger
     const oldIdx = (spikeBufIdx - 1 - windowSlots + SPIKE_SLOTS * 2) % SPIKE_SLOTS;
@@ -367,9 +376,12 @@ function tick() {
 
   // ── No-demand Shutdown ──
   // Echten Sensorwert nutzen – effectiveFlow wäre hier immer >= 1.0 (Schätzung)
+  // Während aktiver Bewässerung Timer auf 30s erhöhen, weil Magnetventile
+  // zwischen den Zonen kurz alle zu sind und 5s nicht ausreichen.
+  const noDemandTimeoutS = irrigationActive() ? 30 : NO_DEMAND_S;
   if (flow < 1.0 && pressure >= pi.setpoint) {
     if (noFlowSince === 0) noFlowSince = now;
-    if ((now - noFlowSince) > NO_DEMAND_S * 1000) {
+    if ((now - noFlowSince) > noDemandTimeoutS * 1000) {
       if (running) {
         webLog(`[PI] No-demand: flow=${flow.toFixed(1)} + Druck ${pressure.toFixed(2)} bar ≥ SP → Pumpe STOP`);
         mqtt.sendCmd('v20/stop', '1');
@@ -435,7 +447,11 @@ function tick() {
     }
 
     // pumpState === 2: PI läuft
-    if (pressure >= pi.p_off) {
+    // Während aktiver Bewässerung wird der p_off-Stop nicht ausgelöst — der
+    // PI-Regler soll die Frequenz runterdrosseln statt komplett zu stoppen.
+    // Echte Überdruck-Notfälle fängt der Setpoint+OVERPRESSURE_HYSTERESIS-
+    // Block weiter oben (mit flow<1 Guard) sicher ab.
+    if (pressure >= pi.p_off && !irrigationActive()) {
       webLog(`[PI] Ausschaltdruck überschritten (${pressure.toFixed(2)} bar > ${pi.p_off} bar) – STOP`);
       mqtt.sendCmd('v20/stop', '1');
       resetIntegral();

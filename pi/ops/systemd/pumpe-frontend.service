@@ -1,0 +1,24 @@
+[Unit]
+Description=Pumpe Frontend (Next.js)
+After=network-online.target pumpe-backend.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pumpe
+Group=pumpe
+WorkingDirectory=/opt/pumpe/current/frontend
+Environment=NODE_ENV=production
+Environment=PORT=3001
+Environment=HOSTNAME=127.0.0.1
+ExecStart=/usr/bin/node /opt/pumpe/current/frontend/.next/standalone/server.js
+Restart=always
+RestartSec=3
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

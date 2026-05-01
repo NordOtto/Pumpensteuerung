@@ -1,0 +1,104 @@
+name: Pi Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release-Tag (z.B. v1.2.3)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set tag
+        id: tag
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "TAG=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "TAG=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ── Backend (Python — keine Native-Builds, requirements.txt in den Tarball) ──
+      - name: Generate backend requirements.txt
+        run: |
+          cd pi/backend
+          # pyproject.toml → requirements.txt extrahieren
+          python -c "
+          import tomllib
+          with open('pyproject.toml','rb') as f: cfg = tomllib.load(f)
+          for d in cfg['project']['dependencies']: print(d)
+          " > requirements.txt
+          cat requirements.txt
+
+      # ── Frontend (Next.js standalone) ──
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: pi/frontend/package-lock.json
+
+      - name: Build frontend
+        run: |
+          cd pi/frontend
+          npm ci
+          npm run build
+          # standalone build verschieben damit Layout zur OTA-Struktur passt
+          cp -r .next/static .next/standalone/.next/static
+          cp -r public .next/standalone/public 2>/dev/null || true
+
+      # ── Tarball ──
+      - name: Build release tarball
+        run: |
+          mkdir -p dist/release
+          mkdir -p dist/release/backend
+          mkdir -p dist/release/frontend
+          cp -r pi/backend/app dist/release/backend/
+          cp pi/backend/pyproject.toml dist/release/backend/
+          cp pi/backend/requirements.txt dist/release/backend/
+          cp pi/backend/.env.example dist/release/backend/
+          cp -r pi/frontend/.next dist/release/frontend/
+          cp pi/frontend/package.json dist/release/frontend/
+          cd dist
+          tar -czf "pumpe-${{ steps.tag.outputs.TAG }}.tar.gz" -C release .
+          sha256sum "pumpe-${{ steps.tag.outputs.TAG }}.tar.gz" > "pumpe-${{ steps.tag.outputs.TAG }}.tar.gz.sha256"
+
+      # ── Signatur (minisign) ──
+      - name: Install minisign
+        run: sudo apt-get update && sudo apt-get install -y minisign
+
+      - name: Sign tarball
+        env:
+          MINISIGN_KEY: ${{ secrets.MINISIGN_KEY }}
+          MINISIGN_PASSWORD: ${{ secrets.MINISIGN_PASSWORD }}
+        run: |
+          if [[ -z "${MINISIGN_KEY:-}" ]]; then
+            echo "::warning::MINISIGN_KEY secret nicht gesetzt — Release wird unsigniert hochgeladen"
+            exit 0
+          fi
+          mkdir -p ~/.minisign
+          echo "$MINISIGN_KEY" > ~/.minisign/minisign.key
+          chmod 600 ~/.minisign/minisign.key
+          echo "$MINISIGN_PASSWORD" | minisign -S \
+            -s ~/.minisign/minisign.key \
+            -m "dist/pumpe-${{ steps.tag.outputs.TAG }}.tar.gz"
+
+      # ── Release publishen ──
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.TAG }}
+          name: Pumpe ${{ steps.tag.outputs.TAG }}
+          generate_release_notes: true
+          files: |
+            dist/pumpe-${{ steps.tag.outputs.TAG }}.tar.gz
+            dist/pumpe-${{ steps.tag.outputs.TAG }}.tar.gz.sha256
+            dist/pumpe-${{ steps.tag.outputs.TAG }}.tar.gz.minisig

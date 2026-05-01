@@ -124,8 +124,9 @@ sudo apt install -y avahi-daemon   # → pumpe.local funktioniert
 ### 2.3 Repo klonen + Setup-Skript ausführen
 
 ```bash
-git clone https://github.com/NordOtto/modbus_logo.git /tmp/modbus_logo
-sudo bash /tmp/modbus_logo/pi/ops/setup.sh
+sudo apt update && sudo apt install git -y
+git clone -b pi-migration https://github.com/NordOtto/Pumpensteuerung.git /tmp/pumpensteuerung
+sudo bash /tmp/pumpensteuerung/pi/ops/setup.sh
 ```
 
 Das Skript macht in einem Rutsch (~15 min):
@@ -289,7 +290,7 @@ ssh pumpe@pumpe.local
 sudo -u pumpe nano /opt/pumpe/ota/config.env
 ```
 ```ini
-GITHUB_REPO=NordOtto/modbus_logo
+GITHUB_REPO=NordOtto/Pumpensteuerung
 MINISIGN_PUBKEY=/opt/pumpe/ota/minisign.pub
 ```
 

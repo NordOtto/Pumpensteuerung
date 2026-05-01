@@ -56,6 +56,7 @@ mkdir -p "$TARGET"/{backend,frontend}
 cp -r "$REPO_DIR/pi/backend/app" "$TARGET/backend/"
 cp "$REPO_DIR/pi/backend/pyproject.toml" "$TARGET/backend/"
 cp "$REPO_DIR/pi/backend/.env.example" "$TARGET/backend/.env"
+chown -R "$PI_USER":"$PI_USER" "$TARGET"
 sudo -u "$PI_USER" python3 -m venv "$TARGET/backend/.venv"
 sudo -u "$PI_USER" "$TARGET/backend/.venv/bin/pip" install --upgrade pip --quiet
 sudo -u "$PI_USER" "$TARGET/backend/.venv/bin/pip" install -e "$TARGET/backend" --quiet

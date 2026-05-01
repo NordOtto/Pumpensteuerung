@@ -29,10 +29,10 @@ und am Laufen zu halten.
 # 1) Pi vorbereiten: Raspbian Bookworm Lite, statische IP, SSH+Schlüssel.
 
 # 2) Repo aufs Pi:
-git clone https://github.com/NordOtto/modbus_logo.git /tmp/modbus_logo
+git clone -b pi-migration https://github.com/NordOtto/Pumpensteuerung.git /tmp/pumpensteuerung
 
 # 3) Setup-Skript:
-sudo bash /tmp/modbus_logo/pi/ops/setup.sh
+sudo bash /tmp/pumpensteuerung/pi/ops/setup.sh
 
 # 4) .env anpassen (MQTT-Credentials, ggf. RTU_PORT):
 sudo -u pumpe nano /opt/pumpe/current/backend/.env
@@ -60,7 +60,7 @@ sudo -u pumpe cp minisign.pub /opt/pumpe/ota/minisign.pub
 
 # 2) config.env anpassen:
 sudo -u pumpe nano /opt/pumpe/ota/config.env
-# GITHUB_REPO=NordOtto/modbus_logo
+# GITHUB_REPO=NordOtto/Pumpensteuerung
 
 # 3) Timer aktivieren:
 sudo systemctl enable --now pumpe-ota.timer

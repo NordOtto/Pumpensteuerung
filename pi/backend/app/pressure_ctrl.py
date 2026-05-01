@@ -312,7 +312,8 @@ class PressureController:
         # z.B. 2.0 auf 2.4 bar wurde als "Hahn zu" interpretiert, obwohl der
         # Sollwert 3.0 bar noch gar nicht erreicht ist.
         spike_armed = (
-            pressure >= max(pi.p_on, pi.setpoint - SPIKE_MIN_SETPOINT_MARGIN)
+            pressure >= pi.setpoint + SPIKE_MIN_SETPOINT_MARGIN
+            and flow < 1.0
             and (now - self._start_sent_at) > SPIKE_STARTUP_SUPPRESS_S * 1000
         )
         if (running and self._pump_state == 2 and pi.spike_enabled and spike_armed
@@ -385,6 +386,21 @@ class PressureController:
         # ── Druck-Modus (ctrl_mode=0) Pumpenlogik ──
         if pi.ctrl_mode == 0:
             if self._pump_state == 0:
+                if running:
+                    if pressure >= pi.setpoint:
+                        web_log(
+                            f"[PI] V20 läuft ohne aktiven Regler bei {pressure:.2f} bar – STOP"
+                        )
+                        self._on_stop()
+                        self._reset_integral()
+                        return
+                    web_log("[PI] V20 läuft bereits – Regler übernimmt")
+                    self._pump_state = 2
+                    self._dry_run_grace_until = now + DRY_RUN_GRACE_S * 1000
+                    self._dry_run_no_flow_since = 0
+                    pi.pump_state = self._pump_state
+                    pi.active = False
+                    return
                 if (not self._manual_stopped) and pressure > 0 and pressure < pi.p_on:
                     web_log(
                         f"[PI] Einschaltdruck unterschritten ({pressure:.2f} bar < {pi.p_on} bar) – START"

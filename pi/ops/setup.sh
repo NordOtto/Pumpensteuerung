@@ -66,7 +66,7 @@ sudo -u "$PI_USER" "$TARGET/backend/.venv/bin/pip" install -e "$TARGET/backend" 
 # Frontend
 echo "  Frontend bauen (kann auf dem Pi 3B+ ein paar Minuten dauern)"
 cp -r "$REPO_DIR/pi/frontend" "$TARGET/frontend.src"
-( cd "$TARGET/frontend.src" && npm ci && npm run build )
+( cd "$TARGET/frontend.src" && npm ci --legacy-peer-deps && npm run build )
 mkdir -p "$TARGET/frontend/.next"
 cp -r "$TARGET/frontend.src/.next/standalone" "$TARGET/frontend/.next/standalone"
 cp -r "$TARGET/frontend.src/.next/static" "$TARGET/frontend/.next/standalone/.next/static"

@@ -302,6 +302,7 @@ class IrrigationManager:
         w.updated_at = _now_iso()
         self._save_weather()
         self.recompute_decision()
+        web_log("[IRR] Wetterdaten via MQTT/API aktualisiert")
         return True
 
     # ── Sicherheits-Vorprüfung ────────────────────────────────

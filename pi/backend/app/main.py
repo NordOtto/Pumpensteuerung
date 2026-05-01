@@ -51,6 +51,7 @@ irrigation = IrrigationManager(
     v20_stop=_on_stop,
     presets_apply=preset_mgr.apply,
 )
+_main_loop: asyncio.AbstractEventLoop | None = None
 
 
 # ── Periodische Tasks ─────────────────────────────────────────
@@ -142,11 +143,19 @@ async def _pressure_log_loop():
 def _on_mqtt_command(topic: str, payload: str) -> None:
     """Behandelt cmd/* und HA-set-Topics. Läuft im paho-Thread —
     Modbus-Calls als asyncio-Tasks queuen."""
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        return
     base = settings.mqtt_topic_prefix
+
+    if topic.startswith(f"{base}/irrigation/"):
+        # Bewässerungs-Topics benötigen keinen asyncio-Loop. Wichtig: Der
+        # paho-Callback läuft in einem Thread ohne Eventloop, daher darf diese
+        # Verarbeitung nicht hinter asyncio.get_event_loop() hängen.
+        irrigation.handle_mqtt(topic, payload)
+        return
+
+    loop = _main_loop
+    if loop is None:
+        web_log(f"[MQTT] Befehl verworfen, Eventloop noch nicht bereit: {topic}")
+        return
 
     if topic == f"{base}/cmd/v20/start":
         asyncio.run_coroutine_threadsafe(modbus_rtu.client.start(), loop)
@@ -170,14 +179,13 @@ def _on_mqtt_command(topic: str, payload: str) -> None:
         pi_ctrl.set_config({"enabled": payload.upper() == "ON"})
     elif topic == f"{base}/vacation/set":
         pi_ctrl.set_vacation(payload.upper() == "ON")
-    elif topic.startswith(f"{base}/irrigation/"):
-        # Bewässerungs-Topics (start/stop/zone-state/weather-input) — IrrigationManager
-        irrigation.handle_mqtt(topic, payload)
 
 
 # ── FastAPI-App ───────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global _main_loop
+    _main_loop = asyncio.get_running_loop()
     # Dependency-Container für REST-Routen befüllen
     deps.pi_ctrl = pi_ctrl
     deps.preset_mgr = preset_mgr

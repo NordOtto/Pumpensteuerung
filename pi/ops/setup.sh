@@ -15,19 +15,21 @@ PI_USER="pumpe"
 
 echo "[1/9] System-Pakete installieren"
 apt-get update
+# Node 20 von NodeSource (Bookworm liefert nur Node 18, Next 15 braucht 20+).
+# WICHTIG: NodeSource-Repo VOR apt-get install einrichten, sonst zieht Debians
+# 'npm' libnode108 rein und kollidiert mit dem späteren nodesource-nodejs.
+# nodesource-nodejs bringt npm bereits mit — kein separates npm-Paket nötig.
+if ! command -v node >/dev/null 2>&1 || ! node -v | grep -qE "^v(20|22)\."; then
+    echo "  NodeSource Node 20 Repo einrichten"
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+fi
 apt-get install -y --no-install-recommends \
     python3 python3-venv python3-pip \
-    nodejs npm \
+    nodejs \
     nginx \
     minisign jq curl \
     openssl \
     git
-# Hinweis: Raspbian Bookworm liefert Node 18 — für Next 15 brauchen wir Node 20.
-if ! node -v | grep -qE "^v(20|22)\."; then
-    echo "[1/9] Node 20 nachinstallieren"
-    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-    apt-get install -y nodejs
-fi
 
 echo "[2/9] User '$PI_USER' anlegen"
 id -u "$PI_USER" >/dev/null 2>&1 || useradd -r -s /usr/sbin/nologin -m -d /home/"$PI_USER" "$PI_USER"

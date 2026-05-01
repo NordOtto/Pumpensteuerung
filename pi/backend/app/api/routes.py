@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from ..state import app_state, log_buffer, log_seq
 from ..storage import get_pressure_history
+from ..irrigation_wizard import recommend_smart_et
 from .deps import deps
 
 router = APIRouter(prefix="/api")
@@ -162,6 +163,11 @@ async def irrigation_status_get():
     return deps.irrigation.get_status()
 
 
+@router.post("/irrigation/wizard/recommend")
+async def irrigation_wizard_recommend(body: dict):
+    return recommend_smart_et(body or {})
+
+
 class RunBody(BaseModel):
     program_id: str
     force_weather: bool = True
@@ -201,7 +207,26 @@ async def ota_check():
     if app_state.ota.running:
         raise HTTPException(status_code=409, detail="OTA bereits aktiv")
     import asyncio
-    asyncio.create_task(_run_ota())
+    asyncio.create_task(_run_ota("check"))
+    return {"ok": True}
+
+
+@router.post("/ota/install")
+async def ota_install(body: dict | None = None):
+    if app_state.ota.running:
+        raise HTTPException(status_code=409, detail="OTA bereits aktiv")
+    import asyncio
+    tag = str((body or {}).get("tag") or app_state.ota.latest_version or "")
+    asyncio.create_task(_run_ota("install", tag))
+    return {"ok": True}
+
+
+@router.post("/ota/rollback")
+async def ota_rollback():
+    if app_state.ota.running:
+        raise HTTPException(status_code=409, detail="OTA bereits aktiv")
+    import asyncio
+    asyncio.create_task(_run_ota("rollback"))
     return {"ok": True}
 
 
@@ -214,26 +239,49 @@ async def ota_log():
     }
 
 
-async def _run_ota() -> None:
+async def _run_ota(action: str, tag: str = "") -> None:
     import asyncio
+    import json
     from datetime import datetime, timezone
     app_state.ota.running = True
     app_state.ota.log = []
     app_state.ota.exit_code = None
+    app_state.ota.phase = action
     app_state.ota.last_check = datetime.now(timezone.utc).isoformat()
     try:
+        cmd = ["/opt/pumpe/ota/update.sh"]
+        if action == "check":
+            cmd.append("check")
+        elif action == "install":
+            cmd.extend(["install", tag])
+        elif action == "rollback":
+            cmd.append("rollback")
+        else:
+            cmd.append("status")
         proc = await asyncio.create_subprocess_exec(
-            "/opt/pumpe/ota/update.sh", "check-and-apply",
+            *cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
         )
         async for line in proc.stdout:
-            app_state.ota.log.append(line.decode().rstrip())
+            decoded = line.decode().rstrip()
+            app_state.ota.log.append(decoded)
+            if decoded.startswith("{") and decoded.endswith("}"):
+                try:
+                    info = json.loads(decoded)
+                    app_state.ota.current_version = info.get("current") or app_state.ota.current_version
+                    app_state.ota.latest_version = info.get("latest") or app_state.ota.latest_version
+                    app_state.ota.latest_commit = info.get("commit") or app_state.ota.latest_commit
+                    app_state.ota.latest_date = info.get("published_at") or app_state.ota.latest_date
+                    app_state.ota.changelog = info.get("changelog") or app_state.ota.changelog
+                    app_state.ota.update_available = bool(info.get("update_available"))
+                except json.JSONDecodeError:
+                    pass
         await proc.wait()
         app_state.ota.exit_code = proc.returncode
-        app_state.ota.update_available = proc.returncode == 0
     except Exception as exc:
         app_state.ota.log.append(f"Fehler: {exc}")
         app_state.ota.exit_code = -1
     finally:
         app_state.ota.running = False
+        app_state.ota.phase = "idle"

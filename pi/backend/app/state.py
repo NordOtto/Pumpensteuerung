@@ -7,9 +7,19 @@ ist die singleton Instanz, die alle Module gemeinsam lesen/schreiben
 from __future__ import annotations
 
 from collections import deque
+from pathlib import Path
 from typing import Deque
 
 from pydantic import BaseModel, Field
+
+
+def _version(default: str = "pi-backend-0.1.0") -> str:
+    here = Path(__file__).resolve()
+    for parent in here.parents:
+        candidate = parent / "VERSION"
+        if candidate.exists():
+            return f"pumpe-{candidate.read_text(encoding='utf-8').strip()}"
+    return default
 
 
 class V20State(BaseModel):
@@ -71,7 +81,7 @@ class PresetLockState(BaseModel):
 class SysState(BaseModel):
     uptime: int = 0
     mqtt: bool = False
-    fw: str = "pi-backend-0.1.0"
+    fw: str = Field(default_factory=_version)
     rtu_connected: bool = False
     tcp_clients: int = 0
     ip: str = ""
@@ -87,6 +97,9 @@ class WeatherState(BaseModel):
     temp_c: float | None = None
     humidity_pct: float | None = None
     wind_kmh: float = 0.0
+    wind_gust_kmh: float | None = None
+    solar_w_m2: float | None = None
+    uv_index: float | None = None
     et0_mm: float | None = None
     soil_moisture_pct: float | None = None
     updated_at: str | None = None
@@ -117,9 +130,13 @@ class OtaState(BaseModel):
     log: list[str] = Field(default_factory=list)
     exit_code: int | None = None
     update_available: bool = False
-    current_version: str = "pi-backend-0.1.0"
+    current_version: str = Field(default_factory=_version)
     latest_version: str | None = None
+    latest_commit: str | None = None
+    latest_date: str | None = None
+    changelog: str | None = None
     last_check: str | None = None
+    phase: str = "idle"
 
 
 class AppState(BaseModel):

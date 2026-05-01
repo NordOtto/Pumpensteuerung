@@ -287,6 +287,9 @@ class IrrigationManager:
             "temp_c": ("temp_c", "tempC", "temperature"),
             "humidity_pct": ("humidity_pct", "humidityPct", "humidity"),
             "wind_kmh": ("wind_kmh", "windKmh", "wind_speed"),
+            "wind_gust_kmh": ("wind_gust_kmh", "windGustKmh", "wind_gust"),
+            "solar_w_m2": ("solar_w_m2", "solarWM2", "solar_radiation"),
+            "uv_index": ("uv_index", "uvIndex"),
             "et0_mm": ("et0_mm", "et0Mm", "evapotranspiration_mm"),
             "soil_moisture_pct": ("soil_moisture_pct", "soilMoisturePct", "soil_moisture"),
         }

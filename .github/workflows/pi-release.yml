@@ -2,12 +2,12 @@ name: Pi Release
 
 on:
   push:
-    tags: ["v*"]
+    branches: ["main"]
   workflow_dispatch:
     inputs:
-      tag:
-        description: "Release-Tag (z.B. v1.2.3)"
-        required: true
+      version:
+        description: "Version ohne v, leer = 0.1.<run_number>"
+        required: false
 
 permissions:
   contents: write
@@ -18,28 +18,33 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set tag
-        id: tag
+      - name: Compute version
+        id: version
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "TAG=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          if [[ -n "${{ inputs.version }}" ]]; then
+            VERSION="${{ inputs.version }}"
           else
-            echo "TAG=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+            BASE="$(cat VERSION 2>/dev/null || echo 0.1.0)"
+            MAJOR="$(echo "$BASE" | cut -d. -f1)"
+            MINOR="$(echo "$BASE" | cut -d. -f2)"
+            VERSION="${MAJOR}.${MINOR}.${GITHUB_RUN_NUMBER}"
           fi
+          echo "$VERSION" > VERSION
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "TAG=v$VERSION" >> "$GITHUB_OUTPUT"
+          echo "COMMIT=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
 
-      # ── Backend (Python — keine Native-Builds, requirements.txt in den Tarball) ──
       - name: Generate backend requirements.txt
         run: |
           cd pi/backend
-          # pyproject.toml → requirements.txt extrahieren
-          python -c "
+          python - <<'PY' > requirements.txt
           import tomllib
-          with open('pyproject.toml','rb') as f: cfg = tomllib.load(f)
-          for d in cfg['project']['dependencies']: print(d)
-          " > requirements.txt
-          cat requirements.txt
+          with open("pyproject.toml", "rb") as f:
+              cfg = tomllib.load(f)
+          for dep in cfg["project"]["dependencies"]:
+              print(dep)
+          PY
 
-      # ── Frontend (Next.js standalone) ──
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -51,16 +56,21 @@ jobs:
           cd pi/frontend
           npm ci
           npm run build
-          # standalone build verschieben damit Layout zur OTA-Struktur passt
           cp -r .next/static .next/standalone/.next/static
           cp -r public .next/standalone/public 2>/dev/null || true
 
-      # ── Tarball ──
       - name: Build release tarball
         run: |
-          mkdir -p dist/release
-          mkdir -p dist/release/backend
-          mkdir -p dist/release/frontend
+          mkdir -p dist/release/backend dist/release/frontend
+          cp VERSION dist/release/VERSION
+          printf '%s\n' "${{ steps.version.outputs.COMMIT }}" > dist/release/COMMIT
+          jq -n \
+            --arg version "${{ steps.version.outputs.VERSION }}" \
+            --arg tag "${{ steps.version.outputs.TAG }}" \
+            --arg commit "${{ steps.version.outputs.COMMIT }}" \
+            --arg built_at "$(date -u +%FT%TZ)" \
+            '{version:$version, tag:$tag, commit:$commit, built_at:$built_at}' \
+            > dist/release/manifest.json
           cp -r pi/backend/app dist/release/backend/
           cp pi/backend/pyproject.toml dist/release/backend/
           cp pi/backend/requirements.txt dist/release/backend/
@@ -68,10 +78,9 @@ jobs:
           cp -r pi/frontend/.next dist/release/frontend/
           cp pi/frontend/package.json dist/release/frontend/
           cd dist
-          tar -czf "pumpe-${{ steps.tag.outputs.TAG }}.tar.gz" -C release .
-          sha256sum "pumpe-${{ steps.tag.outputs.TAG }}.tar.gz" > "pumpe-${{ steps.tag.outputs.TAG }}.tar.gz.sha256"
+          tar -czf "pumpe-${{ steps.version.outputs.TAG }}.tar.gz" -C release .
+          sha256sum "pumpe-${{ steps.version.outputs.TAG }}.tar.gz" > "pumpe-${{ steps.version.outputs.TAG }}.tar.gz.sha256"
 
-      # ── Signatur (minisign) ──
       - name: Install minisign
         run: sudo apt-get update && sudo apt-get install -y minisign
 
@@ -81,7 +90,7 @@ jobs:
           MINISIGN_PASSWORD: ${{ secrets.MINISIGN_PASSWORD }}
         run: |
           if [[ -z "${MINISIGN_KEY:-}" ]]; then
-            echo "::warning::MINISIGN_KEY secret nicht gesetzt — Release wird unsigniert hochgeladen"
+            echo "::warning::MINISIGN_KEY secret nicht gesetzt - Release wird unsigniert hochgeladen"
             exit 0
           fi
           mkdir -p ~/.minisign
@@ -89,16 +98,19 @@ jobs:
           chmod 600 ~/.minisign/minisign.key
           echo "$MINISIGN_PASSWORD" | minisign -S \
             -s ~/.minisign/minisign.key \
-            -m "dist/pumpe-${{ steps.tag.outputs.TAG }}.tar.gz"
+            -m "dist/pumpe-${{ steps.version.outputs.TAG }}.tar.gz"
 
-      # ── Release publishen ──
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.tag.outputs.TAG }}
-          name: Pumpe ${{ steps.tag.outputs.TAG }}
-          generate_release_notes: true
+          tag_name: ${{ steps.version.outputs.TAG }}
+          target_commitish: ${{ github.sha }}
+          name: Pumpe ${{ steps.version.outputs.TAG }}
+          body: |
+            Commit: ${{ steps.version.outputs.COMMIT }}
+
+            ${{ github.event.head_commit.message }}
           files: |
-            dist/pumpe-${{ steps.tag.outputs.TAG }}.tar.gz
-            dist/pumpe-${{ steps.tag.outputs.TAG }}.tar.gz.sha256
-            dist/pumpe-${{ steps.tag.outputs.TAG }}.tar.gz.minisig
+            dist/pumpe-${{ steps.version.outputs.TAG }}.tar.gz
+            dist/pumpe-${{ steps.version.outputs.TAG }}.tar.gz.sha256
+            dist/pumpe-${{ steps.version.outputs.TAG }}.tar.gz.minisig

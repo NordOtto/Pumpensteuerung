@@ -23,7 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-dvh">
         <StatusProvider>
           <TopBar />
-          <main className="mx-auto max-w-5xl px-4 pb-24 pt-20">{children}</main>
+          <main className="mx-auto max-w-6xl px-4 pb-24 pt-24">{children}</main>
           <BottomNav />
         </StatusProvider>
       </body>

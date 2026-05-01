@@ -35,7 +35,7 @@ async def ws_endpoint(ws: WebSocket) -> None:
 
 
 async def broadcast_loop() -> None:
-    """Wird vom main.py als asyncio-Task gestartet (1 Hz)."""
+    """Wird vom main.py als asyncio-Task gestartet (ca. 2 Hz)."""
     while True:
         if _clients:
             payload = json.dumps({
@@ -58,4 +58,4 @@ async def broadcast_loop() -> None:
                         _clients.discard(ws)
                         with suppress(Exception):
                             await ws.close()
-        await asyncio.sleep(1.0)
+        await asyncio.sleep(0.5)

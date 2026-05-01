@@ -48,6 +48,7 @@ export interface IrrigationZone {
   enabled: boolean;
   duration_min: number;
   water_mm: number;
+  min_deficit_mm: number;
   deficit_mm: number;
   target_mm: number;
   preset: string;
@@ -61,6 +62,19 @@ export interface IrrigationProgram {
   mode: "fixed" | "smart_et";
   start_hour: number;
   start_min: number;
+  days: boolean[];
+  seasonal_factor: number;
+  weather_enabled: boolean;
+  max_runs_per_week: number;
+  min_runtime_factor: number;
+  max_runtime_factor: number;
+  thresholds?: {
+    skip_rain_mm: number;
+    reduce_rain_mm: number;
+    wind_max_kmh: number;
+    soil_moisture_skip_pct: number;
+    et0_default_mm: number;
+  };
   zones: IrrigationZone[];
   last_run_at: string | null;
   last_skip_reason: string;
@@ -84,6 +98,9 @@ export interface WeatherState {
   temp_c: number | null;
   humidity_pct: number | null;
   wind_kmh: number;
+  wind_gust_kmh?: number | null;
+  solar_w_m2?: number | null;
+  uv_index?: number | null;
   et0_mm: number | null;
   soil_moisture_pct: number | null;
   updated_at: string | null;
@@ -115,7 +132,11 @@ export interface OtaStatus {
   update_available: boolean;
   current_version: string;
   latest_version: string | null;
+  latest_commit: string | null;
+  latest_date: string | null;
+  changelog: string | null;
   last_check: string | null;
+  phase: string;
 }
 
 export interface AppStatus {

@@ -58,6 +58,16 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ program_id: program_id ?? "" }),
     }),
+  recommendSmartEt: (payload: Record<string, unknown>) =>
+    request<{
+      zone_patch: Partial<import("./types").IrrigationZone>;
+      program_patch: Partial<import("./types").IrrigationProgram>;
+      precip_mm_h: number;
+      summary: string;
+    }>("/api/irrigation/wizard/recommend", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 
   // ── History ────────────────────────────────────────────
   pressureHistory: (seconds = 3600, maxPoints = 360) =>
@@ -74,6 +84,12 @@ export const api = {
   // ── OTA ─────────────────────────────────────────────────
   otaStatus: () => request<OtaStatus>("/api/ota/status"),
   otaCheck: () => request<{ ok: true }>("/api/ota/check", { method: "POST" }),
+  otaInstall: (tag?: string) =>
+    request<{ ok: true }>("/api/ota/install", {
+      method: "POST",
+      body: JSON.stringify({ tag: tag ?? "" }),
+    }),
+  otaRollback: () => request<{ ok: true }>("/api/ota/rollback", { method: "POST" }),
   otaLog: () =>
     request<{ lines: string[]; running: boolean; exit_code: number | null }>("/api/ota/log"),
 };

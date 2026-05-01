@@ -21,12 +21,21 @@ export default function ZonesPage() {
     <div className="flex flex-col gap-6 animate-fade-in">
       <IrrigationAdvisor decision={decision} />
 
-      <Section title="Wetter & ET₀">
+      <Section title="Wetter & ET">
         <WeatherWidget weather={w} />
       </Section>
 
       {programs.map((program) => (
         <Section key={program.id} title={program.name}>
+          <div className="mb-3 grid grid-cols-2 gap-3 md:grid-cols-4">
+            <ControllerStat label="Modus" value={program.mode === "smart_et" ? "Smart ET" : "Fest"} />
+            <ControllerStat label="Max/Woche" value={String(program.max_runs_per_week ?? 3)} />
+            <ControllerStat
+              label="Naechster Lauf"
+              value={decision.next_start ? new Date(decision.next_start).toLocaleString("de-DE", { weekday: "short", hour: "2-digit", minute: "2-digit" }) : "-"}
+            />
+            <ControllerStat label="Entscheidung" value={program.last_skip_reason || decision.reason} />
+          </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {program.zones.map((zone) => {
               const isActive =
@@ -83,6 +92,7 @@ export default function ZonesPage() {
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <KV label="ET heute" value={w.et0_mm != null ? `${w.et0_mm.toFixed(1)} mm` : "—"} />
                     <KV label="Defizit" value={`${zone.deficit_mm.toFixed(1)} mm`} />
+                    <KV label="Start ab" value={`${zone.min_deficit_mm.toFixed(1)} mm`} />
                     <KV label="Ziel" value={`${zone.target_mm.toFixed(1)} mm`} />
                     <KV label="Laufzeit" value={`${zone.duration_min} min`} />
                     <KV label="Preset" value={zone.preset || "Normal"} />
@@ -132,6 +142,15 @@ function KV({ label, value }: { label: string; value: string }) {
     <div className="flex items-baseline justify-between border-b border-border/60 py-1">
       <span className="text-slate-500">{label}</span>
       <span className="font-medium text-slate-700">{value}</span>
+    </div>
+  );
+}
+
+function ControllerStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-border bg-white p-3 shadow-sm">
+      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{label}</div>
+      <div className="truncate text-sm font-semibold text-slate-800">{value}</div>
     </div>
   );
 }

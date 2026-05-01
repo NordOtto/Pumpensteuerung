@@ -80,7 +80,9 @@ export function StatusProvider({ children }: { children: ReactNode }) {
       ws.onmessage = (ev) => {
         try {
           const msg = JSON.parse(ev.data);
-          if (msg?.type === "status" && msg?.state) setStatus(msg.state as AppStatus);
+          if (msg?.type === "status" && msg?.state) {
+            setStatus((prev) => ({ ...(prev ?? {}), ...(msg.state as AppStatus) } as AppStatus));
+          }
         } catch {
           /* ignore malformed */
         }

@@ -118,14 +118,27 @@ export default function AnalyticsPage() {
       }
     }
     load();
-    // Live-Refresh alle 30 s solange Tab offen
-    const id = setInterval(load, 30_000);
+    // Backend schreibt alle 5 s Samples; UI zieht im selben Takt nach.
+    const id = setInterval(load, 5_000);
     return () => {
       cancelled = true;
       clearInterval(id);
     };
   }, [range]);
 
+  const liveSample = status
+    ? {
+        ts: Math.floor(Date.now() / 1000),
+        pressure: status.pressure_bar,
+        flow: status.flow_rate,
+        frequency: status.v20.frequency,
+        running: status.v20.running,
+      }
+    : null;
+  const chartSamples =
+    liveSample && samples.length
+      ? [...samples.filter((s) => Math.abs(s.ts - liveSample.ts) > 2), liveSample]
+      : samples;
   const history = status?.irrigation.history ?? [];
 
   return (
@@ -153,28 +166,28 @@ export default function AnalyticsPage() {
           <div className="rounded-lg border border-border bg-white p-8 text-center text-sm text-slate-400">
             Lade Verlauf…
           </div>
-        ) : samples.length < 2 ? (
+        ) : chartSamples.length < 2 ? (
           <div className="rounded-lg border border-border bg-white p-8 text-center text-sm text-slate-400">
             Noch nicht genug Daten — Backend sammelt alle 5 s einen Sample.
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <HistoryChart
-              samples={samples}
+              samples={chartSamples}
               accessor={(s) => s.pressure}
               color="#2588eb"
               unit="bar"
               label="Druck"
             />
             <HistoryChart
-              samples={samples}
+              samples={chartSamples}
               accessor={(s) => s.flow}
               color="#14c957"
               unit="L/min"
               label="Durchfluss"
             />
             <HistoryChart
-              samples={samples}
+              samples={chartSamples}
               accessor={(s) => s.frequency}
               color="#ffa000"
               unit="Hz"

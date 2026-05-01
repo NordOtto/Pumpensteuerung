@@ -12,3 +12,7 @@ src/secrets.h
 docker/frontend/tailwindcss.exe
 docker/frontend/node_modules/
 docker/backend/node_modules/
+pi/frontend/.next/
+pi/frontend/node_modules/
+pi/frontend/tsconfig.tsbuildinfo
+pi/frontend/next-env.d.ts

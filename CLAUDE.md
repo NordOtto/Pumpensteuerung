@@ -4,153 +4,123 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Projekt-Kontext
 
-Pumpensteuerung für eine Brunnenwasseranlage. ESP32 liest per Modbus RTU einen Siemens Simatic V20 Frequenzumrichter aus und empfängt Sensordaten (Druck, Durchfluss, Temperatur) per Modbus TCP von einer Siemens LOGO 8.4 SPS. Alle Steuerungslogik läuft in einem Docker Stack auf dem Heimserver — der ESP32 ist eine **reine Hardware-Brücke**, keine Logik, keine Persistenz.
+Pumpensteuerung für eine Brunnenwasseranlage. Ein Raspberry Pi 3B+ übernimmt die gesamte Steuerungslogik:
+- liest per **Modbus RTU** (MAX13487 RS-485) einen Siemens Simatic V20 Frequenzumrichter aus
+- empfängt Sensordaten (Druck, Durchfluss, Wassertemperatur) per **Modbus TCP** von einer Siemens LOGO 8.4 SPS
+- steuert intelligente Bewässerungsprogramme mit Wetter-Integration
+- publiziert Zustandsdaten per MQTT an Home Assistant
 
-## Zwei Codebases in einem Repo
+## Repo-Struktur
 
 ```
 modbus_logo/
-├── src/            → ESP32 Firmware (PlatformIO / C++)
-└── docker/
-    ├── backend/    → Node.js Steuerungslogik
-    ├── nginx/      → HTTPS Reverse Proxy
-    └── frontend/   → Dashboard (index.html)
+└── pi/
+    ├── backend/        → Python FastAPI (Modbus, MQTT, REST, WebSocket)
+    ├── frontend/       → Next.js 15 Dashboard (App Router)
+    └── ops/
+        ├── setup.sh    → Erstinstallation auf Raspbian Bookworm Lite
+        ├── systemd/    → pumpe-backend.service, pumpe-frontend.service, pumpe-ota.timer
+        ├── nginx/      → HTTPS Reverse Proxy (Self-Signed TLS)
+        └── ota/        → update.sh (GitHub Releases → signierter Tarball)
 ```
 
 ## Entwicklungs-Befehle
 
-### ESP32 Firmware (PlatformIO)
+### Backend (Python FastAPI)
 
 ```bash
-# Bauen
-pio run
-
-# Auf ESP32 flashen
-pio run --target upload
-
-# Serieller Monitor
-pio device monitor
-
-# Testen
-pio test
+cd pi/backend
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+uvicorn app.main:app --reload --port 8000
 ```
 
-### Docker Backend (lokaler Build + Test)
+### Frontend (Next.js)
 
 ```bash
-# Stack starten
-docker-compose up --build
-
-# Nur Backend-Logs
-docker-compose logs -f backend
-
-# Stack stoppen
-docker-compose down
+cd pi/frontend
+npm install
+npm run dev        # Dev-Server auf :3000
+npm run build      # Produktions-Build (standalone)
 ```
 
-### Docker Swarm Deployment (Heimserver)
+### OTA-Release auslösen
 
 ```bash
-# Stack deployen
-docker stack deploy -c docker-stack.yml pumpe
-
-# Status prüfen
-docker stack services pumpe
-
-# Stack entfernen
-docker stack rm pumpe
+git tag v1.2.3
+git push origin v1.2.3
+# → GitHub Actions (pi-release.yml) baut Tarball + signiert mit minisign
+# → Pi pullt beim nächsten Timer-Tick (≤60 min) automatisch
 ```
 
 ## Architektur
 
-**Kernprinzip:** Steuerungslogik ausschließlich im Docker Backend. ESP32 darf nicht geändert werden wenn nur Backend-Logik angepasst wird.
-
 ```
-Browser (HTTPS :6060)
-  └─ nginx ──→ static files
-            ──→ /ws  → backend:3000 (WebSocket)
-            ──→ /api → backend:3000 (REST)
+Browser (HTTPS :443)
+  └─ nginx ──→ /          → Next.js :3001 (SSR/Static)
+            ──→ /ws       → FastAPI :8000 (WebSocket, 1Hz State-Broadcast)
+            ──→ /api      → FastAPI :8000 (REST)
 
-backend (Node.js) ──MQTT──→ Broker ──→ ESP32 (Befehle)
-                                   ←── ESP32 (Sensordaten, 500ms)
-                                   ←→  Home Assistant
+FastAPI ──RTU──→ V20 Frequenzumrichter (500ms Takt)
+        ←─TCP──  LOGO 8.4 SPS (schreibt Sensor-Register 2–4)
+        ──MQTT─→ Broker 192.168.1.136:1883 ←→ Home Assistant
 ```
 
-**Backend-Module (`docker/backend/`):**
+**Backend-Module (`pi/backend/app/`):**
 
 | Datei | Zweck |
 |-------|-------|
-| `server.js` | Haupteinstieg, initialisiert alle Module |
-| `state.js` | Gemeinsamer State (alle Module lesen/schreiben hier) |
-| `mqttClient.js` | MQTT subscribe/publish, HA-Topics, ESP32-Befehle |
-| `pressureCtrl.js` | PI-Druckregelung (500ms Takt, Anti-Windup, Trockenlauf-Schutz) |
-| `timeguard.js` | Wochenschaltuhr (Zeitzone Europe/Berlin) |
-| `presets.js` | Preset-Verwaltung (`/data/presets.json`) |
-| `restApi.js` | Express REST `/api/*` |
-| `websocketServer.js` | Browser WebSocket |
-| `haDiscovery.js` | HomeAssistant Auto-Discovery |
+| `main.py` | Haupteinstieg, startet alle Loops |
+| `state.py` | Gemeinsamer AppState (Pydantic) |
+| `modbus_rtu.py` | RTU-Client → V20 (pymodbus 3.6.x) |
+| `modbus_tcp.py` | TCP-Server ← LOGO (Port 502) |
+| `pressure_ctrl.py` | PI-Druckregelung (500ms Takt, Anti-Windup) |
+| `irrigation.py` | Bewässerungsprogramme + Wetter-ET0-Logik |
+| `presets.py` | Preset-Verwaltung |
+| `mqtt_client.py` | MQTT subscribe/publish, HA-Integration |
+| `timeguard.py` | Wochenschaltuhr (Europe/Berlin) |
+| `api/routes.py` | FastAPI REST `/api/*` |
+| `ws.py` | WebSocket-Broadcast |
 
 ## Secrets und Credentials
 
-`src/secrets.h` ist in `.gitignore` — **nie committen!**  
-Vorlage: `src/secrets.h.example` — diese Datei kopieren und befüllen.
-
-ENV-Variablen für Docker (im Portainer Stack oder `.env`):
+ENV-Variablen in `/opt/pumpe/current/backend/.env` (aus `.env.example` ableiten):
 ```
-MQTT_BROKER=<broker-ip>
+MQTT_BROKER=192.168.1.136
 MQTT_PORT=1883
 MQTT_USER=<mqtt-user>
 MQTT_PASS=<mqtt-password>
+RTU_PORT=/dev/ttyAMA0
 TZ=Europe/Berlin
 ```
-
-## Versionierung & Updates
-
-```
-git push
-    → GitHub Actions (build.yml): Docker Build
-        → ghcr.io/nordotto/pumpe-backend:latest
-        → ghcr.io/nordotto/pumpe-nginx:latest
-            → Watchtower (läuft als Container, prüft alle 60s)
-                → neues Image erkannt → Container automatisch neu gestartet
-```
-
-- Kein formales Versionierungs-Skript — es gibt immer nur `:latest`
-- Jeder Push triggert sofort ein neues Image + automatisches Update auf dem Heimserver
-- ESP32-Firmware muss separat per PlatformIO geflasht werden — kein OTA für Firmware
 
 ## CI/CD
 
 ```
-git push → GitHub Actions → Docker Build → ghcr.io/nordotto/pumpe-backend:latest
-                                         → ghcr.io/nordotto/pumpe-nginx:latest
-                                                    ↓
-                                          Watchtower (alle 60s) → Auto-Update
+git push vX.Y.Z → GitHub Actions (pi-release.yml)
+    → Next.js standalone build
+    → Python requirements.txt generieren
+    → pumpe-vX.Y.Z.tar.gz + .sha256 + .minisig
+    → GitHub Release Assets
+        ↓
+    Pi OTA-Timer (≤60 min) → update.sh → verify + install + restart
 ```
-
-Images sind privat (`ghcr.io/nordotto`, `read:packages` Token erforderlich).
-
-## MQTT Topics (Kurzübersicht)
-
-- ESP32 publiziert Sensordaten auf `pumpensteuerung/raw/**` (500ms)
-- Backend sendet Befehle auf `pumpensteuerung/cmd/**`
-- Backend publiziert aufbereitete Daten für HA auf `pumpensteuerung/v20/**` etc. (2s)
-
-Vollständige Topic-Liste: siehe `PROJECT_OVERVIEW.md` Abschnitt 4.
 
 ## Bekannte Fehler & Lösungen
 
-> Diese Sektion wird nach jeder Session aktualisiert. Ziel: Kein Fehler wird zweimal gemacht.
-
 | Problem | Ursache | Lösung |
 |---------|---------|--------|
-| AppArmor-Fehler beim Container-Start | cgroupv2 + AppArmor Konflikt auf dem Host | `aa-remove-unknown` auf dem Host ausführen |
-| LOGO schreibt Sensordaten nicht zum ESP32 | Register 0+1 (STW/HSW) werden vom ESP32 nicht mehr verarbeitet | V20-Steuerung läuft ausschließlich über MQTT — LOGO nur noch für Sensor-Register 2–4 |
+| pymodbus ImportError ModbusSlaveContext | pymodbus 3.7 hat ModbusSlaveContext entfernt | `pyproject.toml`: `pymodbus>=3.6,<3.7` |
+| npm ci schlägt fehl (kein lockfile) | package-lock.json fehlte | `npm install --package-lock-only --legacy-peer-deps` lokal ausführen und committen |
+| NodeSource npm vs Debian npm Konflikt | libnode108 Kollision | NodeSource-Repo VOR apt-get install einrichten; kein separates `npm`-Paket installieren |
+| RTU "No response" | A/B-Leitungen vertauscht + kein separates GND | TX/RX tauschen + dediziertes GND-Kabel |
+| Durchfluss zeigt 2 L/min bei Stillstand | Sensor-Rauschen unterhalb Messbereich | Threshold 5 L/min in `modbus_tcp.py` |
+| LOGO schreibt Sensordaten nicht | Register 0+1 (STW/HSW) werden vom Pi nicht verarbeitet | V20-Steuerung über MQTT/RTU — LOGO nur für Sensor-Register 2–4 |
 
 ## Modbus
 
-- **RTU (ESP32 → V20):** UART1, 9600 bps, 8N1, Slave-Adresse 1
-- **TCP (LOGO → ESP32):** ESP32 ist Server auf Port 502, LOGO schreibt Sensordaten in Register 2–4
+- **RTU (Pi → V20):** `/dev/ttyAMA0`, 9600 bps, 8N1, Slave-Adresse 1
+- **TCP (LOGO → Pi):** Pi ist Server auf Port 502, LOGO schreibt Sensordaten in Register 2–4
 - V20 Steuerwort: `0x047F` = Start, `0x047E` = Stop, `0x04FE` = Fault Reset
 
 Vollständige Registertabelle: `V20_MODBUS_REGISTER.md`

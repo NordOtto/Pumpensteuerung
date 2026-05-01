@@ -1,0 +1,30 @@
+[Unit]
+Description=Pumpe Backend (FastAPI + Modbus + MQTT)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pumpe
+Group=pumpe
+WorkingDirectory=/opt/pumpe/current/backend
+EnvironmentFile=/opt/pumpe/current/backend/.env
+ExecStart=/opt/pumpe/current/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=3
+
+# Modbus-TCP-Server bindet :502 — privilegierter Port
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+
+# Hardening (zerlegt nichts, falls Backend mal Amok läuft)
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/pumpe
+
+# RTU braucht Zugriff auf /dev/ttyAMA0 oder /dev/ttyUSB0 (User pumpe muss in dialout sein)
+SupplementaryGroups=dialout
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,31 @@
+[project]
+name = "pumpe-backend"
+version = "0.1.0"
+description = "Brunnenpumpensteuerung + smarte Bewässerung – Pi 3B+ Solo-Brain"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi[standard]>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pymodbus>=3.6,<3.7",
+    "paho-mqtt>=2.1",
+    "apscheduler>=3.10",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.5",
+    "python-jose[cryptography]>=3.3",
+    "pyserial>=3.5",
+    "pyserial-asyncio>=0.6",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.7",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

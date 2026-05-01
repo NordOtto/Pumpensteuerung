@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+  html, body {
+    @apply bg-background text-slate-900 antialiased;
+    font-feature-settings: "tnum", "ss01";
+  }
+  /* Touch-optimiert für Außenbereich */
+  button, a, [role="button"] {
+    @apply select-none;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@layer utilities {
+  .num {
+    font-feature-settings: "tnum";
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+  /* Industrie-HMI: sehr große Zahlen */
+  .num-xl  { @apply num text-5xl font-semibold leading-none; }
+  .num-2xl { @apply num text-6xl font-semibold leading-none; }
+  .num-3xl { @apply num text-7xl font-bold leading-none; }
+}

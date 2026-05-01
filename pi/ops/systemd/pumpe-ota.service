@@ -1,0 +1,12 @@
+[Unit]
+Description=Pumpe OTA Update Check
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=pumpe
+Group=pumpe
+ExecStart=/opt/pumpe/ota/update.sh check-and-apply
+StandardOutput=journal
+StandardError=journal

@@ -1,0 +1,11 @@
+[Unit]
+Description=Pumpe OTA Update Check (alle 60 Min)
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=60min
+Unit=pumpe-ota.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -41,9 +41,9 @@ class _ObservedDataBlock(ModbusSequentialDataBlock):
         for i, raw in enumerate(values):
             reg = base + i
             if reg == REG_FLOW:
-                # Roh-Sensor 200…1000 → 0…85 L/min (LOGO macht die Skalierung,
-                # hier kommt L/min × 100 rein). Anpassen falls LOGO-Programm anders rechnet.
-                app_state.flow_rate = raw / 100.0
+                # Sensor-Messbereich 5–85 L/min; darunter ist Rauschen → 0.
+                flow = raw / 100.0
+                app_state.flow_rate = flow if flow >= 5.0 else 0.0
             elif reg == REG_PRESSURE:
                 app_state.pressure_bar = raw / 100.0
             elif reg == REG_WATER_TEMP:

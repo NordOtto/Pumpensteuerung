@@ -287,6 +287,12 @@ class PressureController:
         running = st.v20.running
         freq = st.v20.frequency
 
+        if running and pressure <= 0:
+            web_log("[PI] Kein gültiger Druckwert bei laufendem V20 – STOP")
+            self._on_stop()
+            self._reset_integral()
+            return
+
         # ── Flow-Schätzung im Totbereich ──
         # Muss VOR den flow-basierten Stop-Checks (Überdruck, No-demand, Dry-run)
         # berechnet werden. Sensor-Untergrenze ist 5 L/min — bei niedriger

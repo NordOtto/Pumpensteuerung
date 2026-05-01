@@ -23,6 +23,7 @@ from .timeguard import is_allowed as tg_is_allowed
 # ── Konstanten (identisch zu pressureCtrl.js:61-71) ──
 DT = 0.5
 NO_DEMAND_S = 5
+NO_DEMAND_PRESSURE_MARGIN = 0.15
 DRY_RUN_S = 60
 DRY_RUN_LOCK_S = 120
 DRY_RUN_GRACE_S = 90
@@ -73,6 +74,7 @@ class PressureController:
 
         # No-demand / Dry-run
         self._no_flow_since = 0
+        self._pressure_no_demand_since = 0
         self._dry_run_no_flow_since = 0
         self._dry_run_lock_until = 0
         self._dry_run_grace_until = 0
@@ -352,6 +354,22 @@ class PressureController:
             return
 
         # ── No-demand Shutdown ──
+        if flow < 1.0 and pressure >= pi.setpoint + NO_DEMAND_PRESSURE_MARGIN:
+            if self._pressure_no_demand_since == 0:
+                self._pressure_no_demand_since = now
+            if (now - self._pressure_no_demand_since) > NO_DEMAND_S * 1000:
+                if running:
+                    web_log(
+                        f"[PI] No-demand Druck: flow={flow:.1f}, Druck {pressure:.2f} bar "
+                        f">= SP+{NO_DEMAND_PRESSURE_MARGIN} – Pumpe STOP"
+                    )
+                    self._on_stop()
+                self._reset_integral()
+                self._pressure_no_demand_since = 0
+                return
+        elif flow >= 1.0 or pressure < pi.setpoint:
+            self._pressure_no_demand_since = 0
+
         if effective_flow < 1.0 and pressure >= pi.setpoint:
             if self._no_flow_since == 0:
                 self._no_flow_since = now
@@ -518,6 +536,7 @@ class PressureController:
         app_state.pi.active = False
         app_state.pi.pump_state = 0
         self._no_flow_since = 0
+        self._pressure_no_demand_since = 0
 
     def _tick_fixed_freq(self, now: int) -> None:
         st = app_state

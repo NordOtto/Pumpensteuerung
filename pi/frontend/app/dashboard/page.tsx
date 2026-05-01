@@ -133,10 +133,12 @@ export default function DashboardPage() {
         </div>
       </Section>
 
-      {/* Warnungen */}
-      <Section title="Warnungen">
-        <WarningList warnings={warnings} />
-      </Section>
+      {/* Warnungen — nur wenn vorhanden */}
+      {warnings.length > 0 && (
+        <Section title="Warnungen">
+          <WarningList warnings={warnings} />
+        </Section>
+      )}
     </div>
   );
 }

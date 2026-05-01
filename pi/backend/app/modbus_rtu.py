@@ -87,7 +87,9 @@ class V20RtuClient:
         v = app_state.v20
         v.running = bool(zsw & 0x0004)             # Bit 2
         v.fault = bool(zsw & 0x0008)               # Bit 3
-        v.frequency = round(hiw * FREQ_READ_SCALE * 50.0, 2)  # 16384 → 50 Hz
+        # FREQ_READ_SCALE = 1/327.68 = 50/16384 → hiw * FREQ_READ_SCALE = Hz direkt.
+        # Vorher stand hier ein zusätzliches *50 (Skalierungs-Bug → Anzeige 50× zu hoch).
+        v.frequency = round(hiw * FREQ_READ_SCALE, 2)
         v.status = "RUN" if v.running else ("FAULT" if v.fault else "IDLE")
 
     async def poll_slow(self) -> None:

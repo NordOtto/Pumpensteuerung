@@ -2,6 +2,8 @@
 
 import { Section } from "@/components/section";
 import { StatusBadge } from "@/components/status-badge";
+import { WeatherWidget } from "@/components/weather-widget";
+import { IrrigationAdvisor } from "@/components/irrigation-advisor";
 import { useStatus } from "@/lib/ws";
 import { api } from "@/lib/api";
 import { moistureColor, cn } from "@/lib/utils";
@@ -17,25 +19,10 @@ export default function ZonesPage() {
 
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
-      <Section
-        title="Wetter & ET0"
-        action={
-          decision.allowed ? (
-            <StatusBadge tone="ok">Bereit</StatusBadge>
-          ) : (
-            <StatusBadge tone="warn">{decision.reason}</StatusBadge>
-          )
-        }
-      >
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Stat label="Temperatur" value={w.temp_c != null ? `${w.temp_c.toFixed(1)} °C` : "—"} />
-          <Stat label="Regen 24h" value={`${w.rain_24h_mm.toFixed(1)} mm`} />
-          <Stat label="ET0" value={w.et0_mm != null ? `${w.et0_mm.toFixed(1)} mm` : "—"} />
-          <Stat
-            label="Bodenfeuchte"
-            value={w.soil_moisture_pct != null ? `${Math.round(w.soil_moisture_pct)} %` : "—"}
-          />
-        </div>
+      <IrrigationAdvisor decision={decision} />
+
+      <Section title="Wetter & ET₀">
+        <WeatherWidget weather={w} />
       </Section>
 
       {programs.map((program) => (
@@ -49,12 +36,20 @@ export default function ZonesPage() {
               const moisture = w.soil_moisture_pct ?? 50;
               const tone = moistureColor(moisture);
               const barColor = { ok: "bg-ok", warn: "bg-warn", danger: "bg-danger" }[tone];
+              const borderL = isActive
+                ? "border-l-primary"
+                : tone === "ok"
+                ? "border-l-ok"
+                : tone === "warn"
+                ? "border-l-warn"
+                : "border-l-danger";
 
               return (
                 <div
                   key={zone.id}
                   className={cn(
-                    "flex flex-col gap-3 rounded-lg border bg-white p-5 shadow-sm",
+                    "flex flex-col gap-3 rounded-lg border border-l-4 bg-white p-5 shadow-sm",
+                    borderL,
                     isActive ? "border-primary ring-2 ring-primary/20" : "border-border"
                   )}
                 >
@@ -128,15 +123,6 @@ export default function ZonesPage() {
           </div>
         </Section>
       ))}
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg border border-border bg-white p-3 shadow-sm">
-      <div className="text-xs uppercase tracking-wider text-slate-500">{label}</div>
-      <div className="num text-2xl font-semibold text-primary">{value}</div>
     </div>
   );
 }

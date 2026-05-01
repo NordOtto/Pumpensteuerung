@@ -112,6 +112,16 @@ class IrrigationState(BaseModel):
     history: list[dict] = Field(default_factory=list)
 
 
+class OtaState(BaseModel):
+    running: bool = False
+    log: list[str] = Field(default_factory=list)
+    exit_code: int | None = None
+    update_available: bool = False
+    current_version: str = "pi-backend-0.1.0"
+    latest_version: str | None = None
+    last_check: str | None = None
+
+
 class AppState(BaseModel):
     v20: V20State = Field(default_factory=V20State)
 
@@ -134,6 +144,7 @@ class AppState(BaseModel):
     sys: SysState = Field(default_factory=SysState)
     vacation: VacationState = Field(default_factory=VacationState)
     irrigation: IrrigationState = Field(default_factory=IrrigationState)
+    ota: OtaState = Field(default_factory=OtaState)
 
     # Log-Ringbuffer (deque ist nicht serialisierbar via pydantic — separat halten)
     model_config = {"arbitrary_types_allowed": True}

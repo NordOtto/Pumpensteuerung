@@ -1,16 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Section } from "@/components/section";
 import { HoldButton } from "@/components/hold-button";
 import { StatusBadge } from "@/components/status-badge";
 import { useStatus } from "@/lib/ws";
 import { api } from "@/lib/api";
-import { formatBar, formatHz } from "@/lib/utils";
+import { formatBar, formatHz, cn } from "@/lib/utils";
+import type { Preset } from "@/lib/types";
 
 export default function ControlPage() {
   const { status } = useStatus();
   const [hzDraft, setHzDraft] = useState<number | null>(null);
+  const [presets, setPresets] = useState<Preset[]>([]);
+  const [activePreset, setActivePreset] = useState<string>("");
+
+  useEffect(() => {
+    api.fetchPresets().then((r) => {
+      setPresets(r.presets);
+      setActivePreset(r.active);
+    }).catch(() => {});
+  }, []);
 
   if (!status) return <div className="flex h-64 items-center justify-center text-slate-400">Lade…</div>;
 
@@ -18,8 +28,45 @@ export default function ControlPage() {
   const hz = hzDraft ?? Math.round(v.freq_setpoint || v.frequency);
   const fixedMode = status.ctrl_mode === 2;
 
+  const MODE_LABEL: Record<number, string> = { 0: "Druck", 1: "Durchfluss", 2: "FixHz" };
+
+  const handleApplyPreset = async (name: string) => {
+    await api.applyPreset(name);
+    setActivePreset(name);
+  };
+
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
+      {/* Preset-Selector */}
+      <Section title="Preset">
+        <div className="rounded-lg border border-border bg-white p-5 shadow-sm">
+          <div className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">
+            Aktiv: <span className="font-semibold text-slate-900">{activePreset || status.active_preset || "Normal"}</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {presets.map((p) => (
+              <button
+                key={p.name}
+                type="button"
+                onClick={() => handleApplyPreset(p.name)}
+                className={cn(
+                  "rounded-xl border px-5 py-3 text-sm font-semibold transition active:scale-[0.97]",
+                  (activePreset || status.active_preset) === p.name
+                    ? "border-primary bg-primary text-white shadow-sm"
+                    : "border-border bg-white text-slate-700 hover:bg-slate-50"
+                )}
+              >
+                <div>{p.name}</div>
+                <div className="text-[10px] font-normal opacity-70">{MODE_LABEL[p.mode] ?? "—"}</div>
+              </button>
+            ))}
+            {presets.length === 0 && (
+              <span className="text-sm text-slate-400">Keine Presets konfiguriert — in Einstellungen anlegen.</span>
+            )}
+          </div>
+        </div>
+      </Section>
+
       <Section title="Manuelle Pumpensteuerung">
         <div className="flex flex-col gap-4 rounded-lg border border-border bg-white p-5 shadow-sm">
           <div className="flex items-center gap-3">

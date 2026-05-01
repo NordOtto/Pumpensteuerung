@@ -186,3 +186,52 @@ async def history_pressure(seconds: int = 3600, max_points: int = 360):
     seconds = max(60, min(30 * 24 * 3600, seconds))
     max_points = max(30, min(2000, max_points))
     return {"samples": get_pressure_history(seconds=seconds, max_points=max_points)}
+
+
+# ── /ota ──────────────────────────────────────────────────────
+@router.get("/ota/status")
+async def ota_status():
+    return app_state.ota.model_dump()
+
+
+@router.post("/ota/check")
+async def ota_check():
+    if app_state.ota.running:
+        raise HTTPException(status_code=409, detail="OTA bereits aktiv")
+    import asyncio
+    asyncio.create_task(_run_ota())
+    return {"ok": True}
+
+
+@router.get("/ota/log")
+async def ota_log():
+    return {
+        "lines": app_state.ota.log,
+        "running": app_state.ota.running,
+        "exit_code": app_state.ota.exit_code,
+    }
+
+
+async def _run_ota() -> None:
+    import asyncio
+    from datetime import datetime, timezone
+    app_state.ota.running = True
+    app_state.ota.log = []
+    app_state.ota.exit_code = None
+    app_state.ota.last_check = datetime.now(timezone.utc).isoformat()
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "/opt/pumpe/ota/update.sh", "check-and-apply",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+        async for line in proc.stdout:
+            app_state.ota.log.append(line.decode().rstrip())
+        await proc.wait()
+        app_state.ota.exit_code = proc.returncode
+        app_state.ota.update_available = proc.returncode == 0
+    except Exception as exc:
+        app_state.ota.log.append(f"Fehler: {exc}")
+        app_state.ota.exit_code = -1
+    finally:
+        app_state.ota.running = False

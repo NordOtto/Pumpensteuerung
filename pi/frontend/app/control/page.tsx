@@ -25,7 +25,9 @@ export default function ControlPage() {
   if (!status) return <div className="flex h-64 items-center justify-center text-slate-400">Lade…</div>;
 
   const v = status.v20;
-  const hz = hzDraft ?? Math.round(v.freq_setpoint || v.frequency);
+  const hzMin = Math.round(status.pi.freq_min || 35);
+  const hzMax = Math.round(status.pi.freq_max || 60);
+  const hz = hzDraft ?? Math.max(hzMin, Math.round(v.freq_setpoint || v.frequency || hzMin));
   const fixedMode = status.ctrl_mode === 2;
 
   const MODE_LABEL: Record<number, string> = { 0: "Druck", 1: "Durchfluss", 2: "FixHz" };
@@ -111,8 +113,8 @@ export default function ControlPage() {
             </div>
             <input
               type="range"
-              min={20}
-              max={60}
+              min={hzMin}
+              max={hzMax}
               step={1}
               value={hz}
               onChange={(e) => setHzDraft(parseInt(e.target.value))}

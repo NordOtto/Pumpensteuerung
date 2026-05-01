@@ -389,6 +389,8 @@ class PressureController:
                     web_log(
                         f"[PI] Einschaltdruck unterschritten ({pressure:.2f} bar < {pi.p_on} bar) – START"
                     )
+                    self._on_freq(pi.freq_max)
+                    st.v20.freq_setpoint = pi.freq_max
                     self._on_start()
                     self._pump_state = 1
                     self._start_sent_at = now
@@ -397,6 +399,8 @@ class PressureController:
                 return
 
             if self._pump_state == 1:
+                self._on_freq(pi.freq_max)
+                st.v20.freq_setpoint = pi.freq_max
                 if running:
                     self._pump_state = 2
                     web_log("[PI] Pumpe läuft – PI aktiv")

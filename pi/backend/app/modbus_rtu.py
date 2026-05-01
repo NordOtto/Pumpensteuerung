@@ -74,7 +74,11 @@ class V20RtuClient:
         await self._write(REG_STW, CMD_FAULT_RESET)
 
     async def set_frequency(self, hz: float) -> None:
-        raw = max(0, min(0xFFFF, int(round(hz * FREQ_WRITE_SCALE))))
+        requested = float(hz)
+        if requested > 0:
+            requested = max(app_state.pi.freq_min, min(app_state.pi.freq_max, requested))
+        raw = max(0, min(0xFFFF, int(round(requested * FREQ_WRITE_SCALE))))
+        app_state.v20.freq_setpoint = requested
         await self._write(REG_HSW, raw)
 
     # ── Polling ───────────────────────────────────────────────

@@ -28,6 +28,8 @@ async def get_status() -> dict:
 # ── /v20 ──────────────────────────────────────────────────────
 @router.post("/v20/start")
 async def v20_start():
+    start_hz = app_state.v20.freq_setpoint or app_state.pi.freq_min
+    await deps.rtu.set_frequency(start_hz)
     await deps.rtu.start()
     return {"ok": True}
 
@@ -51,7 +53,7 @@ class FreqBody(BaseModel):
 @router.post("/v20/freq")
 async def v20_freq(body: FreqBody):
     await deps.rtu.set_frequency(body.hz)
-    return {"ok": True, "hz": body.hz}
+    return {"ok": True, "hz": app_state.v20.freq_setpoint}
 
 
 # ── /pressure ─────────────────────────────────────────────────

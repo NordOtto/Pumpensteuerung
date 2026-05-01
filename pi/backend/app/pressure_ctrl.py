@@ -32,6 +32,8 @@ MIN_FREQ_TIMEOUT_S = 60
 OVERPRESSURE_HYSTERESIS = 0.3
 PRESSURE_TIMEOUT_MS = 5000
 FIXED_FREQ_REFRESH_MS = 2000
+SPIKE_MIN_SETPOINT_MARGIN = 0.15
+SPIKE_STARTUP_SUPPRESS_S = 8
 
 # ── Spike-Detect Ringbuffer ──
 SPIKE_SLOTS = 22
@@ -305,7 +307,16 @@ class PressureController:
         if self._spike_idx == 0:
             self._spike_filled = True
 
-        if running and self._pump_state == 2 and pi.spike_enabled and (self._spike_filled or self._spike_idx > 0):
+        # Hahn-zu darf nicht schon waehrend des Druckaufbaus ausloesen.
+        # Sonst taktet die Pumpe bei niedrigem Druck: schneller Anstieg von
+        # z.B. 2.0 auf 2.4 bar wurde als "Hahn zu" interpretiert, obwohl der
+        # Sollwert 3.0 bar noch gar nicht erreicht ist.
+        spike_armed = (
+            pressure >= max(pi.p_on, pi.setpoint - SPIKE_MIN_SETPOINT_MARGIN)
+            and (now - self._start_sent_at) > SPIKE_STARTUP_SUPPRESS_S * 1000
+        )
+        if (running and self._pump_state == 2 and pi.spike_enabled and spike_armed
+                and (self._spike_filled or self._spike_idx > 0)):
             window_slots = min(round(pi.spike_window_s / DT), SPIKE_SLOTS - 1)
             old_idx = (self._spike_idx - 1 - window_slots + SPIKE_SLOTS * 2) % SPIKE_SLOTS
             old_pressure = self._spike_buf[old_idx]

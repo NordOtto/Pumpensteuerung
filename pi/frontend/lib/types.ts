@@ -97,6 +97,27 @@ export interface SysState {
   ip: string;
 }
 
+export interface Preset {
+  name: string;
+  mode: 0 | 1 | 2;
+  setpoint: number;
+  kp: number;
+  ki: number;
+  freq_min: number;
+  freq_max: number;
+  setpoint_hz: number;
+  expected_pressure: number;
+}
+
+export interface OtaStatus {
+  running: boolean;
+  exit_code: number | null;
+  update_available: boolean;
+  current_version: string;
+  latest_version: string | null;
+  last_check: string | null;
+}
+
 export interface AppStatus {
   v20: V20State;
   pressure_bar: number;

@@ -1,4 +1,5 @@
 /** Minimaler REST-Client zum Backend. */
+import type { IrrigationProgram, OtaStatus, Preset } from "./types";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
@@ -29,9 +30,24 @@ export const api = {
   setVacation: (enabled: boolean) =>
     request("/api/vacation/set", { method: "POST", body: JSON.stringify({ enabled }) }),
 
+  // ── Presets ────────────────────────────────────────────
+  fetchPresets: () =>
+    request<{ active: string; presets: Preset[] }>("/api/presets"),
+  savePreset: (preset: Partial<Preset>) =>
+    request("/api/presets", { method: "POST", body: JSON.stringify(preset) }),
+  deletePreset: (name: string) =>
+    request(`/api/presets/${encodeURIComponent(name)}`, { method: "DELETE" }),
   applyPreset: (name: string) =>
     request("/api/preset/apply", { method: "POST", body: JSON.stringify({ name }) }),
 
+  // ── Bewässerung ────────────────────────────────────────
+  fetchPrograms: () =>
+    request<{ programs: IrrigationProgram[] }>("/api/irrigation/programs"),
+  savePrograms: (programs: IrrigationProgram[]) =>
+    request("/api/irrigation/programs", {
+      method: "POST",
+      body: JSON.stringify({ programs }),
+    }),
   runProgram: (program_id: string, force_weather = true) =>
     request("/api/irrigation/run", {
       method: "POST",
@@ -43,6 +59,7 @@ export const api = {
       body: JSON.stringify({ program_id: program_id ?? "" }),
     }),
 
+  // ── History ────────────────────────────────────────────
   pressureHistory: (seconds = 3600, maxPoints = 360) =>
     request<{
       samples: Array<{
@@ -53,4 +70,10 @@ export const api = {
         running: boolean;
       }>;
     }>(`/api/history/pressure?seconds=${seconds}&max_points=${maxPoints}`),
+
+  // ── OTA ─────────────────────────────────────────────────
+  otaStatus: () => request<OtaStatus>("/api/ota/status"),
+  otaCheck: () => request<{ ok: true }>("/api/ota/check", { method: "POST" }),
+  otaLog: () =>
+    request<{ lines: string[]; running: boolean; exit_code: number | null }>("/api/ota/log"),
 };

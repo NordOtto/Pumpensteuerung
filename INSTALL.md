@@ -125,7 +125,12 @@ sudo apt install -y avahi-daemon   # → pumpe.local funktioniert
 
 ```bash
 sudo apt update && sudo apt install git -y
-git clone -b pi-migration https://github.com/NordOtto/Pumpensteuerung.git /tmp/pumpensteuerung
+
+# Token setzen und klonen
+export GH_TOKEN=ghp_xxxxxxxxxxxx
+git clone -b pi-migration https://${GH_TOKEN}@github.com/NordOtto/Pumpensteuerung.git /tmp/pumpensteuerung
+
+# Setup ausführen
 sudo bash /tmp/pumpensteuerung/pi/ops/setup.sh
 ```
 

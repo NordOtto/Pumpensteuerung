@@ -22,6 +22,12 @@ const STATE_LABEL = {
   läuft: "Bewässerung läuft",
 } as const;
 
+const STATE_BORDER_L = {
+  ok: "border-l-ok",
+  trocken: "border-l-warn",
+  läuft: "border-l-primary",
+} as const;
+
 export function ZoneCard({ name, moisturePct, state, etTodayMm, nextRun, active }: ZoneCardProps) {
   const tone = moistureColor(moisturePct);
   const barColor = { ok: "bg-ok", warn: "bg-warn", danger: "bg-danger" }[tone];
@@ -29,7 +35,8 @@ export function ZoneCard({ name, moisturePct, state, etTodayMm, nextRun, active 
   return (
     <div
       className={cn(
-        "flex flex-col gap-3 rounded-lg border bg-white p-4 shadow-sm animate-fade-in",
+        "flex flex-col gap-3 rounded-lg border border-l-4 bg-white p-4 shadow-sm animate-fade-in",
+        STATE_BORDER_L[state],
         active ? "border-primary ring-2 ring-primary/20" : "border-border"
       )}
     >

@@ -120,6 +120,8 @@ export interface Preset {
   setpoint: number;
   kp: number;
   ki: number;
+  p_on: number;
+  p_off: number;
   freq_min: number;
   freq_max: number;
   setpoint_hz: number;

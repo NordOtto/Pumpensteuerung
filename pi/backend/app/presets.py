@@ -24,6 +24,8 @@ class Preset:
     setpoint: float = 3.0
     kp: float = 8.0
     ki: float = 1.0
+    p_on: float = 2.2
+    p_off: float = 3.7
     freq_min: float = 35.0
     freq_max: float = 52.0
     setpoint_hz: float = 45.0
@@ -36,6 +38,8 @@ class Preset:
             "setpoint": self.setpoint,
             "kp": self.kp,
             "ki": self.ki,
+            "p_on": self.p_on,
+            "p_off": self.p_off,
             "freq_min": self.freq_min,
             "freq_max": self.freq_max,
             "setpoint_hz": self.setpoint_hz,
@@ -132,6 +136,8 @@ class PresetManager:
             app_state.pi.enabled = False
             app_state.pi.ctrl_mode = preset.mode
             app_state.pi.flow_setpoint = 0
+            app_state.pi.p_on = preset.p_on
+            app_state.pi.p_off = preset.p_off
             app_state.active_preset = name
             app_state.ctrl_mode = preset.mode
             app_state.preset_expected_pressure = preset.expected_pressure or 0.0
@@ -150,6 +156,8 @@ class PresetManager:
         self.pi_ctrl.set_config({
             "enabled": True,
             "setpoint": preset.setpoint,
+            "p_on": preset.p_on,
+            "p_off": preset.p_off,
             "kp": preset.kp,
             "ki": preset.ki,
             "freq_min": preset.freq_min,
@@ -187,12 +195,19 @@ class PresetManager:
             except (TypeError, ValueError):
                 return default
 
+        p_on = _clamp_pressure(f("p_on", 2.2))
+        p_off = _clamp_pressure(f("p_off", 3.7))
+        if p_off <= p_on:
+            p_off = min(8.0, p_on + 0.5)
+
         return Preset(
             name=str(d.get("name", "Unbenannt")),
             mode=mode,
             setpoint=f("setpoint", 3.0),
             kp=f("kp", 8.0),
             ki=f("ki", 1.0),
+            p_on=p_on,
+            p_off=p_off,
             freq_min=f("freq_min", 35.0),
             freq_max=f("freq_max", 52.0),
             setpoint_hz=_clamp_hz(f("setpoint_hz", 0.0)),

@@ -584,6 +584,8 @@ const EMPTY_PRESET: Preset = {
   setpoint: 3,
   kp: 8,
   ki: 1,
+  p_on: 2.2,
+  p_off: 3.7,
   freq_min: 35,
   freq_max: 52,
   setpoint_hz: 45,
@@ -664,6 +666,12 @@ function PresetsSection({ active, data, onReload }: { active: string; data: { ac
               {(mode === 2 || mode === 3) && (
                 <NumField label="Feste Drehzahl Hz" value={editing.setpoint_hz} step={1} hint={mode === 3 ? "Hahnmodus: diese Hz laufen zwischen Ein- und Ausschaltdruck." : "FixHz: Pumpe laeuft direkt mit dieser Frequenz."} onChange={(v) => setEditing({ ...editing, setpoint_hz: v })} />
               )}
+              {mode === 3 && (
+                <>
+                  <NumField label="Einschaltdruck bar" value={editing.p_on} step={0.1} hint="Unter diesem Druck startet die Pumpe im Hahnmodus." onChange={(v) => setEditing({ ...editing, p_on: v })} />
+                  <NumField label="Ausschaltdruck bar" value={editing.p_off} step={0.1} hint="Ab diesem Druck stoppt die Pumpe im Hahnmodus." onChange={(v) => setEditing({ ...editing, p_off: v })} />
+                </>
+              )}
               {mode === 2 && (
                 <NumField label="Schutzdruck bar" value={editing.expected_pressure} step={0.1} hint="FixHz-Schutz: oberhalb dieses Drucks plus Hysterese wird gestoppt." onChange={(v) => setEditing({ ...editing, expected_pressure: v })} />
               )}
@@ -678,7 +686,7 @@ function PresetsSection({ active, data, onReload }: { active: string; data: { ac
             </div>
             {mode === 3 && (
               <HelpText>
-                Hahnmodus nutzt die globalen Werte "Ein bar" und "Aus bar": unter Einschaltdruck startet die Pumpe mit fester Hz, ab Ausschaltdruck stoppt sie wieder.
+                Hahnmodus ist fuer Hahn, Schlauchtrommel und Giesskanne gedacht: unter Einschaltdruck startet die Pumpe mit fester Hz, ab Ausschaltdruck stoppt sie wieder. PI-Regelung bleibt dabei aus.
               </HelpText>
             )}
             <div className="mt-4 flex justify-end gap-2">

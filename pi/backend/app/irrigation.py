@@ -67,6 +67,8 @@ DEFAULT_PROGRAM: dict[str, Any] = {
         "water_mm": 6,
         "min_deficit_mm": 8,
         "target_mm": 12,
+        "cycle_min": 0,
+        "soak_min": 0,
         "deficit_mm": 0,
         "preset": "Normal",
         "plant_type": "Rasen",
@@ -139,6 +141,8 @@ def _normalize_program(input_: dict[str, Any], idx: int = 0) -> dict[str, Any]:
                 "water_mm": _clamp(z.get("water_mm", 6), 0.1, 50),
                 "min_deficit_mm": _clamp(z.get("min_deficit_mm", 8), 0.1, 80),
                 "target_mm": _clamp(z.get("target_mm", 12), 0.1, 100),
+                "cycle_min": _clamp(z.get("cycle_min", 0), 0, 240),
+                "soak_min": _clamp(z.get("soak_min", 0), 0, 240),
                 "deficit_mm": _clamp(z.get("deficit_mm", 0), 0, 200),
                 "preset": str(z.get("preset") or "Normal"),
                 "plant_type": str(z.get("plant_type") or ""),
@@ -164,6 +168,8 @@ class _ActiveRun:
     zone_started_at: float = 0.0
     zone_ends_at: float = 0.0
     total_runtime_s: int = 0
+    zone_remaining_s: float = 0.0
+    soaking: bool = False
 
 
 class IrrigationManager:
@@ -515,10 +521,24 @@ class IrrigationManager:
         smart = (self._active.zone_runtimes or {}).get(zone["id"])
         runtime_s = (smart["runtime_s"] if smart
                      else max(30, round(zone["duration_min"] * 60 * self._active.runtime_factor)))
+        self._active.zone_remaining_s = runtime_s
+        self._active.soaking = False
+        self._start_zone_cycle()
+
+    def _start_zone_cycle(self) -> None:
+        if not self._active or not self._active.zone:
+            return
+        zone = self._active.zone
+        cycle_s = float(zone.get("cycle_min", 0) or 0) * 60
+        runtime_s = self._active.zone_remaining_s
+        if cycle_s > 0:
+            runtime_s = min(runtime_s, cycle_s)
+        runtime_s = max(30, round(runtime_s))
         now = datetime.now(_TZ).timestamp()
         self._active.zone_started_at = now
         self._active.zone_ends_at = now + runtime_s
         self._active.total_runtime_s += runtime_s
+        self._active.zone_remaining_s = max(0, self._active.zone_remaining_s - runtime_s)
 
         if zone.get("preset"):
             self._presets_apply(zone["preset"])
@@ -532,7 +552,8 @@ class IrrigationManager:
             "ends_at": datetime.fromtimestamp(self._active.zone_ends_at, tz=_TZ).isoformat(),
             "updated_at": _now_iso(),
         }
-        web_log(f"[IRR] Zone {zone['name']} gestartet ({round(runtime_s / 60)} min)")
+        suffix = f", Rest {round(self._active.zone_remaining_s / 60)} min" if self._active.zone_remaining_s > 0 else ""
+        web_log(f"[IRR] Zone {zone['name']} gestartet ({round(runtime_s / 60)} min{suffix})")
         self.recompute_decision(self._active.program["id"])
         self.publish_decision()
 
@@ -541,6 +562,23 @@ class IrrigationManager:
             return
         self._publish_zone_command(self._active.zone, "stop", self._active.program, 0)
         zid = self._active.zone["id"]
+        soak_s = float(self._active.zone.get("soak_min", 0) or 0) * 60
+        if self._active.zone_remaining_s > 0 and soak_s > 0:
+            self._v20_stop()
+            now = datetime.now(_TZ).timestamp()
+            self._active.zone_ends_at = now + soak_s
+            self._active.soaking = True
+            app_state.irrigation.zones[zid] = {
+                **app_state.irrigation.zones.get(zid, {}),
+                "command": "stop",
+                "state": "SOAKING",
+                "ends_at": datetime.fromtimestamp(self._active.zone_ends_at, tz=_TZ).isoformat(),
+                "updated_at": _now_iso(),
+            }
+            web_log(f"[IRR] Zone {self._active.zone['name']} Sickerpause ({round(soak_s / 60)} min)")
+            self.recompute_decision(self._active.program["id"])
+            self.publish_decision()
+            return
         app_state.irrigation.zones[zid] = {
             **app_state.irrigation.zones.get(zid, {}),
             "command": "stop",
@@ -551,6 +589,12 @@ class IrrigationManager:
         self._active.zone_index += 1
         self._active.zone = None
         self._start_zone()
+
+    def _finish_soak(self) -> None:
+        if not self._active or not self._active.zone:
+            return
+        self._active.soaking = False
+        self._start_zone_cycle()
 
     def _finish_run(self, result: str, reason: str = "") -> None:
         if not self._active:
@@ -685,6 +729,9 @@ class IrrigationManager:
             safety = self._safety_block_reason()
             if safety:
                 self._finish_run("stopped", safety)
+                return
+            if self._active.soaking and now >= self._active.zone_ends_at:
+                self._finish_soak()
                 return
             if self._active.zone and now >= self._active.zone_ends_at:
                 self._finish_zone()

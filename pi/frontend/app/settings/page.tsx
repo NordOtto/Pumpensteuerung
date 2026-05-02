@@ -76,6 +76,8 @@ const EMPTY_ZONE: IrrigationZone = {
   min_deficit_mm: 8,
   deficit_mm: 0,
   target_mm: 15,
+  cycle_min: 0,
+  soak_min: 0,
   preset: "Normal",
   plant_type: "Rasen",
 };
@@ -443,7 +445,7 @@ function SmartEtGuide({
                     <GuideMetric label="Wasser" value={`${formatMaybe(recommendation.zone_patch.water_mm)} mm`} />
                     <GuideMetric label="Laufzeit" value={`${recommendation.zone_patch.duration_min ?? "--"} min`} />
                     <GuideMetric label="Start ab" value={`${formatMaybe(recommendation.zone_patch.min_deficit_mm)} mm`} />
-                    <GuideMetric label="Niederschlag" value={`${recommendation.precip_mm_h.toFixed(1)} mm/h`} />
+                    <GuideMetric label="Sickerphase" value={recommendation.zone_patch.cycle_min ? `${recommendation.zone_patch.cycle_min} / ${recommendation.zone_patch.soak_min} min` : "aus"} />
                   </div>
                 )}
               </GuideStep>
@@ -574,6 +576,8 @@ function ZoneEditor({ value, presets, onChange, onCancel, onSave }: {
         <NumField label="Ziel mm" value={value.target_mm} step={0.5} hint="Maximale Wassermenge, die Smart-ET je Lauf auffuellen will." onChange={(v) => onChange({ ...value, target_mm: v })} />
         <NumField label="Start ab mm" value={value.min_deficit_mm} step={0.5} hint="Smart-ET startet diese Zone erst ab diesem Wasserdefizit." onChange={(v) => onChange({ ...value, min_deficit_mm: v })} />
         <NumField label="Akt. Defizit mm" value={value.deficit_mm} step={0.5} hint="Aktueller Wasserbedarf. Wird taeglich aus ET0, Saisonfaktor und Regen fortgeschrieben." onChange={(v) => onChange({ ...value, deficit_mm: v })} />
+        <NumField label="Beregnungsblock min" value={value.cycle_min} step={1} hint="0 = ohne Pause. Fuer Rasen z. B. 10-15 min laufen lassen." onChange={(v) => onChange({ ...value, cycle_min: v })} />
+        <NumField label="Sickerpause min" value={value.soak_min} step={1} hint="Pause zwischen Bloecken, damit Wasser tiefer einsickert." onChange={(v) => onChange({ ...value, soak_min: v })} />
       </div>
       <HelpText>
         Die Zone ist die logische Ventil-ID fuer Home Assistant/MQTT. Beim Start sendet die Steuerung einen Befehl an <code>pumpensteuerung/irrigation/zone/&lt;zone_id&gt;/command</code>; HA schaltet dazu das passende Ventil.

@@ -13,9 +13,11 @@ def test_lawn_full_sun_recommendation_is_deep_watering():
 
     assert rec["program_patch"]["mode"] == "smart_et"
     assert rec["program_patch"]["max_runs_per_week"] == 3
-    assert rec["zone_patch"]["target_mm"] >= 15
-    assert rec["zone_patch"]["min_deficit_mm"] >= 9
-    assert rec["zone_patch"]["duration_min"] >= 20
+    assert rec["zone_patch"]["target_mm"] >= 25
+    assert rec["zone_patch"]["min_deficit_mm"] >= 16
+    assert rec["zone_patch"]["duration_min"] >= 45
+    assert rec["zone_patch"]["cycle_min"] == 12
+    assert rec["zone_patch"]["soak_min"] == 25
 
 
 def test_drip_zone_uses_given_preset_and_clamps_duration():

@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Any
 
 PLANT_PROFILES: dict[str, dict[str, float]] = {
-    "rasen": {"target_mm": 15.0, "min_deficit_mm": 9.0, "seasonal_factor": 1.0},
+    "rasen": {"target_mm": 25.0, "min_deficit_mm": 16.0, "seasonal_factor": 1.0},
     "hecke": {"target_mm": 12.0, "min_deficit_mm": 7.0, "seasonal_factor": 0.85},
     "beet": {"target_mm": 10.0, "min_deficit_mm": 6.0, "seasonal_factor": 0.8},
     "tropfschlauch": {"target_mm": 14.0, "min_deficit_mm": 8.0, "seasonal_factor": 0.75},
@@ -40,6 +40,8 @@ def recommend_smart_et(payload: dict[str, Any]) -> dict[str, Any]:
     seasonal_factor = round(profile["seasonal_factor"] * SUN_FACTOR.get(sun, 1.0), 2)
     duration_min = round(max(3.0, min(240.0, target_mm / max(precip_mm_h, 0.1) * 60.0)))
     water_mm = round(precip_mm_h * duration_min / 60.0, 1)
+    cycle_min = 12 if plant == "rasen" and duration_min >= 25 else 0
+    soak_min = 25 if cycle_min else 0
 
     return {
         "zone_patch": {
@@ -47,6 +49,8 @@ def recommend_smart_et(payload: dict[str, Any]) -> dict[str, Any]:
             "water_mm": water_mm,
             "target_mm": target_mm,
             "min_deficit_mm": min_deficit_mm,
+            "cycle_min": cycle_min,
+            "soak_min": soak_min,
             "preset": preset,
             "plant_type": plant.capitalize(),
         },

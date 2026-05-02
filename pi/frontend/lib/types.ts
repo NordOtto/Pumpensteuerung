@@ -51,6 +51,8 @@ export interface IrrigationZone {
   min_deficit_mm: number;
   deficit_mm: number;
   target_mm: number;
+  cycle_min: number;
+  soak_min: number;
   preset: string;
   plant_type: string;
 }

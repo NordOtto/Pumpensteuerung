@@ -63,7 +63,7 @@ cmd_status() {
 
 cmd_check() {
     local cur; cur=$(current_tag)
-    local json; json=$(latest_release_json) || die "Konnte Release-Info nicht laden"
+    local json; json=$(latest_release_json) || die "Konnte Release-Info nicht laden (Repo: ${GITHUB_REPO}; pruefe config.env, GitHub Release und ggf. Token)"
     local tag commit published changelog
     tag=$(echo "$json" | jq -r '.tag_name')
     commit=$(echo "$json" | jq -r '.target_commitish // ""')
@@ -142,9 +142,9 @@ cmd_install() {
     local tag="${1:-}"
     local json
     if [[ -n "$tag" ]]; then
-        json=$(release_json_for_tag "$tag") || die "Konnte Release ${tag} nicht laden"
+        json=$(release_json_for_tag "$tag") || die "Konnte Release ${tag} nicht laden (Repo: ${GITHUB_REPO}; pruefe config.env, GitHub Release und ggf. Token)"
     else
-        json=$(latest_release_json) || die "Konnte latest Release nicht laden"
+        json=$(latest_release_json) || die "Konnte latest Release nicht laden (Repo: ${GITHUB_REPO}; pruefe config.env, GitHub Release und ggf. Token)"
         tag=$(echo "$json" | jq -r '.tag_name')
     fi
     [[ -n "$tag" && "$tag" != "null" ]] || die "Kein Release-Tag gefunden"
@@ -166,7 +166,7 @@ cmd_rollback() {
 
 cmd_check_and_apply() {
     local cur; cur=$(current_tag)
-    local json; json=$(latest_release_json) || die "Konnte Release-Info nicht laden"
+    local json; json=$(latest_release_json) || die "Konnte Release-Info nicht laden (Repo: ${GITHUB_REPO}; pruefe config.env, GitHub Release und ggf. Token)"
     local tag; tag=$(echo "$json" | jq -r '.tag_name')
     [[ -n "$tag" && "$tag" != "null" ]] || die "Kein tag_name im API-Response"
     if [[ "$tag" == "$cur" ]]; then

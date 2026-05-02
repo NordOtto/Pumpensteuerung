@@ -20,13 +20,13 @@ MAX_PRESETS = 20
 @dataclass
 class Preset:
     name: str
-    mode: int = 0
+    mode: int = 3
     setpoint: float = 3.0
     kp: float = 8.0
     ki: float = 1.0
     freq_min: float = 35.0
     freq_max: float = 52.0
-    setpoint_hz: float = 0.0
+    setpoint_hz: float = 45.0
     expected_pressure: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
@@ -127,24 +127,25 @@ class PresetManager:
         self.pi_ctrl.set_manual_stop(False)
         self.pi_ctrl._reset_integral()  # private API – bewusst, wie pi.resetIntegral()
 
-        if preset.mode == 2:
-            # Fix-Frequenz: PI deaktivieren, Sollfrequenz direkt setzen
+        if preset.mode in (2, 3):
+            # FixHz starts immediately. Hahn mode uses pressure switch logic in pressure_ctrl.
             app_state.pi.enabled = False
-            app_state.pi.ctrl_mode = 2
+            app_state.pi.ctrl_mode = preset.mode
             app_state.pi.flow_setpoint = 0
             app_state.active_preset = name
-            app_state.ctrl_mode = 2
+            app_state.ctrl_mode = preset.mode
             app_state.preset_expected_pressure = preset.expected_pressure or 0.0
             app_state.preset_setpoint_hz = preset.setpoint_hz or 0.0
-            if preset.setpoint_hz > 0:
+            if preset.mode == 2 and preset.setpoint_hz > 0:
                 self.on_v20_start()
                 self.on_v20_freq(preset.setpoint_hz)
                 app_state.v20.freq_setpoint = preset.setpoint_hz
-            web_log(f"[Presets] Aktiviert (FixHz): {name} {preset.setpoint_hz} Hz")
+            label = "FixHz" if preset.mode == 2 else "Hahn"
+            web_log(f"[Presets] Aktiviert ({label}): {name} {preset.setpoint_hz} Hz")
             return True
 
         # Mode 0/1: PI re-konfigurieren
-        if app_state.ctrl_mode == 2:
+        if app_state.ctrl_mode in (2, 3):
             self.pi_ctrl.force_stop()
         self.pi_ctrl.set_config({
             "enabled": True,
@@ -174,10 +175,10 @@ class PresetManager:
     @staticmethod
     def _from_dict(d: dict[str, Any]) -> Preset:
         try:
-            mode = int(d.get("mode", 0))
+            mode = int(d.get("mode", 3))
         except (TypeError, ValueError):
-            mode = 0
-        if mode not in (0, 1, 2):
+            mode = 3
+        if mode not in (0, 1, 2, 3):
             mode = 0
 
         def f(key: str, default: float) -> float:

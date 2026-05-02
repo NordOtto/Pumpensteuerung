@@ -27,7 +27,7 @@ export interface PIState {
   active: boolean;
   pump_state: 0 | 1 | 2;
   dry_run_locked: boolean;
-  ctrl_mode: 0 | 1 | 2;
+  ctrl_mode: 0 | 1 | 2 | 3;
   spike_enabled: boolean;
 }
 
@@ -116,7 +116,7 @@ export interface SysState {
 
 export interface Preset {
   name: string;
-  mode: 0 | 1 | 2;
+  mode: 0 | 1 | 2 | 3;
   setpoint: number;
   kp: number;
   ki: number;
@@ -149,7 +149,7 @@ export interface AppStatus {
   pi: PIState;
   timeguard: TimeguardState;
   active_preset: string;
-  ctrl_mode: 0 | 1 | 2;
+  ctrl_mode: 0 | 1 | 2 | 3;
   vacation: { enabled: boolean };
   irrigation: {
     programs: IrrigationProgram[];

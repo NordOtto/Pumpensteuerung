@@ -270,6 +270,10 @@ class PressureController:
             self._tick_fixed_freq(now)
             return
 
+        if st.ctrl_mode == 3:
+            self._tick_tap_mode(now)
+            return
+
         # PI deaktiviert
         if not pi.enabled:
             self._reset_integral()
@@ -597,4 +601,49 @@ class PressureController:
         if now - self._last_fixed_freq_sent > FIXED_FREQ_REFRESH_MS:
             self._on_freq(round(hz, 1))
             st.v20.freq_setpoint = hz
+            self._last_fixed_freq_sent = now
+
+    def _tick_tap_mode(self, now: int) -> None:
+        """Hahnmodus: pressure switch behavior with fixed pump frequency."""
+        st = app_state
+        pi = app_state.pi
+        hz = _clamp(st.preset_setpoint_hz or pi.freq_max, 10, 60)
+
+        if self._last_pressure_ts > 0 and (now - self._last_pressure_ts) > PRESSURE_TIMEOUT_MS:
+            if st.v20.running:
+                web_log("[PI] Druck-Timeout (Hahn) - V20 gestoppt")
+                self._on_stop()
+            self._last_pressure_ts = 0
+            self._reset_integral()
+            return
+
+        pressure = st.pressure_bar
+        if pressure <= 0:
+            return
+
+        if st.v20.running:
+            self._pump_state = 2
+            if pressure >= pi.p_off:
+                web_log(f"[PI] Hahnmodus: Ausschaltdruck erreicht ({pressure:.2f} >= {pi.p_off}) - STOP")
+                self._on_stop()
+                self._reset_integral()
+                return
+            if now - self._last_fixed_freq_sent > FIXED_FREQ_REFRESH_MS:
+                self._on_freq(round(hz, 1))
+                st.v20.freq_setpoint = hz
+                self._last_fixed_freq_sent = now
+            pi.pump_state = 2
+            pi.active = False
+            return
+
+        self._pump_state = 0
+        pi.pump_state = 0
+        pi.active = False
+        if not self._manual_stopped and pressure < pi.p_on:
+            web_log(f"[PI] Hahnmodus: Einschaltdruck unterschritten ({pressure:.2f} < {pi.p_on}) - START {hz:.1f} Hz")
+            self._on_freq(round(hz, 1))
+            st.v20.freq_setpoint = hz
+            self._on_start()
+            self._pump_state = 1
+            pi.pump_state = 1
             self._last_fixed_freq_sent = now

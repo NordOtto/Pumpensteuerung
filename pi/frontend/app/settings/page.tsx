@@ -284,7 +284,7 @@ function ProgramsSection({ programs }: { programs: IrrigationProgram[] }) {
                       ))}
                     </div>
                     <div className="mt-4 grid gap-3 md:grid-cols-4">
-                      <NumField label="Saisonfaktor" value={p.seasonal_factor} step={0.05} onChange={(v) => updateProg(i, { seasonal_factor: v })} />
+                      <NumField label="Saisonfaktor" value={p.seasonal_factor} step={0.05} hint="Multipliziert ET0: 1.0 normal, >1 mehr Wasser, <1 weniger. Der Guide berechnet ihn aus Pflanze und Sonne." onChange={(v) => updateProg(i, { seasonal_factor: v })} />
                       <NumField label="Max/Woche" value={p.max_runs_per_week} step={1} onChange={(v) => updateProg(i, { max_runs_per_week: v })} />
                       <NumField label="Wind max km/h" value={p.thresholds?.wind_max_kmh ?? 35} step={1} onChange={(v) => updateProg(i, { thresholds: { ...p.thresholds!, wind_max_kmh: v } })} />
                       <NumField label="Regen Skip mm" value={p.thresholds?.skip_rain_mm ?? 6} step={0.5} onChange={(v) => updateProg(i, { thresholds: { ...p.thresholds!, skip_rain_mm: v } })} />
@@ -553,15 +553,18 @@ function ZoneEditor({ value, presets, onChange, onCancel, onSave }: {
     >
       <div className="mb-3 text-sm font-bold text-slate-800">Zone bearbeiten</div>
       <div className="grid gap-3 md:grid-cols-3">
-        <TextField label="Name" value={value.name} onChange={(v) => onChange({ ...value, name: v })} />
-        <Select label="Preset" value={value.preset} options={[...presets, "Benutzerdefiniert"]} onChange={(v) => onChange({ ...value, preset: v })} />
+        <TextField label="Name" value={value.name} hint="Anzeigename, z. B. Garten, Hecke oder Schlauchtrommel." onChange={(v) => onChange({ ...value, name: v })} />
+        <Select label="Preset" value={value.preset} options={[...presets, "Benutzerdefiniert"]} hint="Wird vor dem Zonenstart aktiviert, z. B. Beregnung mit Druckregelung." onChange={(v) => onChange({ ...value, preset: v })} />
         <Select label="Pflanzentyp" value={value.plant_type || "Rasen"} options={PLANTS} onChange={(v) => onChange({ ...value, plant_type: v })} />
-        <NumField label="Laufzeit min" value={value.duration_min} step={1} onChange={(v) => onChange({ ...value, duration_min: v })} />
-        <NumField label="Wasser mm" value={value.water_mm} step={0.5} onChange={(v) => onChange({ ...value, water_mm: v })} />
-        <NumField label="Ziel mm" value={value.target_mm} step={0.5} onChange={(v) => onChange({ ...value, target_mm: v })} />
-        <NumField label="Start ab mm" value={value.min_deficit_mm} step={0.5} onChange={(v) => onChange({ ...value, min_deficit_mm: v })} />
-        <NumField label="Akt. Defizit mm" value={value.deficit_mm} step={0.5} onChange={(v) => onChange({ ...value, deficit_mm: v })} />
+        <NumField label="Laufzeit min" value={value.duration_min} step={1} hint="Basislaufzeit fuer diese Zone." onChange={(v) => onChange({ ...value, duration_min: v })} />
+        <NumField label="Wasser mm" value={value.water_mm} step={0.5} hint="Wassermenge, die diese Basislaufzeit ungefaehr ausbringt." onChange={(v) => onChange({ ...value, water_mm: v })} />
+        <NumField label="Ziel mm" value={value.target_mm} step={0.5} hint="Maximale Wassermenge, die Smart-ET je Lauf auffuellen will." onChange={(v) => onChange({ ...value, target_mm: v })} />
+        <NumField label="Start ab mm" value={value.min_deficit_mm} step={0.5} hint="Smart-ET startet diese Zone erst ab diesem Wasserdefizit." onChange={(v) => onChange({ ...value, min_deficit_mm: v })} />
+        <NumField label="Akt. Defizit mm" value={value.deficit_mm} step={0.5} hint="Aktueller Wasserbedarf. Wird taeglich aus ET0, Saisonfaktor und Regen fortgeschrieben." onChange={(v) => onChange({ ...value, deficit_mm: v })} />
       </div>
+      <HelpText>
+        Die Zone ist die logische Ventil-ID fuer Home Assistant/MQTT. Beim Start sendet die Steuerung einen Befehl an <code>pumpensteuerung/irrigation/zone/&lt;zone_id&gt;/command</code>; HA schaltet dazu das passende Ventil.
+      </HelpText>
       <div className="mt-4 flex justify-end gap-2">
         <button type="button" onClick={onCancel} className="rounded-lg border border-border bg-white px-4 py-2 text-sm">Abbrechen</button>
         <button type="button" onClick={onSave} className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">Zone speichern</button>
@@ -572,17 +575,28 @@ function ZoneEditor({ value, presets, onChange, onCancel, onSave }: {
 
 const EMPTY_PRESET: Preset = {
   name: "",
-  mode: 0,
+  mode: 3,
   setpoint: 3,
   kp: 8,
   ki: 1,
   freq_min: 35,
   freq_max: 52,
-  setpoint_hz: 40,
+  setpoint_hz: 45,
   expected_pressure: 3,
 };
 
-const MODE_LABEL: Record<number, string> = { 0: "Druck", 1: "Durchfluss", 2: "FixHz" };
+const MODE_LABEL: Record<number, string> = {
+  0: "Druckregelung",
+  1: "Durchflussregelung",
+  2: "Fixe Frequenz",
+  3: "Hahnmodus",
+};
+const MODE_OPTIONS = [
+  { value: "0", label: "Druckregelung" },
+  { value: "1", label: "Durchflussregelung" },
+  { value: "2", label: "Fixe Frequenz" },
+  { value: "3", label: "Hahnmodus" },
+];
 
 function PresetsSection({ active }: { active: string }) {
   const [data, setData] = useState<{ active: string; presets: Preset[] } | null>(null);
@@ -605,6 +619,13 @@ function PresetsSection({ active }: { active: string }) {
       setErr(e instanceof Error ? e.message : "Speichern fehlgeschlagen");
     }
   };
+  const mode = editing?.mode ?? 0;
+  const setpointLabel = mode === 1 ? "Soll-Durchfluss L/min" : "Solldruck bar";
+  const setpointHint = mode === 1
+    ? "Ziel-Durchfluss fuer die PI-Regelung."
+    : mode === 0
+      ? "Zieldruck, den der PI-Regler waehrend des Laufens halten soll."
+      : "Nur fuer Druck-/Durchflussregelung relevant.";
 
   return (
     <Section title="Pumpen-Presets">
@@ -627,14 +648,37 @@ function PresetsSection({ active }: { active: string }) {
           <div className="border-t border-border bg-slate-50 p-4">
             <div className="grid gap-3 md:grid-cols-4">
               <TextField label="Name" value={editing.name} disabled={!isNew} onChange={(v) => setEditing({ ...editing, name: v })} />
-              <Select label="Modus" value={String(editing.mode)} options={["0", "1", "2"]} onChange={(v) => setEditing({ ...editing, mode: Number(v) as 0 | 1 | 2 })} />
-              <NumField label="Setpoint" value={editing.setpoint} step={0.1} onChange={(v) => setEditing({ ...editing, setpoint: v })} />
-              <NumField label="Soll-Hz" value={editing.setpoint_hz} step={1} onChange={(v) => setEditing({ ...editing, setpoint_hz: v })} />
-              <NumField label="Kp" value={editing.kp} step={0.5} onChange={(v) => setEditing({ ...editing, kp: v })} />
-              <NumField label="Ki" value={editing.ki} step={0.1} onChange={(v) => setEditing({ ...editing, ki: v })} />
-              <NumField label="Hz min" value={editing.freq_min} step={1} onChange={(v) => setEditing({ ...editing, freq_min: v })} />
-              <NumField label="Hz max" value={editing.freq_max} step={1} onChange={(v) => setEditing({ ...editing, freq_max: v })} />
+              <Select
+                label="Modus"
+                value={String(editing.mode)}
+                options={MODE_OPTIONS.map((o) => o.value)}
+                optionLabels={Object.fromEntries(MODE_OPTIONS.map((o) => [o.value, o.label]))}
+                hint="Druck: PI auf bar. Durchfluss: PI auf L/min. FixHz: sofort feste Drehzahl. Hahn: Ein/Aus ueber Druck, feste Drehzahl."
+                onChange={(v) => setEditing({ ...editing, mode: Number(v) as 0 | 1 | 2 | 3 })}
+              />
+              {mode !== 2 && mode !== 3 && (
+                <NumField label={setpointLabel} value={editing.setpoint} step={0.1} hint={setpointHint} onChange={(v) => setEditing({ ...editing, setpoint: v })} />
+              )}
+              {(mode === 2 || mode === 3) && (
+                <NumField label="Feste Drehzahl Hz" value={editing.setpoint_hz} step={1} hint={mode === 3 ? "Hahnmodus: diese Hz laufen zwischen Ein- und Ausschaltdruck." : "FixHz: Pumpe laeuft direkt mit dieser Frequenz."} onChange={(v) => setEditing({ ...editing, setpoint_hz: v })} />
+              )}
+              {mode === 2 && (
+                <NumField label="Schutzdruck bar" value={editing.expected_pressure} step={0.1} hint="FixHz-Schutz: oberhalb dieses Drucks plus Hysterese wird gestoppt." onChange={(v) => setEditing({ ...editing, expected_pressure: v })} />
+              )}
+              {(mode === 0 || mode === 1) && (
+                <>
+                  <NumField label="Kp Reaktion" value={editing.kp} step={0.5} hint="Direkte Reaktion auf Abweichung. Hoeher = schneller, kann unruhiger werden." onChange={(v) => setEditing({ ...editing, kp: v })} />
+                  <NumField label="Ki Nachregelung" value={editing.ki} step={0.1} hint="Korrigiert bleibende Abweichung ueber Zeit. Zu hoch kann Schwingen erzeugen." onChange={(v) => setEditing({ ...editing, ki: v })} />
+                  <NumField label="Hz min" value={editing.freq_min} step={1} hint="Untergrenze der automatischen Frequenzregelung." onChange={(v) => setEditing({ ...editing, freq_min: v })} />
+                  <NumField label="Hz max" value={editing.freq_max} step={1} hint="Obergrenze der automatischen Frequenzregelung." onChange={(v) => setEditing({ ...editing, freq_max: v })} />
+                </>
+              )}
             </div>
+            {mode === 3 && (
+              <HelpText>
+                Hahnmodus nutzt die globalen Werte "Ein bar" und "Aus bar": unter Einschaltdruck startet die Pumpe mit fester Hz, ab Ausschaltdruck stoppt sie wieder.
+              </HelpText>
+            )}
             <div className="mt-4 flex justify-end gap-2">
               <button type="button" onClick={() => setEditing(null)} className="rounded-lg border border-border bg-white px-4 py-2 text-sm">Abbrechen</button>
               <button type="button" onClick={save} className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">Speichern</button>
@@ -662,13 +706,13 @@ function PiSection({ setpoint, pOn, pOff, kp, ki, freqMin, freqMax, enabled, spi
           <Toggle checked={enabled} onChange={(v) => api.setPressure({ enabled: v })} />
         </div>
         <div className="grid gap-3 md:grid-cols-4">
-          <NumField label="Soll bar" value={draft.setpoint} step={0.1} onChange={(v) => setDraft({ ...draft, setpoint: v })} />
-          <NumField label="Ein bar" value={draft.p_on} step={0.1} onChange={(v) => setDraft({ ...draft, p_on: v })} />
-          <NumField label="Aus bar" value={draft.p_off} step={0.1} onChange={(v) => setDraft({ ...draft, p_off: v })} />
-          <NumField label="Hz min" value={draft.freq_min} step={1} onChange={(v) => setDraft({ ...draft, freq_min: v })} />
-          <NumField label="Hz max" value={draft.freq_max} step={1} onChange={(v) => setDraft({ ...draft, freq_max: v })} />
-          <NumField label="Kp" value={draft.kp} step={0.5} onChange={(v) => setDraft({ ...draft, kp: v })} />
-          <NumField label="Ki" value={draft.ki} step={0.1} onChange={(v) => setDraft({ ...draft, ki: v })} />
+          <NumField label="Solldruck bar" value={draft.setpoint} step={0.1} hint="Zieldruck fuer Druckregelung. Dient auch als Mitte fuer Ein-/Ausschaltdruck." onChange={(v) => setDraft({ ...draft, setpoint: v })} />
+          <NumField label="Einschaltdruck bar" value={draft.p_on} step={0.1} hint="Hahn-/Druckbetrieb: darunter startet die Pumpe." onChange={(v) => setDraft({ ...draft, p_on: v })} />
+          <NumField label="Ausschaltdruck bar" value={draft.p_off} step={0.1} hint="Hahn-/Druckbetrieb: ab hier stoppt die Pumpe." onChange={(v) => setDraft({ ...draft, p_off: v })} />
+          <NumField label="Hz min" value={draft.freq_min} step={1} hint="Untergrenze fuer automatische PI-Regelung." onChange={(v) => setDraft({ ...draft, freq_min: v })} />
+          <NumField label="Hz max" value={draft.freq_max} step={1} hint="Obergrenze fuer automatische PI-Regelung und Fallback fuer Hahnmodus." onChange={(v) => setDraft({ ...draft, freq_max: v })} />
+          <NumField label="Kp Reaktion" value={draft.kp} step={0.5} hint="Direkter Regelanteil. Hoeher = schneller, aber unruhiger." onChange={(v) => setDraft({ ...draft, kp: v })} />
+          <NumField label="Ki Nachregelung" value={draft.ki} step={0.1} hint="Korrigiert bleibende Abweichung. Zu hoch kann Schwingen erzeugen." onChange={(v) => setDraft({ ...draft, ki: v })} />
         </div>
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <span className="text-xs text-slate-500">Hahn-zu-Erkennung: {spike ? "an" : "aus"}</span>
@@ -797,32 +841,43 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
   );
 }
 
-function NumField({ label, value, step, onChange }: { label: string; value: number; step: number; onChange: (v: number) => void }) {
+function NumField({ label, value, step, hint, onChange }: { label: string; value: number; step: number; hint?: string; onChange: (v: number) => void }) {
   return (
     <label className="flex flex-col gap-1">
       <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</span>
       <input type="number" value={Number.isFinite(value) ? value : 0} step={step} onChange={(e) => onChange(parseFloat(e.target.value) || 0)} className="h-11 rounded-lg border border-border bg-white px-3 text-base font-semibold tabular-nums focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30" />
+      {hint && <span className="text-[11px] leading-snug text-slate-500">{hint}</span>}
     </label>
   );
 }
 
-function TextField({ label, value, disabled, onChange }: { label: string; value: string; disabled?: boolean; onChange: (v: string) => void }) {
+function TextField({ label, value, disabled, hint, onChange }: { label: string; value: string; disabled?: boolean; hint?: string; onChange: (v: string) => void }) {
   return (
     <label className="flex flex-col gap-1">
       <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</span>
       <input type="text" value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)} className="h-11 rounded-lg border border-border bg-white px-3 text-sm disabled:bg-slate-100" />
+      {hint && <span className="text-[11px] leading-snug text-slate-500">{hint}</span>}
     </label>
   );
 }
 
-function Select({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (v: string) => void }) {
+function Select({ label, value, options, optionLabels, hint, onChange }: { label: string; value: string; options: string[]; optionLabels?: Record<string, string>; hint?: string; onChange: (v: string) => void }) {
   return (
     <label className="flex flex-col gap-1">
       <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</span>
       <select value={value} onChange={(e) => onChange(e.target.value)} className="h-11 rounded-lg border border-border bg-white px-3 text-sm font-semibold">
-        {options.map((o) => <option key={o} value={o}>{o}</option>)}
+        {options.map((o) => <option key={o} value={o}>{optionLabels?.[o] ?? o}</option>)}
       </select>
+      {hint && <span className="text-[11px] leading-snug text-slate-500">{hint}</span>}
     </label>
+  );
+}
+
+function HelpText({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mt-3 rounded-lg border border-primary/15 bg-primary/5 p-3 text-xs leading-relaxed text-slate-600">
+      {children}
+    </div>
   );
 }
 

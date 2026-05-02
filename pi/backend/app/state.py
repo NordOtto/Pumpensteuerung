@@ -54,7 +54,7 @@ class PIState(BaseModel):
     pump_state: int = 0             # 0=AUS, 1=STARTET, 2=LÄUFT
     dry_run_locked: bool = False
     flow_setpoint: float = 0.0
-    ctrl_mode: int = 0              # 0=Druck, 1=Durchfluss, 2=FixHz
+    ctrl_mode: int = 0              # 0=Druck, 1=Durchfluss, 2=FixHz, 3=Hahn
     spike_enabled: bool = True
     spike_threshold: float = 0.4
     spike_window_s: float = 3.0

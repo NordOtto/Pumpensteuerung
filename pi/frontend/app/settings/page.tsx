@@ -844,10 +844,38 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 }
 
 function NumField({ label, value, step, hint, onChange }: { label: string; value: number; step: number; hint?: string; onChange: (v: number) => void }) {
+  const [text, setText] = useState(() => String(Number.isFinite(value) ? value : 0));
+
+  useEffect(() => {
+    setText(String(Number.isFinite(value) ? value : 0));
+  }, [value]);
+
   return (
     <label className="flex flex-col gap-1">
       <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</span>
-      <input type="number" value={Number.isFinite(value) ? value : 0} step={step} onChange={(e) => onChange(parseFloat(e.target.value) || 0)} className="h-11 rounded-lg border border-border bg-white px-3 text-base font-semibold tabular-nums focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30" />
+      <input
+        type="number"
+        value={text}
+        step={step}
+        onChange={(e) => {
+          const next = e.target.value;
+          setText(next);
+          if (next === "" || next === "-" || next === "." || next === ",") return;
+          const parsed = Number.parseFloat(next.replace(",", "."));
+          if (Number.isFinite(parsed)) onChange(parsed);
+        }}
+        onBlur={() => {
+          const parsed = Number.parseFloat(text.replace(",", "."));
+          if (Number.isFinite(parsed)) {
+            const normalized = String(parsed);
+            setText(normalized);
+            onChange(parsed);
+          } else {
+            setText(String(Number.isFinite(value) ? value : 0));
+          }
+        }}
+        className="h-11 rounded-lg border border-border bg-white px-3 text-base font-semibold tabular-nums focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+      />
       {hint && <span className="text-[11px] leading-snug text-slate-500">{hint}</span>}
     </label>
   );

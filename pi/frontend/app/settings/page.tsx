@@ -123,6 +123,7 @@ function clonePrograms(programs: IrrigationProgram[]) {
 
 function ProgramsSection({ programs, presets }: { programs: IrrigationProgram[]; presets: Preset[] }) {
   const [draft, setDraft] = useState<IrrigationProgram[]>(() => clonePrograms(programs));
+  const [dirty, setDirty] = useState(false);
   const [openIdx, setOpenIdx] = useState(0);
   const [editingZone, setEditingZone] = useState<{ pIdx: number; zIdx: number | null; z: IrrigationZone } | null>(null);
   const [wizard, setWizard] = useState<SmartEtWizard>({
@@ -140,9 +141,12 @@ function ProgramsSection({ programs, presets }: { programs: IrrigationProgram[];
   const [wizardBusy, setWizardBusy] = useState(false);
   const [err, setErr] = useState("");
 
-  useEffect(() => { setDraft(clonePrograms(programs)); }, [programs]);
+  useEffect(() => {
+    if (!dirty) setDraft(clonePrograms(programs));
+  }, [programs, dirty]);
 
   const updateProg = (i: number, patch: Partial<IrrigationProgram>) => {
+    setDirty(true);
     setDraft((d) => d.map((p, idx) => (idx === i ? { ...p, ...patch } : p)));
   };
 
@@ -150,6 +154,7 @@ function ProgramsSection({ programs, presets }: { programs: IrrigationProgram[];
     setErr("");
     try {
       await api.savePrograms(draft);
+      setDirty(false);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Speichern fehlgeschlagen");
     }
@@ -178,6 +183,7 @@ function ProgramsSection({ programs, presets }: { programs: IrrigationProgram[];
     const rec = wizardRec ?? await api.recommendSmartEt(wizard);
     setWizardRec(rec);
     setWizardSummary(rec.summary);
+    setDirty(true);
     setDraft((d) => d.map((p, idx) => {
       if (idx !== pIdx) return p;
       const nextZone = { ...zone, ...rec.zone_patch, enabled: true };
@@ -193,6 +199,7 @@ function ProgramsSection({ programs, presets }: { programs: IrrigationProgram[];
     if (!editingZone) return;
     const { pIdx, zIdx, z } = editingZone;
     const id = z.id || `zone_${Date.now()}`;
+    setDirty(true);
     setDraft((d) => d.map((p, i) => {
       if (i !== pIdx) return p;
       const zones = zIdx === null
@@ -204,6 +211,7 @@ function ProgramsSection({ programs, presets }: { programs: IrrigationProgram[];
   };
 
   const addProgram = () => {
+    setDirty(true);
     setDraft((d) => {
       const next = { ...EMPTY_PROGRAM, id: `prog_${Date.now()}`, name: `Programm ${d.length + 1}` };
       setOpenIdx(d.length);

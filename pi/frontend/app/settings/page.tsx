@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, ChevronLeft, ChevronRight, Droplets, Gauge, Ruler, Sparkles, SunMedium } from "lucide-react";
 import type React from "react";
@@ -29,12 +29,19 @@ type SmartEtRecommendation = Awaited<ReturnType<typeof api.recommendSmartEt>>;
 
 export default function SettingsPage() {
   const { status } = useStatus();
+  const [presetData, setPresetData] = useState<{ active: string; presets: Preset[] } | null>(null);
+  const loadPresets = useCallback(() => {
+    api.fetchPresets().then(setPresetData).catch(() => {});
+  }, []);
+
+  useEffect(() => { loadPresets(); }, [loadPresets]);
+
   if (!status) return <div className="flex h-64 items-center justify-center text-slate-400">Lade...</div>;
 
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
-      <ProgramsSection programs={status.irrigation.programs as IrrigationProgram[]} />
-      <PresetsSection active={status.active_preset} />
+      <ProgramsSection programs={status.irrigation.programs as IrrigationProgram[]} presets={presetData?.presets ?? []} />
+      <PresetsSection active={status.active_preset} data={presetData} onReload={loadPresets} />
       <PiSection
         setpoint={status.pi.setpoint}
         pOn={status.pi.p_on}
@@ -114,11 +121,10 @@ function clonePrograms(programs: IrrigationProgram[]) {
   })) as IrrigationProgram[];
 }
 
-function ProgramsSection({ programs }: { programs: IrrigationProgram[] }) {
+function ProgramsSection({ programs, presets }: { programs: IrrigationProgram[]; presets: Preset[] }) {
   const [draft, setDraft] = useState<IrrigationProgram[]>(() => clonePrograms(programs));
   const [openIdx, setOpenIdx] = useState(0);
   const [editingZone, setEditingZone] = useState<{ pIdx: number; zIdx: number | null; z: IrrigationZone } | null>(null);
-  const [presets, setPresets] = useState<Preset[]>([]);
   const [wizard, setWizard] = useState<SmartEtWizard>({
     plant_type: "Rasen",
     soil_type: "lehmig",
@@ -135,7 +141,6 @@ function ProgramsSection({ programs }: { programs: IrrigationProgram[] }) {
   const [err, setErr] = useState("");
 
   useEffect(() => { setDraft(clonePrograms(programs)); }, [programs]);
-  useEffect(() => { api.fetchPresets().then((r) => setPresets(r.presets)).catch(() => {}); }, []);
 
   const updateProg = (i: number, patch: Partial<IrrigationProgram>) => {
     setDraft((d) => d.map((p, idx) => (idx === i ? { ...p, ...patch } : p)));
@@ -598,13 +603,10 @@ const MODE_OPTIONS = [
   { value: "3", label: "Hahnmodus" },
 ];
 
-function PresetsSection({ active }: { active: string }) {
-  const [data, setData] = useState<{ active: string; presets: Preset[] } | null>(null);
+function PresetsSection({ active, data, onReload }: { active: string; data: { active: string; presets: Preset[] } | null; onReload: () => void }) {
   const [editing, setEditing] = useState<Preset | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [err, setErr] = useState("");
-  const load = () => api.fetchPresets().then(setData).catch(() => {});
-  useEffect(() => { load(); }, []);
   if (!data) return <Section title="Presets"><div className="p-4 text-sm text-slate-400">Lade...</div></Section>;
 
   const save = async () => {
@@ -612,7 +614,7 @@ function PresetsSection({ active }: { active: string }) {
     setErr("");
     try {
       await api.savePreset(editing);
-      await load();
+      onReload();
       setEditing(null);
       setIsNew(false);
     } catch (e) {
@@ -638,9 +640,9 @@ function PresetsSection({ active }: { active: string }) {
                 <span className="ml-2 text-xs text-slate-500">{MODE_LABEL[p.mode]}</span>
                 {(data.active === p.name || active === p.name) && <span className="ml-2 rounded bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">aktiv</span>}
               </div>
-              <button type="button" onClick={() => api.applyPreset(p.name).then(load)} className="rounded border border-border px-3 py-1 text-xs font-semibold">Anwenden</button>
+              <button type="button" onClick={() => api.applyPreset(p.name).then(onReload)} className="rounded border border-border px-3 py-1 text-xs font-semibold">Anwenden</button>
               <button type="button" onClick={() => { setEditing({ ...p }); setIsNew(false); }} className="rounded border border-border px-3 py-1 text-xs font-semibold">Bearbeiten</button>
-              <button type="button" onClick={() => api.deletePreset(p.name).then(load).catch((e) => setErr(e.message))} className="rounded border border-danger/40 px-3 py-1 text-xs font-semibold text-danger">Loschen</button>
+              <button type="button" onClick={() => api.deletePreset(p.name).then(onReload).catch((e) => setErr(e.message))} className="rounded border border-danger/40 px-3 py-1 text-xs font-semibold text-danger">Loschen</button>
             </div>
           ))}
         </div>

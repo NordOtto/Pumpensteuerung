@@ -4,7 +4,7 @@ import { StatusBadge } from "./status-badge";
 interface ZoneCardProps {
   name: string;
   moisturePct: number;
-  state: "ok" | "trocken" | "läuft";
+  state: "ok" | "trocken" | "laeuft";
   etTodayMm: number | null;
   nextRun: string | null;
   active?: boolean;
@@ -13,19 +13,19 @@ interface ZoneCardProps {
 const STATE_TONE = {
   ok: "ok",
   trocken: "warn",
-  läuft: "ok",
+  laeuft: "ok",
 } as const;
 
 const STATE_LABEL = {
   ok: "OK",
   trocken: "Trocken",
-  läuft: "Bewässerung läuft",
+  laeuft: "Bewaesserung laeuft",
 } as const;
 
-const STATE_BORDER_L = {
-  ok: "border-l-ok",
-  trocken: "border-l-warn",
-  läuft: "border-l-primary",
+const STATE_ACCENT = {
+  ok: "from-ok",
+  trocken: "from-warn",
+  laeuft: "from-primary",
 } as const;
 
 export function ZoneCard({ name, moisturePct, state, etTodayMm, nextRun, active }: ZoneCardProps) {
@@ -35,14 +35,15 @@ export function ZoneCard({ name, moisturePct, state, etTodayMm, nextRun, active 
   return (
     <div
       className={cn(
-        "flex flex-col gap-3 rounded-lg border border-l-4 bg-white p-4 shadow-sm animate-fade-in",
-        STATE_BORDER_L[state],
-        active ? "border-primary ring-2 ring-primary/20" : "border-border"
+        "relative flex flex-col gap-3 overflow-hidden rounded-lg border border-white/70 bg-gradient-to-br from-white/90 via-white/80 to-sky-50/70 p-4 shadow-[0_16px_38px_rgba(15,23,42,0.08)] backdrop-blur animate-fade-in",
+        active ? "ring-2 ring-primary/20" : ""
       )}
     >
+      <div className={cn("absolute inset-y-0 left-0 w-1 bg-gradient-to-b to-white/20", STATE_ACCENT[state])} />
+
       <div className="flex items-start justify-between gap-2">
         <div className="font-semibold uppercase tracking-tight text-slate-900">{name}</div>
-        <StatusBadge tone={STATE_TONE[state]} pulse={state === "läuft"}>
+        <StatusBadge tone={STATE_TONE[state]} pulse={state === "laeuft"}>
           {STATE_LABEL[state]}
         </StatusBadge>
       </div>
@@ -54,7 +55,7 @@ export function ZoneCard({ name, moisturePct, state, etTodayMm, nextRun, active 
             {Math.round(moisturePct)}%
           </span>
         </div>
-        <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+        <div className="h-2.5 w-full overflow-hidden rounded-full bg-white shadow-inner">
           <div
             className={cn("h-full transition-[width]", barColor)}
             style={{ width: `${Math.max(0, Math.min(100, moisturePct))}%` }}
@@ -65,12 +66,12 @@ export function ZoneCard({ name, moisturePct, state, etTodayMm, nextRun, active 
       <div className="flex items-baseline justify-between text-xs">
         <span className="text-slate-500">ET heute</span>
         <span className="num font-medium text-slate-700">
-          {etTodayMm != null ? `−${etTodayMm.toFixed(1)} mm` : "—"}
+          {etTodayMm != null ? `-${etTodayMm.toFixed(1)} mm` : "--"}
         </span>
       </div>
       <div className="flex items-baseline justify-between text-xs">
-        <span className="text-slate-500">Nächste Bewässerung</span>
-        <span className="font-medium text-slate-700">{nextRun ?? "—"}</span>
+        <span className="text-slate-500">Naechste Bewaesserung</span>
+        <span className="font-medium text-slate-700">{nextRun ?? "--"}</span>
       </div>
     </div>
   );

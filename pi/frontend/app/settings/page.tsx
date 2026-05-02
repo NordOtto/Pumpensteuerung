@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { Check, ChevronLeft, ChevronRight, Droplets, Gauge, Ruler, Sparkles, SunMedium } from "lucide-react";
+import type React from "react";
 import { Section } from "@/components/section";
 import { useStatus } from "@/lib/ws";
 import { api } from "@/lib/api";
@@ -10,6 +13,19 @@ const DAY_NAMES = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 const PLANTS = ["Rasen", "Hecke", "Beet", "Tropfschlauch"];
 const SOILS = ["sandig", "lehmig", "schwer"];
 const SUN = ["schattig", "halbsonnig", "vollsonnig"];
+const GUIDE_STEPS = ["Nutzung", "Standort", "Messung", "Empfehlung"];
+
+type SmartEtWizard = {
+  plant_type: string;
+  soil_type: string;
+  sun_exposure: string;
+  measured_mm: number;
+  test_minutes: number;
+  max_runs_per_week: number;
+  preset: string;
+};
+
+type SmartEtRecommendation = Awaited<ReturnType<typeof api.recommendSmartEt>>;
 
 export default function SettingsPage() {
   const { status } = useStatus();
@@ -103,7 +119,7 @@ function ProgramsSection({ programs }: { programs: IrrigationProgram[] }) {
   const [openIdx, setOpenIdx] = useState(0);
   const [editingZone, setEditingZone] = useState<{ pIdx: number; zIdx: number | null; z: IrrigationZone } | null>(null);
   const [presets, setPresets] = useState<Preset[]>([]);
-  const [wizard, setWizard] = useState({
+  const [wizard, setWizard] = useState<SmartEtWizard>({
     plant_type: "Rasen",
     soil_type: "lehmig",
     sun_exposure: "vollsonnig",
@@ -112,7 +128,10 @@ function ProgramsSection({ programs }: { programs: IrrigationProgram[] }) {
     max_runs_per_week: 3,
     preset: "Rasen",
   });
+  const [wizardStep, setWizardStep] = useState(0);
+  const [wizardRec, setWizardRec] = useState<SmartEtRecommendation | null>(null);
   const [wizardSummary, setWizardSummary] = useState("");
+  const [wizardBusy, setWizardBusy] = useState(false);
   const [err, setErr] = useState("");
 
   useEffect(() => { setDraft(clonePrograms(programs)); }, [programs]);
@@ -131,12 +150,28 @@ function ProgramsSection({ programs }: { programs: IrrigationProgram[] }) {
     }
   };
 
+  const calculateWizard = async () => {
+    setErr("");
+    setWizardBusy(true);
+    try {
+      const rec = await api.recommendSmartEt(wizard);
+      setWizardRec(rec);
+      setWizardSummary(rec.summary);
+      setWizardStep(3);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Empfehlung fehlgeschlagen");
+    } finally {
+      setWizardBusy(false);
+    }
+  };
+
   const applyWizard = async () => {
     const pIdx = openIdx;
     const program = draft[pIdx];
     if (!program) return;
     const zone = program.zones[0] ?? { ...EMPTY_ZONE, id: `zone_${Date.now()}`, name: "Zone 1" };
-    const rec = await api.recommendSmartEt(wizard);
+    const rec = wizardRec ?? await api.recommendSmartEt(wizard);
+    setWizardRec(rec);
     setWizardSummary(rec.summary);
     setDraft((d) => d.map((p, idx) => {
       if (idx !== pIdx) return p;
@@ -172,36 +207,41 @@ function ProgramsSection({ programs }: { programs: IrrigationProgram[] }) {
   };
 
   const presetNames = presets.map((p) => p.name);
+  const activeProgram = draft[openIdx];
 
   return (
     <Section title="Bewasserungs-Programme">
       <div className="grid gap-4 lg:grid-cols-[360px_1fr]">
-        <div className="rounded-lg border border-border bg-slate-950 p-4 text-white shadow-sm">
-          <div className="text-xs font-bold uppercase tracking-widest text-primary/80">Smart-ET Assistent</div>
-          <div className="mt-2 text-sm text-slate-300">
-            Die Tage sind Freigabefenster. Gestartet wird nur, wenn ET-Defizit, Wetter und Sicherheitslogik passen.
-          </div>
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <Select label="Nutzung" value={wizard.plant_type} options={PLANTS} onChange={(v) => setWizard({ ...wizard, plant_type: v })} />
-            <Select label="Preset" value={wizard.preset} options={[...presetNames, "Benutzerdefiniert"]} onChange={(v) => setWizard({ ...wizard, preset: v })} />
-            <Select label="Boden" value={wizard.soil_type} options={SOILS} onChange={(v) => setWizard({ ...wizard, soil_type: v })} />
-            <Select label="Sonne" value={wizard.sun_exposure} options={SUN} onChange={(v) => setWizard({ ...wizard, sun_exposure: v })} />
-            <DarkNum label="Test-mm" value={wizard.measured_mm} step={0.5} onChange={(v) => setWizard({ ...wizard, measured_mm: v })} />
-            <DarkNum label="Test-min" value={wizard.test_minutes} step={1} onChange={(v) => setWizard({ ...wizard, test_minutes: v })} />
-            <DarkNum label="Max/Woche" value={wizard.max_runs_per_week} step={1} onChange={(v) => setWizard({ ...wizard, max_runs_per_week: v })} />
-          </div>
-          <button type="button" onClick={applyWizard} className="mt-4 w-full rounded-lg bg-primary py-3 text-sm font-bold text-white">
-            Werte fur offenes Programm berechnen
-          </button>
-          {wizardSummary && <div className="mt-3 rounded-md bg-white/10 p-3 text-xs text-slate-200">{wizardSummary}</div>}
-        </div>
+        <SmartEtGuide
+          programName={activeProgram?.name || "offenes Programm"}
+          step={wizardStep}
+          value={wizard}
+          presets={presetNames}
+          recommendation={wizardRec}
+          summary={wizardSummary}
+          busy={wizardBusy}
+          onStep={setWizardStep}
+          onChange={(next) => {
+            setWizard(next);
+            setWizardRec(null);
+            setWizardSummary("");
+          }}
+          onCalculate={calculateWizard}
+          onApply={applyWizard}
+        />
 
         <div className="flex flex-col gap-3">
           {draft.map((p, i) => {
             const isOpen = openIdx === i;
             const maxDeficit = Math.max(0, ...p.zones.map((z) => z.deficit_mm ?? 0));
             return (
-              <div key={p.id || i} className="overflow-hidden rounded-lg border border-border bg-white shadow-sm">
+              <motion.div
+                key={p.id || i}
+                className="overflow-hidden rounded-lg border border-white/70 bg-white/80 shadow-[0_14px_36px_rgba(15,23,42,0.08)] backdrop-blur"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.03, duration: 0.22 }}
+              >
                 <button type="button" onClick={() => setOpenIdx(isOpen ? -1 : i)} className="flex w-full items-center gap-3 px-4 py-3 text-left">
                   <Toggle checked={p.enabled} onChange={(v) => updateProg(i, { enabled: v })} />
                   <div className="min-w-0 flex-1">
@@ -216,7 +256,12 @@ function ProgramsSection({ programs }: { programs: IrrigationProgram[] }) {
                 </button>
 
                 {isOpen && (
-                  <div className="border-t border-border bg-slate-50 p-4">
+                  <motion.div
+                    className="border-t border-white/70 bg-gradient-to-br from-slate-50/80 to-primary/5 p-4"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    transition={{ duration: 0.2 }}
+                  >
                     <div className="grid gap-3 md:grid-cols-3">
                       <TextField label="Name" value={p.name} onChange={(v) => updateProg(i, { name: v })} />
                       <Select label="Modus" value={p.mode} options={["smart_et", "fixed"]} onChange={(v) => updateProg(i, { mode: v as "smart_et" | "fixed" })} />
@@ -251,9 +296,9 @@ function ProgramsSection({ programs }: { programs: IrrigationProgram[] }) {
                         + Zone hinzufugen
                       </button>
                     </div>
-                  </div>
+                  </motion.div>
                 )}
-              </div>
+              </motion.div>
             );
           })}
 
@@ -278,10 +323,198 @@ function ProgramsSection({ programs }: { programs: IrrigationProgram[] }) {
   );
 }
 
+function SmartEtGuide({
+  programName,
+  step,
+  value,
+  presets,
+  recommendation,
+  summary,
+  busy,
+  onStep,
+  onChange,
+  onCalculate,
+  onApply,
+}: {
+  programName: string;
+  step: number;
+  value: SmartEtWizard;
+  presets: string[];
+  recommendation: SmartEtRecommendation | null;
+  summary: string;
+  busy: boolean;
+  onStep: (step: number) => void;
+  onChange: (value: SmartEtWizard) => void;
+  onCalculate: () => void;
+  onApply: () => void;
+}) {
+  const nextStep = Math.min(step + 1, GUIDE_STEPS.length - 1);
+  const prevStep = Math.max(step - 1, 0);
+
+  return (
+    <motion.aside
+      className="overflow-hidden rounded-lg border border-white/70 bg-gradient-to-br from-white/90 via-white/75 to-cyan-50/80 p-4 shadow-[0_18px_45px_rgba(37,136,235,0.14)] backdrop-blur"
+      initial={{ opacity: 0, x: -14 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.28, ease: "easeOut" }}
+    >
+      <div className="mb-4 flex items-start gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary shadow-inner">
+          <Sparkles className="h-5 w-5" />
+        </div>
+        <div className="min-w-0">
+          <div className="text-xs font-bold uppercase tracking-widest text-primary">Smart-ET Guide</div>
+          <div className="mt-1 text-sm text-slate-600">
+            Fuehrt die Empfehlung fuer <span className="font-semibold text-slate-900">{programName}</span>.
+          </div>
+        </div>
+      </div>
+
+      <div className="mb-4 grid grid-cols-4 gap-2">
+        {GUIDE_STEPS.map((label, index) => (
+          <button
+            key={label}
+            type="button"
+            onClick={() => onStep(index)}
+            className={`h-2 rounded-full transition ${index <= step ? "bg-primary shadow-[0_0_16px_rgba(37,136,235,0.35)]" : "bg-slate-200"}`}
+            aria-label={label}
+          />
+        ))}
+      </div>
+
+      <div className="min-h-[250px]">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={step}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+            className="rounded-lg border border-white/70 bg-white/70 p-3 shadow-sm"
+          >
+            {step === 0 && (
+              <GuideStep icon={<Droplets className="h-4 w-4" />} title="Nutzung festlegen">
+                <div className="grid gap-3">
+                  <Select label="Nutzung" value={value.plant_type} options={PLANTS} onChange={(v) => onChange({ ...value, plant_type: v })} />
+                  <Select label="Preset" value={value.preset} options={[...presets, "Benutzerdefiniert"]} onChange={(v) => onChange({ ...value, preset: v })} />
+                </div>
+              </GuideStep>
+            )}
+
+            {step === 1 && (
+              <GuideStep icon={<SunMedium className="h-4 w-4" />} title="Standort einordnen">
+                <div className="grid gap-3">
+                  <Select label="Boden" value={value.soil_type} options={SOILS} onChange={(v) => onChange({ ...value, soil_type: v })} />
+                  <Select label="Sonne" value={value.sun_exposure} options={SUN} onChange={(v) => onChange({ ...value, sun_exposure: v })} />
+                </div>
+              </GuideStep>
+            )}
+
+            {step === 2 && (
+              <GuideStep icon={<Ruler className="h-4 w-4" />} title="Testlauf messen">
+                <div className="grid gap-3">
+                  <NumField label="Test-mm" value={value.measured_mm} step={0.5} onChange={(v) => onChange({ ...value, measured_mm: v })} />
+                  <NumField label="Test-min" value={value.test_minutes} step={1} onChange={(v) => onChange({ ...value, test_minutes: v })} />
+                  <NumField label="Max/Woche" value={value.max_runs_per_week} step={1} onChange={(v) => onChange({ ...value, max_runs_per_week: v })} />
+                </div>
+              </GuideStep>
+            )}
+
+            {step === 3 && (
+              <GuideStep icon={<Gauge className="h-4 w-4" />} title="Empfehlung pruefen">
+                <div className="rounded-lg border border-primary/15 bg-gradient-to-br from-primary/10 to-ok/10 p-3 text-sm text-slate-700">
+                  {summary || "Berechne eine Empfehlung aus Nutzung, Standort und Testlauf."}
+                </div>
+                {recommendation && (
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <GuideMetric label="Wasser" value={`${formatMaybe(recommendation.zone_patch.water_mm)} mm`} />
+                    <GuideMetric label="Laufzeit" value={`${recommendation.zone_patch.duration_min ?? "--"} min`} />
+                    <GuideMetric label="Start ab" value={`${formatMaybe(recommendation.zone_patch.min_deficit_mm)} mm`} />
+                    <GuideMetric label="Niederschlag" value={`${recommendation.precip_mm_h.toFixed(1)} mm/h`} />
+                  </div>
+                )}
+              </GuideStep>
+            )}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => onStep(prevStep)}
+          disabled={step === 0}
+          className="inline-flex h-11 items-center gap-2 rounded-lg border border-border bg-white/75 px-3 text-sm font-semibold text-slate-700 shadow-sm disabled:opacity-40"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Zurueck
+        </button>
+        {step < 2 && (
+          <button
+            type="button"
+            onClick={() => onStep(nextStep)}
+            className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-white shadow-[0_10px_24px_rgba(37,136,235,0.25)]"
+          >
+            Weiter
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        )}
+        {step === 2 && (
+          <button
+            type="button"
+            onClick={onCalculate}
+            disabled={busy}
+            className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-white shadow-[0_10px_24px_rgba(37,136,235,0.25)] disabled:opacity-50"
+          >
+            {busy ? "Berechne..." : "Empfehlung berechnen"}
+            <Sparkles className="h-4 w-4" />
+          </button>
+        )}
+        {step === 3 && (
+          <button
+            type="button"
+            onClick={recommendation ? onApply : onCalculate}
+            disabled={busy}
+            className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-white shadow-[0_10px_24px_rgba(37,136,235,0.25)] disabled:opacity-50"
+          >
+            {recommendation ? "In Programm uebernehmen" : busy ? "Berechne..." : "Empfehlung berechnen"}
+            <Check className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+    </motion.aside>
+  );
+}
+
+function GuideStep({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-800">
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">{icon}</span>
+        {title}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function GuideMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-white/80 bg-white/80 p-2 shadow-sm">
+      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{label}</div>
+      <div className="num mt-1 text-sm font-semibold text-slate-900">{value}</div>
+    </div>
+  );
+}
+
+function formatMaybe(value: number | undefined) {
+  return typeof value === "number" && Number.isFinite(value) ? value.toFixed(1) : "--";
+}
+
 function ZoneRow({ zone, onEdit, onDelete }: { zone: IrrigationZone; onEdit: () => void; onDelete: () => void }) {
   const pct = Math.min(100, Math.round((zone.deficit_mm / Math.max(zone.target_mm, 1)) * 100));
   return (
-    <div className="rounded-lg border border-border bg-white p-4">
+    <div className="rounded-lg border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="font-semibold text-slate-900">{zone.name || "Zone"}</div>
@@ -312,7 +545,12 @@ function ZoneEditor({ value, presets, onChange, onCancel, onSave }: {
   onSave: () => void;
 }) {
   return (
-    <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-4">
+    <motion.div
+      className="rounded-lg border border-primary/20 bg-gradient-to-br from-white/90 to-primary/10 p-4 shadow-[0_14px_34px_rgba(37,136,235,0.12)] backdrop-blur"
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2 }}
+    >
       <div className="mb-3 text-sm font-bold text-slate-800">Zone bearbeiten</div>
       <div className="grid gap-3 md:grid-cols-3">
         <TextField label="Name" value={value.name} onChange={(v) => onChange({ ...value, name: v })} />
@@ -328,7 +566,7 @@ function ZoneEditor({ value, presets, onChange, onCancel, onSave }: {
         <button type="button" onClick={onCancel} className="rounded-lg border border-border bg-white px-4 py-2 text-sm">Abbrechen</button>
         <button type="button" onClick={onSave} className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">Zone speichern</button>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -370,7 +608,7 @@ function PresetsSection({ active }: { active: string }) {
 
   return (
     <Section title="Pumpen-Presets">
-      <div className="rounded-lg border border-border bg-white shadow-sm">
+      <div className="rounded-lg border border-white/70 bg-white/80 shadow-[0_14px_36px_rgba(15,23,42,0.08)] backdrop-blur">
         <div className="divide-y divide-border">
           {data.presets.map((p) => (
             <div key={p.name} className="flex flex-wrap items-center gap-3 px-4 py-3">
@@ -418,7 +656,7 @@ function PiSection({ setpoint, pOn, pOff, kp, ki, freqMin, freqMax, enabled, spi
   const [draft, setDraft] = useState({ setpoint, p_on: pOn, p_off: pOff, kp, ki, freq_min: freqMin, freq_max: freqMax });
   return (
     <Section title="PI-Druckregelung">
-      <div className="rounded-lg border border-border bg-white p-4 shadow-sm">
+      <div className="rounded-lg border border-white/70 bg-gradient-to-br from-white/90 to-sky-50/70 p-4 shadow-[0_14px_36px_rgba(15,23,42,0.08)] backdrop-blur">
         <div className="mb-4 flex items-center justify-between">
           <span className="text-sm font-semibold text-slate-700">Regler aktiv</span>
           <Toggle checked={enabled} onChange={(v) => api.setPressure({ enabled: v })} />
@@ -448,7 +686,7 @@ function TimeguardSection({ tg }: { tg: { enabled: boolean; start_hour: number; 
   const [d, setD] = useState({ start_hour: tg.start_hour, start_min: tg.start_min, end_hour: tg.end_hour, end_min: tg.end_min, days: [...tg.days] });
   return (
     <Section title="Zeitfenster">
-      <div className="rounded-lg border border-border bg-white p-4 shadow-sm">
+      <div className="rounded-lg border border-white/70 bg-gradient-to-br from-white/90 to-cyan-50/60 p-4 shadow-[0_14px_36px_rgba(15,23,42,0.08)] backdrop-blur">
         <div className="mb-4 flex items-center justify-between">
           <span className="text-sm font-semibold text-slate-700">Aktiv {tg.allowed ? "(im Fenster)" : "(gesperrt)"}</span>
           <Toggle checked={tg.enabled} onChange={(v) => api.setTimeguard({ enabled: v })} />
@@ -503,7 +741,7 @@ function OtaSection({ fw }: { fw: string }) {
 
   return (
     <Section title="System-Update">
-      <div className="rounded-lg border border-border bg-white p-4 shadow-sm">
+      <div className="rounded-lg border border-white/70 bg-white/80 p-4 shadow-[0_14px_36px_rgba(15,23,42,0.08)] backdrop-blur">
         <div className="grid gap-3 md:grid-cols-3">
           <Info label="Installiert" value={ota?.current_version ?? fw} />
           <Info label="Neueste Version" value={ota?.latest_version ?? "-"} />
@@ -524,7 +762,7 @@ function OtaSection({ fw }: { fw: string }) {
 function VacationSection({ enabled }: { enabled: boolean }) {
   return (
     <Section title="Urlaubsmodus">
-      <div className="flex items-center justify-between rounded-lg border border-border bg-white p-4 shadow-sm">
+      <div className="flex items-center justify-between rounded-lg border border-white/70 bg-gradient-to-br from-white/90 to-sky-50/70 p-4 shadow-[0_14px_36px_rgba(15,23,42,0.08)] backdrop-blur">
         <div>
           <div className="font-semibold text-slate-700">Pumpe gesperrt</div>
           <div className="text-xs text-slate-500">Alle Bewasserungen pausiert.</div>
@@ -568,15 +806,6 @@ function NumField({ label, value, step, onChange }: { label: string; value: numb
   );
 }
 
-function DarkNum({ label, value, step, onChange }: { label: string; value: number; step: number; onChange: (v: number) => void }) {
-  return (
-    <label className="flex flex-col gap-1">
-      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</span>
-      <input type="number" value={value} step={step} onChange={(e) => onChange(parseFloat(e.target.value) || 0)} className="h-10 rounded-lg border border-white/10 bg-white/10 px-3 text-sm font-bold text-white outline-none focus:border-primary" />
-    </label>
-  );
-}
-
 function TextField({ label, value, disabled, onChange }: { label: string; value: string; disabled?: boolean; onChange: (v: string) => void }) {
   return (
     <label className="flex flex-col gap-1">
@@ -611,7 +840,7 @@ function TimeField({ label, h, m, onChange }: { label: string; h: number; m: num
 
 function Info({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-border bg-white p-3 shadow-sm">
+    <div className="rounded-lg border border-white/70 bg-white/80 p-3 shadow-sm backdrop-blur">
       <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</div>
       <div className="truncate text-sm font-medium text-slate-700">{value}</div>
     </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { motion } from "framer-motion";
 import { Section } from "@/components/section";
 import { KpiCard } from "@/components/kpi-card";
 import { ZoneCard } from "@/components/zone-card";
@@ -32,36 +33,25 @@ export default function DashboardPage() {
       ? "warn"
       : "default";
   const decision = status.irrigation.decision;
-  const weather = status.irrigation.weather;
 
   return (
-    <div className="flex flex-col gap-5 animate-fade-in">
-      <section className="rounded-lg border border-slate-800 bg-slate-950 p-4 text-white shadow-sm">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="text-xs font-bold uppercase tracking-widest text-primary/80">Leitstand</div>
-            <div className="text-sm text-slate-300">
-              {decision.running
-                ? `${decision.active_program} / ${decision.active_zone} aktiv`
-                : `Bereit: ${decision.reason}`}
-            </div>
-          </div>
-          <StatusBadge tone={pumpTone} pulse={v.running}>{pumpLabel}</StatusBadge>
-        </div>
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-6">
-          <CommandMetric label="Druck" value={formatBar(status.pressure_bar)} unit="bar" tone={pressureTone} />
-          <CommandMetric label="Soll" value={formatBar(status.pi.setpoint)} unit="bar" />
-          <CommandMetric label="Flow" value={formatLpm(status.flow_rate)} unit="L/min" />
-          <CommandMetric label="Hz" value={formatHz(v.frequency)} unit="Hz" tone={v.running ? "ok" : "default"} />
-          <CommandMetric label="ET0" value={weather.et0_mm != null ? weather.et0_mm.toFixed(1) : "--"} unit="mm" />
-          <CommandMetric label="Budget" value={decision.water_budget_mm.toFixed(1)} unit="mm" tone={decision.allowed ? "ok" : "warn"} />
-        </div>
-      </section>
-
+    <motion.div
+      className="flex flex-col gap-5 animate-fade-in"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.28, ease: "easeOut" }}
+    >
       <Section title="Schnellstart">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          {status.irrigation.programs.map((p) => (
-            <div key={p.id} className="rounded-lg border border-border bg-white p-4 shadow-sm">
+          {status.irrigation.programs.map((p, index) => (
+            <motion.div
+              key={p.id}
+              className="overflow-hidden rounded-lg border border-white/70 bg-gradient-to-br from-white/90 via-white/75 to-primary/5 p-4 shadow-[0_14px_35px_rgba(37,136,235,0.10)] backdrop-blur"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.04, duration: 0.22 }}
+            >
+              <div className="mb-3 h-1 w-14 rounded-full bg-gradient-to-r from-primary to-ok" />
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="font-semibold text-slate-900">{p.name}</div>
@@ -74,7 +64,7 @@ export default function DashboardPage() {
                 <button type="button" onClick={() => api.runProgram(p.id, false)} className="flex-1 rounded-lg bg-primary py-2 text-sm font-bold text-white">Smart Start</button>
                 <button type="button" onClick={() => api.stopProgram(p.id)} className="rounded-lg border border-border px-3 py-2 text-sm font-bold text-slate-700">Stop</button>
               </div>
-            </div>
+            </motion.div>
           ))}
         </div>
       </Section>
@@ -113,7 +103,12 @@ export default function DashboardPage() {
 
       {/* Pumpenstatus */}
       <Section title="Pumpe">
-        <div className="flex flex-col gap-4 rounded-lg border border-border bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+        <motion.div
+          className="flex flex-col gap-4 rounded-lg border border-white/70 bg-gradient-to-br from-white/90 via-white/75 to-sky-50/70 p-4 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur sm:flex-row sm:items-center sm:justify-between"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.24 }}
+        >
           <div className="flex items-center gap-3">
             <StatusBadge tone={pumpTone} pulse={v.running}>
               {pumpLabel}
@@ -140,7 +135,7 @@ export default function DashboardPage() {
               Stop
             </button>
           </div>
-        </div>
+        </motion.div>
       </Section>
 
       {/* Zonen-Übersicht (Hecke / Garten / Vorgarten) — fällt auf irrigation.zones zurück */}
@@ -153,7 +148,7 @@ export default function DashboardPage() {
             const isRunning =
               decision.running && decision.active_zone === z.id;
             const dryBelow = moisture < 30;
-            const state = isRunning ? "läuft" : dryBelow ? "trocken" : "ok";
+            const state = isRunning ? "laeuft" : dryBelow ? "trocken" : "ok";
             return (
               <ZoneCard
                 key={z.id}
@@ -183,7 +178,7 @@ export default function DashboardPage() {
           <WarningList warnings={warnings} />
         </Section>
       )}
-    </div>
+    </motion.div>
   );
 }
 
@@ -195,19 +190,3 @@ const DASHBOARD_ZONES = [
   { id: "garten", name: "Garten", fallbackMoisture: 55 },
   { id: "vorgarten", name: "Vorgarten", fallbackMoisture: 45 },
 ];
-
-function CommandMetric({ label, value, unit, tone = "default" }: { label: string; value: string; unit: string; tone?: "default" | "ok" | "warn" | "danger" }) {
-  const tones = {
-    default: "text-white",
-    ok: "text-ok",
-    warn: "text-warn",
-    danger: "text-danger",
-  };
-  return (
-    <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-      <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{label}</div>
-      <div className={`num mt-1 text-2xl font-bold ${tones[tone]}`}>{value}</div>
-      <div className="text-[10px] uppercase text-slate-500">{unit}</div>
-    </div>
-  );
-}

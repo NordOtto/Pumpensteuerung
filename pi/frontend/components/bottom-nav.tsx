@@ -16,8 +16,8 @@ const ITEMS = [
 export function BottomNav() {
   const pathname = usePathname();
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-white shadow-[0_-4px_20px_0_rgba(0,0,0,0.04)]">
-      <div className="mx-auto flex max-w-5xl items-center justify-around px-2 py-2.5">
+    <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-white/70 bg-white/80 shadow-[0_-12px_32px_rgba(15,23,42,0.08)] backdrop-blur-xl lg:inset-y-0 lg:left-0 lg:right-auto lg:w-20 lg:border-r lg:border-t-0">
+      <div className="mx-auto flex max-w-5xl items-center justify-around px-2 py-2.5 lg:h-full lg:flex-col lg:justify-center lg:gap-3 lg:px-3">
         {ITEMS.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || pathname.startsWith(`${href}/`);
           return (
@@ -25,12 +25,14 @@ export function BottomNav() {
               key={href}
               href={href}
               className={cn(
-                "flex min-h-[48px] min-w-[60px] flex-col items-center justify-center gap-0.5 rounded-xl px-3 py-1 transition-colors",
-                active ? "bg-primary/10 text-primary" : "text-slate-400 hover:text-primary"
+                "group flex min-h-[48px] min-w-[60px] flex-col items-center justify-center gap-0.5 rounded-lg px-3 py-1 transition-all lg:min-h-[62px] lg:w-full",
+                active
+                  ? "bg-gradient-to-br from-primary/15 to-cyan-50 text-primary shadow-[0_12px_30px_rgba(37,136,235,0.16)]"
+                  : "text-slate-400 hover:bg-white/70 hover:text-primary"
               )}
             >
               <Icon className="h-5 w-5" />
-              <span className="text-[10px] font-medium uppercase tracking-wider">{label}</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wider lg:text-[9px]">{label}</span>
             </Link>
           );
         })}

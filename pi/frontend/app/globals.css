@@ -10,6 +10,11 @@
     @apply bg-background text-slate-900 antialiased;
     font-feature-settings: "tnum", "ss01";
   }
+  body {
+    background:
+      linear-gradient(135deg, rgba(37, 136, 235, 0.08), rgba(20, 201, 87, 0.04) 34%, rgba(255, 255, 255, 1) 72%);
+    background-attachment: fixed;
+  }
   /* Touch-optimiert für Außenbereich */
   button, a, [role="button"] {
     @apply select-none;

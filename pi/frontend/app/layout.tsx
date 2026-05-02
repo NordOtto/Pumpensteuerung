@@ -20,10 +20,12 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="de" className="light">
-      <body className="min-h-dvh">
+      <body className="min-h-dvh overflow-x-hidden">
         <StatusProvider>
           <TopBar />
-          <main className="mx-auto max-w-6xl px-4 pb-24 pt-24">{children}</main>
+          <main className="mx-auto max-w-7xl px-4 pb-24 pt-24 md:px-6 lg:pl-28 lg:pr-8">
+            {children}
+          </main>
           <BottomNav />
         </StatusProvider>
       </body>

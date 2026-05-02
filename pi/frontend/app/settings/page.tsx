@@ -428,8 +428,8 @@ function SmartEtGuide({
             {step === 2 && (
               <GuideStep icon={<Ruler className="h-4 w-4" />} title="Testlauf messen">
                 <div className="grid gap-3">
-                  <NumField label="Test-mm" value={value.measured_mm} step={0.5} onChange={(v) => onChange({ ...value, measured_mm: v })} />
-                  <NumField label="Test-min" value={value.test_minutes} step={1} onChange={(v) => onChange({ ...value, test_minutes: v })} />
+                  <NumField label="Gemessene Regenhoehe mm" value={value.measured_mm} step={0.5} hint="Wasserhoehe im Regenmesser nach dem Testlauf. 1 mm entspricht 1 Liter pro m²." onChange={(v) => onChange({ ...value, measured_mm: v })} />
+                  <NumField label="Testdauer min" value={value.test_minutes} step={1} hint="So lange laeuft die Zone fuer die Messung, z. B. 10 Minuten." onChange={(v) => onChange({ ...value, test_minutes: v })} />
                   <NumField label="Max/Woche" value={value.max_runs_per_week} step={1} onChange={(v) => onChange({ ...value, max_runs_per_week: v })} />
                 </div>
               </GuideStep>
@@ -445,6 +445,7 @@ function SmartEtGuide({
                     <GuideMetric label="Wasser" value={`${formatMaybe(recommendation.zone_patch.water_mm)} mm`} />
                     <GuideMetric label="Laufzeit" value={`${recommendation.zone_patch.duration_min ?? "--"} min`} />
                     <GuideMetric label="Start ab" value={`${formatMaybe(recommendation.zone_patch.min_deficit_mm)} mm`} />
+                    <GuideMetric label="Rate" value={`${recommendation.precip_mm_h.toFixed(1)} mm/h`} />
                     <GuideMetric label="Sickerphase" value={recommendation.zone_patch.cycle_min ? `${recommendation.zone_patch.cycle_min} / ${recommendation.zone_patch.soak_min} min` : "aus"} />
                   </div>
                 )}

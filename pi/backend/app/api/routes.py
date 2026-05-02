@@ -6,7 +6,9 @@ für Phase 1 läuft alles über interne LAN-Authentifizierung via nginx.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from typing import Any
+
+from fastapi import APIRouter, Body, HTTPException
 from pydantic import BaseModel
 
 from ..state import app_state, log_buffer, log_seq
@@ -135,7 +137,7 @@ async def irrigation_programs_get():
 
 
 @router.post("/irrigation/programs")
-async def irrigation_programs_set(body: dict | list):
+async def irrigation_programs_set(body: Any = Body(...)):
     try:
         return deps.irrigation.set_programs(body)
     except ValueError as exc:

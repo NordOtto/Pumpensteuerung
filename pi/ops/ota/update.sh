@@ -134,9 +134,11 @@ download_release() {
     mv "$staging" "$target"
 
     log "Installiere venv-Dependencies"
-    python3 -m venv --clear "${target}/backend/.venv"
-    "${target}/backend/.venv/bin/pip" install --no-cache-dir --upgrade pip --quiet
-    "${target}/backend/.venv/bin/pip" install --no-cache-dir -r "${target}/backend/requirements.txt" --quiet
+    if ! python3 -m venv --clear "${target}/backend/.venv" ||
+       ! "${target}/backend/.venv/bin/python" -m pip install --no-cache-dir -r "${target}/backend/requirements.txt" --quiet; then
+        rm -rf "$target"
+        die "${tag}: venv-Setup fehlgeschlagen"
+    fi
     [[ -x "${target}/backend/.venv/bin/uvicorn" ]] || die "${tag}: uvicorn fehlt nach venv-Setup"
 }
 
@@ -184,7 +186,7 @@ cmd_install() {
     cmd_apply "$tag"
     ls -1t "$RELEASES_DIR" 2>/dev/null | tail -n +4 | while read -r old; do
         log "Loesche altes Release ${old}"
-        rm -rf "${RELEASES_DIR:?}/${old}"
+        rm -rf "${RELEASES_DIR:?}/${old}" || log "Konnte altes Release ${old} nicht loeschen"
     done
 }
 

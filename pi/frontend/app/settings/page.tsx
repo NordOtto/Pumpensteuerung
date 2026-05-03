@@ -783,6 +783,9 @@ function OtaSection({ fw }: { fw: string }) {
   const [ota, setOta] = useState<OtaStatus | null>(null);
   const [log, setLog] = useState<string[]>([]);
   const [polling, setPolling] = useState(false);
+  const [tokenDraft, setTokenDraft] = useState("");
+  const [tokenBusy, setTokenBusy] = useState(false);
+  const [tokenMessage, setTokenMessage] = useState("");
   const logRef = useRef<HTMLPreElement>(null);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   useEffect(() => {
@@ -806,6 +809,50 @@ function OtaSection({ fw }: { fw: string }) {
     }, 1000);
   };
 
+  const saveToken = async () => {
+    setTokenBusy(true);
+    setTokenMessage("");
+    try {
+      const res = await api.otaTokenSet(tokenDraft);
+      setTokenDraft("");
+      setTokenMessage(res.message || "Token gespeichert");
+      const next = await api.otaStatus();
+      setOta(next);
+    } catch (e) {
+      setTokenMessage(e instanceof Error ? e.message : "Token konnte nicht gespeichert werden");
+      api.otaStatus().then(setOta).catch(() => {});
+    } finally {
+      setTokenBusy(false);
+    }
+  };
+
+  const deleteToken = async () => {
+    setTokenBusy(true);
+    setTokenMessage("");
+    try {
+      await api.otaTokenDelete();
+      setTokenDraft("");
+      setTokenMessage("Token entfernt");
+      const next = await api.otaStatus();
+      setOta(next);
+    } catch (e) {
+      setTokenMessage(e instanceof Error ? e.message : "Token konnte nicht entfernt werden");
+    } finally {
+      setTokenBusy(false);
+    }
+  };
+
+  const tokenTone =
+    !ota?.token_configured ? "text-slate-500 bg-slate-100 border-slate-200"
+    : ota.token_ok === true ? "text-ok bg-ok/10 border-ok/20"
+    : ota.token_ok === false ? "text-danger bg-danger/10 border-danger/20"
+    : "text-warn bg-warn/10 border-warn/20";
+  const tokenLabel =
+    !ota?.token_configured ? "Kein Token"
+    : ota.token_ok === true ? "Token OK"
+    : ota.token_ok === false ? "Token fehlerhaft"
+    : "Token hinterlegt";
+
   return (
     <Section title="System-Update">
       <div className="rounded-lg border border-white/70 bg-white/80 p-4 shadow-[0_14px_36px_rgba(15,23,42,0.08)] backdrop-blur">
@@ -813,6 +860,48 @@ function OtaSection({ fw }: { fw: string }) {
           <Info label="Installiert" value={ota?.current_version ?? fw} />
           <Info label="Neueste Version" value={ota?.latest_version ?? "-"} />
           <Info label="Commit" value={ota?.latest_commit?.slice(0, 12) ?? "-"} />
+        </div>
+        <div className="mt-4 rounded-lg border border-white/70 bg-gradient-to-br from-white/90 to-sky-50/70 p-3 shadow-sm">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="text-sm font-bold text-slate-900">GitHub Token</div>
+              <div className="text-xs text-slate-500">Wird fuer private Repositories benoetigt. Der Token wird nicht angezeigt.</div>
+            </div>
+            <span className={`rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wider ${tokenTone}`}>
+              {tokenLabel}
+            </span>
+          </div>
+          <div className="grid gap-2 md:grid-cols-[1fr_auto_auto]">
+            <input
+              type="password"
+              value={tokenDraft}
+              autoComplete="off"
+              placeholder={ota?.token_configured ? "Neuen Token eintragen zum Ersetzen" : "GitHub Fine-Grained Token"}
+              onChange={(e) => setTokenDraft(e.target.value)}
+              className="h-11 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-slate-900 outline-none ring-primary/20 focus:ring-4"
+            />
+            <button
+              type="button"
+              onClick={saveToken}
+              disabled={tokenBusy || tokenDraft.trim().length < 20}
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white disabled:opacity-40"
+            >
+              Speichern & pruefen
+            </button>
+            {ota?.token_configured && (
+              <button
+                type="button"
+                onClick={deleteToken}
+                disabled={tokenBusy}
+                className="rounded-lg border border-danger/30 px-4 py-2 text-sm font-bold text-danger disabled:opacity-40"
+              >
+                Entfernen
+              </button>
+            )}
+          </div>
+          {(tokenMessage || ota?.token_message) && (
+            <div className="mt-2 text-xs text-slate-500">{tokenMessage || ota?.token_message}</div>
+          )}
         </div>
         {ota?.changelog && <div className="mt-3 rounded-lg border border-border bg-slate-50 p-3 text-sm text-slate-700 whitespace-pre-line">{ota.changelog}</div>}
         <div className="mt-4 flex flex-wrap gap-2">

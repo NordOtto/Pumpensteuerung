@@ -90,6 +90,12 @@ export const api = {
       body: JSON.stringify({ tag: tag ?? "" }),
     }),
   otaRollback: () => request<{ ok: true }>("/api/ota/rollback", { method: "POST" }),
+  otaTokenSet: (token: string) =>
+    request<{ ok: true; configured: boolean; token_ok: boolean; message: string }>("/api/ota/token", {
+      method: "POST",
+      body: JSON.stringify({ token }),
+    }),
+  otaTokenDelete: () => request<{ ok: true; configured: boolean }>("/api/ota/token", { method: "DELETE" }),
   otaLog: () =>
     request<{ lines: string[]; running: boolean; exit_code: number | null }>("/api/ota/log"),
 };

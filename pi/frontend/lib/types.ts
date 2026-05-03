@@ -149,6 +149,9 @@ export interface OtaStatus {
   changelog: string | null;
   last_check: string | null;
   phase: string;
+  token_configured: boolean;
+  token_ok: boolean | null;
+  token_message: string;
 }
 
 export interface AppStatus {

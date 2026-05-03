@@ -145,6 +145,9 @@ class OtaState(BaseModel):
     changelog: str | None = None
     last_check: str | None = None
     phase: str = "idle"
+    token_configured: bool = False
+    token_ok: bool | None = None
+    token_message: str = ""
 
 
 class AppState(BaseModel):

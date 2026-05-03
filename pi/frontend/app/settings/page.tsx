@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, ChevronLeft, ChevronRight, Download, Droplets, Eye, EyeOff, Gauge, KeyRound, RefreshCw, RotateCcw, Ruler, Sparkles, SunMedium } from "lucide-react";
 import type React from "react";
-import { Section } from "@/components/section";
+import { SortablePanels } from "@/components/sortable-panels";
 import { useStatus } from "@/lib/ws";
 import { api } from "@/lib/api";
 import type { IrrigationProgram, IrrigationZone, OtaStatus, Preset } from "@/lib/types";
@@ -40,29 +40,49 @@ export default function SettingsPage() {
 
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
-      <ProgramsSection programs={status.irrigation.programs as IrrigationProgram[]} presets={presetData?.presets ?? []} />
-      <PresetsSection active={status.active_preset} data={presetData} onReload={loadPresets} />
-      <PiSection
-        setpoint={status.pi.setpoint}
-        pOn={status.pi.p_on}
-        pOff={status.pi.p_off}
-        kp={status.pi.kp}
-        ki={status.pi.ki}
-        freqMin={status.pi.freq_min}
-        freqMax={status.pi.freq_max}
-        enabled={status.pi.enabled}
-        spike={status.pi.spike_enabled}
-      />
-      <TimeguardSection tg={status.timeguard} />
-      <OtaSection fw={status.sys.fw} />
-      <VacationSection enabled={status.vacation.enabled} />
-      <SystemInfo
-        ip={status.sys.ip}
-        fw={status.sys.fw}
-        uptime={status.sys.uptime}
-        mqtt={status.sys.mqtt}
-        rtu={status.sys.rtu_connected}
-      />
+      <SortablePanels
+        storageKey="pumpe.settings.sections"
+        defaultOrder={["programs", "presets", "pi", "timeguard", "ota", "vacation", "system"]}
+        titles={{
+          programs: "Bewasserungs-Programme",
+          presets: "Pumpen-Presets",
+          pi: "PI-Druckregelung",
+          timeguard: "Zeitfenster",
+          ota: "System-Update",
+          vacation: "Urlaubsmodus",
+          system: "System",
+        }}
+      >
+        {{
+          programs: <ProgramsSection programs={status.irrigation.programs as IrrigationProgram[]} presets={presetData?.presets ?? []} />,
+          presets: <PresetsSection active={status.active_preset} data={presetData} onReload={loadPresets} />,
+          pi: (
+            <PiSection
+              setpoint={status.pi.setpoint}
+              pOn={status.pi.p_on}
+              pOff={status.pi.p_off}
+              kp={status.pi.kp}
+              ki={status.pi.ki}
+              freqMin={status.pi.freq_min}
+              freqMax={status.pi.freq_max}
+              enabled={status.pi.enabled}
+              spike={status.pi.spike_enabled}
+            />
+          ),
+          timeguard: <TimeguardSection tg={status.timeguard} />,
+          ota: <OtaSection fw={status.sys.fw} />,
+          vacation: <VacationSection enabled={status.vacation.enabled} />,
+          system: (
+            <SystemInfo
+              ip={status.sys.ip}
+              fw={status.sys.fw}
+              uptime={status.sys.uptime}
+              mqtt={status.sys.mqtt}
+              rtu={status.sys.rtu_connected}
+            />
+          ),
+        }}
+      </SortablePanels>
     </div>
   );
 }
@@ -225,7 +245,7 @@ function ProgramsSection({ programs, presets }: { programs: IrrigationProgram[];
   const activeProgram = draft[openIdx];
 
   return (
-    <Section title="Bewasserungs-Programme">
+    <>
       <div className="grid gap-4 lg:grid-cols-[360px_1fr]">
         <SmartEtGuide
           programName={activeProgram?.name || "offenes Programm"}
@@ -334,7 +354,7 @@ function ProgramsSection({ programs, presets }: { programs: IrrigationProgram[];
           </div>
         </div>
       </div>
-    </Section>
+    </>
   );
 }
 
@@ -622,7 +642,7 @@ function PresetsSection({ active, data, onReload }: { active: string; data: { ac
   const [editing, setEditing] = useState<Preset | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [err, setErr] = useState("");
-  if (!data) return <Section title="Presets"><div className="p-4 text-sm text-slate-400">Lade...</div></Section>;
+  if (!data) return <div className="p-4 text-sm text-slate-400">Lade...</div>;
 
   const save = async () => {
     if (!editing) return;
@@ -645,7 +665,7 @@ function PresetsSection({ active, data, onReload }: { active: string; data: { ac
       : "Nur fuer Druck-/Durchflussregelung relevant.";
 
   return (
-    <Section title="Pumpen-Presets">
+    <>
       <div className="rounded-lg border border-white/70 bg-white/80 shadow-[0_14px_36px_rgba(15,23,42,0.08)] backdrop-blur">
         <div className="divide-y divide-border">
           {data.presets.map((p) => (
@@ -713,7 +733,7 @@ function PresetsSection({ active, data, onReload }: { active: string; data: { ac
           <button type="button" onClick={() => { setEditing({ ...EMPTY_PRESET }); setIsNew(true); }} className="rounded-lg border border-dashed border-primary px-4 py-2 text-sm font-bold text-primary">+ Neuer Preset</button>
         </div>
       </div>
-    </Section>
+    </>
   );
 }
 
@@ -722,7 +742,7 @@ function PiSection({ setpoint, pOn, pOff, kp, ki, freqMin, freqMax, enabled, spi
 }) {
   const [draft, setDraft] = useState({ setpoint, p_on: pOn, p_off: pOff, kp, ki, freq_min: freqMin, freq_max: freqMax });
   return (
-    <Section title="PI-Druckregelung">
+    <>
       <div className="rounded-lg border border-white/70 bg-gradient-to-br from-white/90 to-sky-50/70 p-4 shadow-[0_14px_36px_rgba(15,23,42,0.08)] backdrop-blur">
         <div className="mb-4 flex items-center justify-between">
           <span className="text-sm font-semibold text-slate-700">Regler aktiv</span>
@@ -745,14 +765,14 @@ function PiSection({ setpoint, pOn, pOff, kp, ki, freqMin, freqMax, enabled, spi
           </div>
         </div>
       </div>
-    </Section>
+    </>
   );
 }
 
 function TimeguardSection({ tg }: { tg: { enabled: boolean; start_hour: number; start_min: number; end_hour: number; end_min: number; days: boolean[]; allowed: boolean } }) {
   const [d, setD] = useState({ start_hour: tg.start_hour, start_min: tg.start_min, end_hour: tg.end_hour, end_min: tg.end_min, days: [...tg.days] });
   return (
-    <Section title="Zeitfenster">
+    <>
       <div className="rounded-lg border border-white/70 bg-gradient-to-br from-white/90 to-cyan-50/60 p-4 shadow-[0_14px_36px_rgba(15,23,42,0.08)] backdrop-blur">
         <div className="mb-4 flex items-center justify-between">
           <span className="text-sm font-semibold text-slate-700">Aktiv {tg.allowed ? "(im Fenster)" : "(gesperrt)"}</span>
@@ -775,7 +795,7 @@ function TimeguardSection({ tg }: { tg: { enabled: boolean; start_hour: number; 
           <button type="button" onClick={() => api.setTimeguard(d)} className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">Speichern</button>
         </div>
       </div>
-    </Section>
+    </>
   );
 }
 
@@ -882,7 +902,7 @@ function OtaSection({ fw }: { fw: string }) {
     : "Bereit";
 
   return (
-    <Section title="System-Update">
+    <>
       <div className="relative overflow-hidden rounded-lg border border-white/70 bg-gradient-to-br from-white/90 via-cyan-50/70 to-emerald-50/60 p-4 shadow-[0_18px_48px_rgba(15,23,42,0.12)] backdrop-blur">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary via-cyan-400 to-ok" />
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -1044,13 +1064,13 @@ function OtaSection({ fw }: { fw: string }) {
           </motion.div>
         )}
       </div>
-    </Section>
+    </>
   );
 }
 
 function VacationSection({ enabled }: { enabled: boolean }) {
   return (
-    <Section title="Urlaubsmodus">
+    <>
       <div className="flex items-center justify-between rounded-lg border border-white/70 bg-gradient-to-br from-white/90 to-sky-50/70 p-4 shadow-[0_14px_36px_rgba(15,23,42,0.08)] backdrop-blur">
         <div>
           <div className="font-semibold text-slate-700">Pumpe gesperrt</div>
@@ -1058,7 +1078,7 @@ function VacationSection({ enabled }: { enabled: boolean }) {
         </div>
         <Toggle checked={enabled} onChange={(v) => api.setVacation(v)} />
       </div>
-    </Section>
+    </>
   );
 }
 
@@ -1067,14 +1087,14 @@ function SystemInfo({ ip, fw, uptime, mqtt, rtu }: { ip: string; fw: string; upt
   const hrs = Math.floor((uptime % 86400) / 3600);
   const min = Math.floor((uptime % 3600) / 60);
   return (
-    <Section title="System">
+    <>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Info label="Firmware" value={fw} />
         <Info label="IP" value={ip || "-"} />
         <Info label="Uptime" value={`${days}d ${hrs}h ${min}m`} />
         <Info label="Verbindungen" value={`${mqtt ? "MQTT ok" : "MQTT aus"} | ${rtu ? "RTU ok" : "RTU aus"}`} />
       </div>
-    </Section>
+    </>
   );
 }
 

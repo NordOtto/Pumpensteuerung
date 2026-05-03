@@ -22,19 +22,23 @@ export interface KpiCardProps {
   unit?: string;
   tone?: Tone;
   hint?: string;
-  size?: "lg" | "xl";
+  size?: "sm" | "lg" | "xl";
 }
 
 export function KpiCard({ label, value, unit, tone = "default", hint, size = "lg" }: KpiCardProps) {
+  const compact = size === "sm";
   return (
-    <div className="group relative flex min-h-36 flex-col gap-2 overflow-hidden rounded-lg border border-white/70 bg-gradient-to-br from-white/90 via-white/80 to-sky-50/75 p-4 shadow-[0_16px_38px_rgba(15,23,42,0.08)] backdrop-blur animate-fade-in">
+    <div className={cn(
+      "group relative flex flex-col overflow-hidden rounded-lg border border-white/70 bg-gradient-to-br from-white/90 via-white/80 to-sky-50/75 shadow-[0_16px_38px_rgba(15,23,42,0.08)] backdrop-blur animate-fade-in",
+      compact ? "min-h-24 gap-1 p-3" : "min-h-36 gap-2 p-4"
+    )}>
       <div className={cn("absolute inset-x-0 top-0 h-1 bg-gradient-to-r", TONE_BAR[tone])} />
-      <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{label}</span>
-      <div className="flex items-baseline gap-2">
-        <span className={cn(size === "xl" ? "num-3xl" : "num-2xl", TONE[tone])}>{value}</span>
-        {unit && <span className="text-sm font-bold uppercase text-slate-400">{unit}</span>}
+      <span className={cn("font-bold uppercase tracking-wider text-slate-500", compact ? "text-[10px]" : "text-xs")}>{label}</span>
+      <div className={cn("flex items-baseline", compact ? "gap-1" : "gap-2")}>
+        <span className={cn(size === "xl" ? "num-3xl" : compact ? "num text-2xl font-semibold leading-none" : "num-2xl", TONE[tone])}>{value}</span>
+        {unit && <span className={cn("font-bold uppercase text-slate-400", compact ? "text-[10px]" : "text-sm")}>{unit}</span>}
       </div>
-      {hint && <span className="mt-auto text-xs font-medium text-slate-500">{hint}</span>}
+      {hint && <span className={cn("mt-auto font-medium text-slate-500", compact ? "truncate text-[10px]" : "text-xs")}>{hint}</span>}
     </div>
   );
 }

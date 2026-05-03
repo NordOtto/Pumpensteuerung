@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AnimatePresence, motion, Reorder } from "framer-motion";
-import { ChevronDown, Clock3, GripVertical, Play, RotateCcw, ShieldCheck, Square, TimerReset } from "lucide-react";
-import { Section } from "@/components/section";
+import { motion } from "framer-motion";
+import { Clock3, Play, RotateCcw, ShieldCheck, Square, TimerReset } from "lucide-react";
 import { KpiCard } from "@/components/kpi-card";
 import { ZoneCard } from "@/components/zone-card";
 import { WarningList } from "@/components/warning-list";
 import { StatusBadge } from "@/components/status-badge";
+import { SortablePanels } from "@/components/sortable-panels";
 import { useStatus } from "@/lib/ws";
 import { api } from "@/lib/api";
 import { cn, formatBar, formatHz, formatLpm } from "@/lib/utils";
@@ -16,17 +16,19 @@ import type { IrrigationProgram } from "@/lib/types";
 const QUICK_MINUTES = [10, 20, 30, 45, 60];
 const DEFAULT_SECTION_ORDER = ["live", "pump", "irrigation", "zones", "warnings"] as const;
 type DashboardSectionId = (typeof DEFAULT_SECTION_ORDER)[number];
-type CollapsedState = Partial<Record<DashboardSectionId, boolean>>;
-const ORDER_KEY = "pumpe.dashboard.sectionOrder";
-const COLLAPSE_KEY = "pumpe.dashboard.collapsed";
+const SECTION_TITLES: Record<DashboardSectionId, string> = {
+  live: "Live-Werte",
+  pump: "Pumpe steuern",
+  irrigation: "Bewaesserung",
+  zones: "Bewaesserungs-Zonen",
+  warnings: "Warnungen",
+};
 
 export default function DashboardPage() {
   const { status, warnings } = useStatus();
   const [selectedProgramId, setSelectedProgramId] = useState("");
   const [manualMinutes, setManualMinutes] = useState(30);
   const [actionError, setActionError] = useState("");
-  const [sectionOrder, setSectionOrder] = useState<DashboardSectionId[]>([...DEFAULT_SECTION_ORDER]);
-  const [collapsed, setCollapsed] = useState<CollapsedState>({});
 
   const programs = status?.irrigation.programs ?? [];
   const decisionForSelection = status?.irrigation.decision;
@@ -38,34 +40,6 @@ export default function DashboardPage() {
       programs[0]
     );
   }, [programs, selectedProgramId, decisionForSelection?.program_id]);
-
-  useEffect(() => {
-    try {
-      const savedOrder = JSON.parse(localStorage.getItem(ORDER_KEY) || "[]");
-      if (Array.isArray(savedOrder)) {
-        const known = savedOrder.filter((id): id is DashboardSectionId =>
-          DEFAULT_SECTION_ORDER.includes(id as DashboardSectionId)
-        );
-        const missing = DEFAULT_SECTION_ORDER.filter((id) => !known.includes(id));
-        setSectionOrder([...known, ...missing]);
-      }
-      const savedCollapsed = JSON.parse(localStorage.getItem(COLLAPSE_KEY) || "{}");
-      if (savedCollapsed && typeof savedCollapsed === "object") {
-        setCollapsed(savedCollapsed);
-      }
-    } catch {
-      setSectionOrder([...DEFAULT_SECTION_ORDER]);
-      setCollapsed({});
-    }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem(ORDER_KEY, JSON.stringify(sectionOrder));
-  }, [sectionOrder]);
-
-  useEffect(() => {
-    localStorage.setItem(COLLAPSE_KEY, JSON.stringify(collapsed));
-  }, [collapsed]);
 
   if (!status) {
     return <div className="flex h-64 items-center justify-center text-slate-400">Verbinde mit Steuerung...</div>;
@@ -122,8 +96,6 @@ export default function DashboardPage() {
       })
     : "kein Start geplant";
 
-  const visibleSections = sectionOrder.filter((id) => id !== "warnings" || warnings.length > 0);
-
   return (
     <motion.div
       className="flex flex-col gap-5 animate-fade-in"
@@ -131,31 +103,29 @@ export default function DashboardPage() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.28, ease: "easeOut" }}
     >
-      <Reorder.Group axis="y" values={visibleSections} onReorder={(items) => setSectionOrder(mergeSectionOrder(items))} className="flex flex-col gap-5">
-        {visibleSections.map((id) => (
-          <DashboardPanel
-            key={id}
-            id={id}
-            title={sectionTitle(id)}
-            collapsed={collapsed[id] ?? false}
-            onToggle={() => setCollapsed((current) => ({ ...current, [id]: !(current[id] ?? false) }))}
-          >
-            {id === "live" && (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <SortablePanels
+        storageKey="pumpe.dashboard.sections"
+        defaultOrder={DEFAULT_SECTION_ORDER}
+        titles={SECTION_TITLES}
+        hidden={{ warnings: warnings.length === 0 }}
+      >
+        {{
+          live: (
+              <div className="grid grid-cols-3 gap-2 sm:gap-3">
                 <KpiCard
                   label="Druck"
                   value={formatBar(status.pressure_bar)}
                   unit="bar"
                   tone={pressureTone}
                   hint={`Ein ${formatBar(status.pi.p_on)} / Aus ${formatBar(status.pi.p_off)} bar`}
-                  size="lg"
+                  size="sm"
                 />
                 <KpiCard
                   label="Durchfluss"
                   value={formatLpm(status.flow_rate)}
                   unit="L/min"
                   hint={status.flow_estimated ? "Geschaetzt" : "Sensor"}
-                  size="lg"
+                  size="sm"
                 />
                 <KpiCard
                   label="Pumpenfrequenz"
@@ -163,12 +133,12 @@ export default function DashboardPage() {
                   unit="Hz"
                   tone={v.running ? "ok" : "default"}
                   hint={v.freq_setpoint ? `Soll ${formatHz(v.freq_setpoint)} Hz` : undefined}
-                  size="lg"
+                  size="sm"
                 />
               </div>
-            )}
+          ),
 
-            {id === "pump" && (
+          pump: (
               <motion.div
                 className="rounded-lg border border-white/70 bg-gradient-to-br from-white/95 via-white/80 to-sky-50/75 p-4 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur"
                 initial={{ opacity: 0, y: 10 }}
@@ -209,9 +179,9 @@ export default function DashboardPage() {
                   </div>
                 </div>
               </motion.div>
-            )}
+          ),
 
-            {id === "irrigation" && (
+          irrigation: (
               <div className={cn("grid gap-4", decision.running && "xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,0.65fr)]")}>
                 <motion.div
                   className="rounded-lg border border-white/70 bg-gradient-to-br from-white/95 via-white/80 to-cyan-50/75 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.09)] backdrop-blur"
@@ -336,9 +306,9 @@ export default function DashboardPage() {
                   </motion.div>
                 )}
               </div>
-            )}
+          ),
 
-            {id === "zones" && (
+          zones: (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 {dashboardZones(status.irrigation.programs).map((z) => {
                   const moisture = status.irrigation.weather.soil_moisture_pct ?? z.fallbackMoisture;
@@ -360,12 +330,11 @@ export default function DashboardPage() {
                   );
                 })}
               </div>
-            )}
+          ),
 
-            {id === "warnings" && <WarningList warnings={warnings} />}
-          </DashboardPanel>
-        ))}
-      </Reorder.Group>
+          warnings: <WarningList warnings={warnings} />,
+        }}
+      </SortablePanels>
     </motion.div>
   );
 }
@@ -420,62 +389,6 @@ function RunMetric({ icon, label, value }: { icon: React.ReactNode; label: strin
   );
 }
 
-function DashboardPanel({
-  id,
-  title,
-  collapsed,
-  onToggle,
-  children,
-}: {
-  id: DashboardSectionId;
-  title: string;
-  collapsed: boolean;
-  onToggle: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <Reorder.Item value={id} layout="position" dragListener className="touch-pan-y list-none">
-      <section className="mb-0">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-2">
-            <button
-              type="button"
-              aria-label={`${title} verschieben`}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/70 bg-white/75 text-slate-400 shadow-sm active:scale-95"
-            >
-              <GripVertical size={18} />
-            </button>
-            <span className="h-5 w-1 rounded-full bg-gradient-to-b from-primary to-ok shadow-[0_0_16px_rgba(37,136,235,0.32)]" />
-            <h2 className="truncate text-xs font-bold uppercase tracking-widest text-slate-600">{title}</h2>
-          </div>
-          <button
-            type="button"
-            onClick={onToggle}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/70 bg-white/75 text-slate-500 shadow-sm transition active:scale-95"
-            aria-label={collapsed ? `${title} ausklappen` : `${title} einklappen`}
-          >
-            <ChevronDown size={18} className={cn("transition-transform", collapsed && "-rotate-90")} />
-          </button>
-        </div>
-        <AnimatePresence initial={false}>
-          {!collapsed && (
-            <motion.div
-              key="content"
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.18, ease: "easeOut" }}
-              className="overflow-hidden"
-            >
-              {children}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </section>
-    </Reorder.Item>
-  );
-}
-
 function PumpInfo({ label, value }: { label: string; value: string }) {
   return (
     <span className="rounded-lg border border-white/70 bg-white/65 px-3 py-2 shadow-inner">
@@ -525,18 +438,4 @@ function modeLabel(mode: number) {
   if (mode === 2) return "Fix-Hz";
   if (mode === 3) return "Hahnmodus";
   return "Unbekannt";
-}
-
-function sectionTitle(id: DashboardSectionId) {
-  if (id === "live") return "Live-Werte";
-  if (id === "pump") return "Pumpe steuern";
-  if (id === "irrigation") return "Bewaesserung";
-  if (id === "zones") return "Bewaesserungs-Zonen";
-  return "Warnungen";
-}
-
-function mergeSectionOrder(items: DashboardSectionId[]) {
-  const visible = items.filter((id): id is DashboardSectionId => DEFAULT_SECTION_ORDER.includes(id));
-  const missing = DEFAULT_SECTION_ORDER.filter((id) => !visible.includes(id));
-  return [...visible, ...missing];
 }

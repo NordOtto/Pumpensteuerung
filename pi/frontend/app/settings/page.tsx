@@ -888,7 +888,7 @@ function OtaSection({ fw }: { fw: string }) {
   const statusLabel =
     ota?.running || polling ? "Update-Aktion laeuft"
     : ota?.exit_code && ota.exit_code !== 0 ? "Letzte Aktion fehlerhaft"
-    : ota?.update_available ? "Online-Update verfuegbar"
+    : ota?.update_available ? "Update verfuegbar"
     : "System aktuell oder nicht geprueft";
   const progress =
     ota?.running || polling ? (updateAction === "install" ? 68 : updateAction === "rollback" ? 48 : 34)
@@ -900,6 +900,15 @@ function OtaSection({ fw }: { fw: string }) {
     : ota?.exit_code === 0 ? "Fertig"
     : ota?.exit_code && ota.exit_code !== 0 ? "Fehler"
     : "Bereit";
+  const releaseDate = ota?.latest_date
+    ? new Date(ota.latest_date).toLocaleString("de-DE", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "";
 
   return (
     <>
@@ -912,7 +921,7 @@ function OtaSection({ fw }: { fw: string }) {
               Prueft GitHub Releases, installiert freigegebene Pakete und zeigt den Live-Log direkt hier an.
             </div>
           </div>
-          <span className={`inline-flex w-fit rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wider ${statusTone}`}>
+          <span className={`inline-flex w-fit rounded-full border px-3 py-1 text-xs font-bold ${statusTone}`}>
             {statusLabel}
           </span>
         </div>
@@ -929,8 +938,10 @@ function OtaSection({ fw }: { fw: string }) {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
           >
-            <div className="font-semibold text-slate-900">Update bereit: {ota.latest_version}</div>
-            {ota.latest_date && <div className="mt-1 text-xs text-slate-500">Release: {new Date(ota.latest_date).toLocaleString("de-DE")}</div>}
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <div className="font-semibold text-slate-900">Update {ota.latest_version} bereit</div>
+              {releaseDate && <div className="text-xs text-slate-500">Release: {releaseDate}</div>}
+            </div>
           </motion.div>
         )}
 

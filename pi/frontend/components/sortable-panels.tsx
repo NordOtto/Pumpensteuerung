@@ -30,7 +30,7 @@ export function SortablePanels<T extends PanelId>({
     try {
       const savedOrder = JSON.parse(localStorage.getItem(orderKey) || "[]");
       if (Array.isArray(savedOrder)) {
-        const known = savedOrder.filter((id): id is T => defaultOrder.includes(id as T));
+        const known = uniqueOrder(savedOrder.filter((id): id is T => defaultOrder.includes(id as T)));
         const missing = defaultOrder.filter((id) => !known.includes(id));
         setOrder([...known, ...missing]);
       }
@@ -129,7 +129,16 @@ function SortablePanel({
 }
 
 function mergeOrder<T extends string>(items: T[], defaults: readonly T[]) {
-  const visible = items.filter((id): id is T => defaults.includes(id));
+  const visible = uniqueOrder(items.filter((id): id is T => defaults.includes(id)));
   const missing = defaults.filter((id) => !visible.includes(id));
   return [...visible, ...missing];
+}
+
+function uniqueOrder<T extends string>(items: T[]) {
+  const seen = new Set<T>();
+  return items.filter((id) => {
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
 }

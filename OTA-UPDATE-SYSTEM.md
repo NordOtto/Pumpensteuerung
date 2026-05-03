@@ -78,8 +78,8 @@ Fuer signierte OTA-Updates werden diese Secrets genutzt:
 - `MINISIGN_PASSWORD`
 
 Wenn `MINISIGN_KEY` fehlt, wird das Release ohne Signatur hochgeladen.
-Der aktuelle Pi-Updater erwartet aber eine `.minisig` und einen Public Key.
-Fuer echte OTA-Installationen muss Signierung deshalb sauber eingerichtet sein.
+Der Pi-Updater nutzt dann als Fallback die `.sha256`-Datei.
+Minisign bleibt der bevorzugte Weg, weil es neben Integritaet auch Authentizitaet prueft.
 
 ## 5) Pi-Dateisystem
 
@@ -190,16 +190,17 @@ Das Backend liest diese Ausgabe ein und uebernimmt sie in `app_state.ota`.
 `install` macht:
 
 1. Release-JSON laden.
-2. `.tar.gz` und `.tar.gz.minisig` aus dem GitHub Release laden.
-3. Signatur mit `minisign.pub` pruefen.
-4. Archiv nach `/opt/pumpe/releases/<tag>` entpacken.
-5. Backend-Venv im Release erzeugen.
-6. Python-Abhaengigkeiten aus `backend/requirements.txt` installieren.
-7. `.env` vom aktuellen Release uebernehmen.
-8. Symlink `/opt/pumpe/current` atomar auf das neue Release setzen.
-9. `pumpe-backend.service` und `pumpe-frontend.service` neu starten.
-10. Smoke-Test auf `http://127.0.0.1:8000/api/health`.
-11. Bei Fehler Rollback.
+2. `.tar.gz` laden.
+3. Wenn `.minisig` und `minisign.pub` vorhanden sind: Signatur pruefen.
+4. Sonst `.sha256` laden und SHA256 pruefen.
+5. Archiv nach `/opt/pumpe/releases/<tag>` entpacken.
+6. Backend-Venv im Release erzeugen.
+7. Python-Abhaengigkeiten aus `backend/requirements.txt` installieren.
+8. `.env` vom aktuellen Release uebernehmen.
+9. Symlink `/opt/pumpe/current` atomar auf das neue Release setzen.
+10. `pumpe-backend.service` und `pumpe-frontend.service` neu starten.
+11. Smoke-Test auf `http://127.0.0.1:8000/api/health`.
+12. Bei Fehler Rollback.
 
 ## 8) Backend API fuer OTA
 
@@ -272,8 +273,8 @@ Auf dem Pi wurde geprueft:
   - `latest_version: v0.1.2`
   - `update_available: true`
 
-Damit funktioniert der Versionscheck. Die eigentliche Installation haengt davon ab,
-dass das Release signiert ist und `minisign.pub` auf dem Pi zum Release-Key passt.
+Damit funktioniert der Versionscheck. Die Installation nutzt Minisign, wenn Signatur
+und Public Key vorhanden sind; sonst wird die SHA256-Datei des Releases geprueft.
 
 ## 11) Direkter Deploy vs. OTA Release
 

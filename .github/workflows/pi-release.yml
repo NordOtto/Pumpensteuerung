@@ -127,3 +127,4 @@ jobs:
             dist/pumpe-${{ steps.version.outputs.TAG }}.tar.gz
             dist/pumpe-${{ steps.version.outputs.TAG }}.tar.gz.sha256
             dist/pumpe-${{ steps.version.outputs.TAG }}.tar.gz.minisig
+          fail_on_unmatched_files: false

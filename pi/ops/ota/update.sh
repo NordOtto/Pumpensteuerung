@@ -83,21 +83,29 @@ cmd_check() {
 download_release() {
     local json="$1"
     local tag="$2"
-    local tarball_url sig_url
+    local tarball_url sig_url sha_url
     tarball_url=$(echo "$json" | jq -r '.assets[] | select(.name | endswith(".tar.gz")) | .browser_download_url' | head -1)
     sig_url=$(echo "$json" | jq -r '.assets[] | select(.name | endswith(".tar.gz.minisig")) | .browser_download_url' | head -1)
+    sha_url=$(echo "$json" | jq -r '.assets[] | select(.name | endswith(".tar.gz.sha256")) | .browser_download_url' | head -1)
     [[ -n "$tarball_url" && "$tarball_url" != "null" ]] || die "Kein .tar.gz im Release"
-    [[ -n "$sig_url" && "$sig_url" != "null" ]] || die "Keine Signatur im Release"
 
     local tmp; tmp=$(mktemp -d)
     trap 'rm -rf "$tmp"' EXIT
 
-    log "Lade Tarball + Signatur"
+    log "Lade Tarball"
     curl -fsSL -o "${tmp}/pkg.tar.gz" "$tarball_url"
-    curl -fsSL -o "${tmp}/pkg.tar.gz.minisig" "$sig_url"
 
-    log "Verifiziere Signatur"
-    minisign -V -p "$MINISIGN_PUBKEY" -m "${tmp}/pkg.tar.gz" || die "Signatur ungueltig"
+    if [[ -n "$sig_url" && "$sig_url" != "null" && -f "${MINISIGN_PUBKEY:-}" ]]; then
+        log "Lade und verifiziere Minisign-Signatur"
+        curl -fsSL -o "${tmp}/pkg.tar.gz.minisig" "$sig_url"
+        minisign -V -p "$MINISIGN_PUBKEY" -m "${tmp}/pkg.tar.gz" || die "Signatur ungueltig"
+    elif [[ -n "$sha_url" && "$sha_url" != "null" ]]; then
+        log "Keine Signatur verfuegbar, pruefe SHA256"
+        curl -fsSL -o "${tmp}/pkg.tar.gz.sha256" "$sha_url"
+        (cd "$tmp" && sed 's# .*/# #' pkg.tar.gz.sha256 | sha256sum -c -) || die "SHA256-Pruefung fehlgeschlagen"
+    else
+        die "Weder Signatur noch SHA256 im Release gefunden"
+    fi
 
     local target="${RELEASES_DIR}/${tag}"
     rm -rf "$target"

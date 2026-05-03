@@ -32,6 +32,14 @@ github_auth() {
     fi
 }
 
+github_curl_args() {
+    if [[ -f "${GITHUB_TOKEN_FILE:-}" ]]; then
+        printf '%s\n' "-H" "Authorization: Bearer $(cat "$GITHUB_TOKEN_FILE")"
+    fi
+    printf '%s\n' "-H" "Accept: application/octet-stream"
+    printf '%s\n' "-H" "X-GitHub-Api-Version: 2022-11-28"
+}
+
 current_tag() {
     [[ -L "$CURRENT_LINK" ]] || { echo ""; return; }
     basename "$(readlink -f "$CURRENT_LINK")"
@@ -84,25 +92,27 @@ download_release() {
     local json="$1"
     local tag="$2"
     local tarball_url sig_url sha_url
-    tarball_url=$(echo "$json" | jq -r '.assets[] | select(.name | endswith(".tar.gz")) | .browser_download_url' | head -1)
-    sig_url=$(echo "$json" | jq -r '.assets[] | select(.name | endswith(".tar.gz.minisig")) | .browser_download_url' | head -1)
-    sha_url=$(echo "$json" | jq -r '.assets[] | select(.name | endswith(".tar.gz.sha256")) | .browser_download_url' | head -1)
+    tarball_url=$(echo "$json" | jq -r '.assets[] | select(.name | endswith(".tar.gz")) | .url' | head -1)
+    sig_url=$(echo "$json" | jq -r '.assets[] | select(.name | endswith(".tar.gz.minisig")) | .url' | head -1)
+    sha_url=$(echo "$json" | jq -r '.assets[] | select(.name | endswith(".tar.gz.sha256")) | .url' | head -1)
     [[ -n "$tarball_url" && "$tarball_url" != "null" ]] || die "Kein .tar.gz im Release"
 
     local tmp; tmp=$(mktemp -d)
-    trap 'rm -rf "$tmp"' EXIT
+    trap "rm -rf '$tmp'" EXIT
+    local auth=()
+    mapfile -t auth < <(github_curl_args)
 
     log "Lade Tarball"
-    curl -fsSL -o "${tmp}/pkg.tar.gz" "$tarball_url"
+    curl -fsSL "${auth[@]}" -o "${tmp}/pkg.tar.gz" "$tarball_url"
 
     if [[ -n "$sig_url" && "$sig_url" != "null" && -f "${MINISIGN_PUBKEY:-}" ]]; then
         log "Lade und verifiziere Minisign-Signatur"
-        curl -fsSL -o "${tmp}/pkg.tar.gz.minisig" "$sig_url"
+        curl -fsSL "${auth[@]}" -o "${tmp}/pkg.tar.gz.minisig" "$sig_url"
         minisign -V -p "$MINISIGN_PUBKEY" -m "${tmp}/pkg.tar.gz" || die "Signatur ungueltig"
     elif [[ -n "$sha_url" && "$sha_url" != "null" ]]; then
         log "Keine Signatur verfuegbar, pruefe SHA256"
-        curl -fsSL -o "${tmp}/pkg.tar.gz.sha256" "$sha_url"
-        (cd "$tmp" && sed 's# .*/# #' pkg.tar.gz.sha256 | sha256sum -c -) || die "SHA256-Pruefung fehlgeschlagen"
+        curl -fsSL "${auth[@]}" -o "${tmp}/pkg.tar.gz.sha256" "$sha_url"
+        (cd "$tmp" && awk '{print $1 "  pkg.tar.gz"}' pkg.tar.gz.sha256 | sha256sum -c -) || die "SHA256-Pruefung fehlgeschlagen"
     else
         die "Weder Signatur noch SHA256 im Release gefunden"
     fi
@@ -137,8 +147,15 @@ cmd_apply() {
     sudo systemctl restart pumpe-backend.service
     sudo systemctl restart pumpe-frontend.service
 
-    sleep 5
-    if ! curl -fsS http://127.0.0.1:8000/api/health >/dev/null; then
+    local healthy=0
+    for _ in $(seq 1 30); do
+        if curl -fsS http://127.0.0.1:8000/api/health >/dev/null; then
+            healthy=1
+            break
+        fi
+        sleep 1
+    done
+    if [[ "$healthy" != "1" ]]; then
         log "Smoke-Test fehlgeschlagen, Rollback"
         cmd_rollback
         exit 1

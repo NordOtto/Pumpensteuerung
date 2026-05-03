@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { motion } from "framer-motion";
-import { Clock3, Play, RotateCcw, ShieldCheck, Square, TimerReset } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion, Reorder } from "framer-motion";
+import { ChevronDown, Clock3, GripVertical, Play, RotateCcw, ShieldCheck, Square, TimerReset } from "lucide-react";
 import { Section } from "@/components/section";
 import { KpiCard } from "@/components/kpi-card";
 import { ZoneCard } from "@/components/zone-card";
@@ -14,12 +14,19 @@ import { cn, formatBar, formatHz, formatLpm } from "@/lib/utils";
 import type { IrrigationProgram } from "@/lib/types";
 
 const QUICK_MINUTES = [10, 20, 30, 45, 60];
+const DEFAULT_SECTION_ORDER = ["live", "pump", "irrigation", "zones", "warnings"] as const;
+type DashboardSectionId = (typeof DEFAULT_SECTION_ORDER)[number];
+type CollapsedState = Partial<Record<DashboardSectionId, boolean>>;
+const ORDER_KEY = "pumpe.dashboard.sectionOrder";
+const COLLAPSE_KEY = "pumpe.dashboard.collapsed";
 
 export default function DashboardPage() {
   const { status, warnings } = useStatus();
   const [selectedProgramId, setSelectedProgramId] = useState("");
   const [manualMinutes, setManualMinutes] = useState(30);
   const [actionError, setActionError] = useState("");
+  const [sectionOrder, setSectionOrder] = useState<DashboardSectionId[]>([...DEFAULT_SECTION_ORDER]);
+  const [collapsed, setCollapsed] = useState<CollapsedState>({});
 
   const programs = status?.irrigation.programs ?? [];
   const decisionForSelection = status?.irrigation.decision;
@@ -31,6 +38,34 @@ export default function DashboardPage() {
       programs[0]
     );
   }, [programs, selectedProgramId, decisionForSelection?.program_id]);
+
+  useEffect(() => {
+    try {
+      const savedOrder = JSON.parse(localStorage.getItem(ORDER_KEY) || "[]");
+      if (Array.isArray(savedOrder)) {
+        const known = savedOrder.filter((id): id is DashboardSectionId =>
+          DEFAULT_SECTION_ORDER.includes(id as DashboardSectionId)
+        );
+        const missing = DEFAULT_SECTION_ORDER.filter((id) => !known.includes(id));
+        setSectionOrder([...known, ...missing]);
+      }
+      const savedCollapsed = JSON.parse(localStorage.getItem(COLLAPSE_KEY) || "{}");
+      if (savedCollapsed && typeof savedCollapsed === "object") {
+        setCollapsed(savedCollapsed);
+      }
+    } catch {
+      setSectionOrder([...DEFAULT_SECTION_ORDER]);
+      setCollapsed({});
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(ORDER_KEY, JSON.stringify(sectionOrder));
+  }, [sectionOrder]);
+
+  useEffect(() => {
+    localStorage.setItem(COLLAPSE_KEY, JSON.stringify(collapsed));
+  }, [collapsed]);
 
   if (!status) {
     return <div className="flex h-64 items-center justify-center text-slate-400">Verbinde mit Steuerung...</div>;
@@ -87,6 +122,8 @@ export default function DashboardPage() {
       })
     : "kein Start geplant";
 
+  const visibleSections = sectionOrder.filter((id) => id !== "warnings" || warnings.length > 0);
+
   return (
     <motion.div
       className="flex flex-col gap-5 animate-fade-in"
@@ -94,269 +131,241 @@ export default function DashboardPage() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.28, ease: "easeOut" }}
     >
-      <Section title="Live-Werte">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <KpiCard
-            label="Druck"
-            value={formatBar(status.pressure_bar)}
-            unit="bar"
-            tone={pressureTone}
-            hint={`Ein ${formatBar(status.pi.p_on)} / Aus ${formatBar(status.pi.p_off)} bar`}
-            size="lg"
-          />
-          <KpiCard
-            label="Durchfluss"
-            value={formatLpm(status.flow_rate)}
-            unit="L/min"
-            hint={status.flow_estimated ? "Geschaetzt" : "Sensor"}
-            size="lg"
-          />
-          <KpiCard
-            label="Pumpenfrequenz"
-            value={formatHz(v.frequency)}
-            unit="Hz"
-            tone={v.running ? "ok" : "default"}
-            hint={v.freq_setpoint ? `Soll ${formatHz(v.freq_setpoint)} Hz` : undefined}
-            size="lg"
-          />
-        </div>
-      </Section>
-
-      <Section title="Pumpe steuern">
-        <motion.div
-          className="rounded-lg border border-white/70 bg-gradient-to-br from-white/95 via-white/80 to-sky-50/75 p-4 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.24 }}
-        >
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-wrap items-center gap-3">
-              <StatusBadge tone={pumpTone} pulse={v.running}>
-                {pumpLabel}
-              </StatusBadge>
-              <PumpInfo label="Preset" value={status.active_preset || "Normal"} />
-              <PumpInfo label="Regelung" value={modeLabel(status.ctrl_mode)} />
-              <PumpInfo label="FU" value={v.status || (v.connected ? "bereit" : "offline")} />
-              <PumpInfo label="RTU" value={v.connected ? "verbunden" : "getrennt"} />
-            </div>
-
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <button
-                type="button"
-                onClick={handlePumpToggle}
-                disabled={!v.running && (v.fault || status.vacation.enabled)}
-                className={cn(
-                  "inline-flex h-14 min-w-44 items-center justify-center gap-2 rounded-lg px-5 text-sm font-bold uppercase tracking-wide text-white shadow-sm transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45",
-                  v.running ? "bg-danger hover:bg-danger/90" : "bg-ok hover:bg-ok/90"
-                )}
-              >
-                {v.running ? <Square size={18} /> : <Play size={18} />}
-                {v.running ? "Pumpe stoppen" : "Pumpe starten"}
-              </button>
-              {v.fault && (
-                <button
-                  type="button"
-                  onClick={() => api.v20Reset()}
-                  className="inline-flex h-14 min-w-32 items-center justify-center gap-2 rounded-lg border border-warn/40 bg-warn/10 px-5 text-sm font-bold uppercase tracking-wide text-warn transition active:scale-[0.98] hover:bg-warn/15"
-                >
-                  <RotateCcw size={18} />
-                  FU Reset
-                </button>
-              )}
-            </div>
-          </div>
-        </motion.div>
-      </Section>
-
-      <Section title="Bewaesserung">
-        <div className={cn("grid gap-4", decision.running && "xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,0.65fr)]")}>
-          <motion.div
-            className="rounded-lg border border-white/70 bg-gradient-to-br from-white/95 via-white/80 to-cyan-50/75 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.09)] backdrop-blur"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.24 }}
+      <Reorder.Group axis="y" values={visibleSections} onReorder={(items) => setSectionOrder(mergeSectionOrder(items))} className="flex flex-col gap-5">
+        {visibleSections.map((id) => (
+          <DashboardPanel
+            key={id}
+            id={id}
+            title={sectionTitle(id)}
+            collapsed={collapsed[id] ?? false}
+            onToggle={() => setCollapsed((current) => ({ ...current, [id]: !(current[id] ?? false) }))}
           >
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <StatusBadge tone={decision.running ? "ok" : decision.allowed ? "muted" : "warn"} pulse={decision.running}>
-                    {decision.running ? "Bewaessert" : decision.allowed ? "Bereit" : "Wartet"}
-                  </StatusBadge>
-                  <span className="rounded-full border border-white/70 bg-white/70 px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm">
-                    {decision.running
-                      ? decision.started_by === "manual" ? "Manuell" : "Automatisch"
-                      : selectedProgram?.mode === "smart_et" ? "Smart ET" : "Fest"}
-                  </span>
-                  {decision.phase === "soak" && (
-                    <span className="rounded-full border border-ok/20 bg-ok/10 px-3 py-1 text-xs font-semibold text-ok">
-                      Sickerpause
-                    </span>
-                  )}
-                </div>
-                <h1 className="text-2xl font-bold text-slate-950">
-                  {decision.running
-                    ? decision.active_program_name || "Bewaesserung aktiv"
-                    : selectedProgram?.name || "Kein Programm"}
-                </h1>
-                <p className="mt-1 max-w-2xl text-sm text-slate-500">
-                  {decision.running
-                    ? `${decision.active_zone_name || "Zone"} ${decision.phase === "soak" ? "sickert" : "laeuft"} mit Preset ${decision.active_preset || status.active_preset || "Normal"}.`
-                    : `Naechster Automatikstart: ${nextStart}. ${decision.reason || "Bereit"}.`}
-                </p>
-              </div>
-
-              <div className="grid min-w-[220px] grid-cols-2 gap-2 rounded-lg border border-white/65 bg-white/65 p-3 shadow-inner">
-                <RunMetric icon={<TimerReset size={16} />} label="Gesamt" value={formatDuration(decision.remaining_s)} />
-                <RunMetric icon={<Clock3 size={16} />} label="Aktueller Schritt" value={formatDuration(decision.zone_remaining_s)} />
-              </div>
-            </div>
-
-            <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
-              <div className="space-y-3">
-                <div className="flex flex-wrap gap-2">
-                  {programs.map((p) => {
-                    const selected = selectedProgram?.id === p.id;
-                    return (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => setSelectedProgramId(p.id)}
-                        className={cn(
-                          "rounded-lg border px-3 py-2 text-left text-sm font-semibold transition active:scale-[0.98]",
-                          selected
-                            ? "border-primary/50 bg-primary text-white shadow-[0_10px_24px_rgba(37,136,235,0.22)]"
-                            : "border-white/70 bg-white/70 text-slate-700 hover:bg-white"
-                        )}
-                      >
-                        <span>{p.name}</span>
-                        <span className={cn("ml-2 text-xs font-medium", selected ? "text-white/75" : "text-slate-400")}>
-                          {p.mode === "smart_et" ? "ET" : "Fest"} | {p.zones.length} Zone{p.zones.length === 1 ? "" : "n"}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div className="grid gap-3 md:grid-cols-3">
-                  <ActionButton
-                    icon={<ShieldCheck size={18} />}
-                    title="Automatik jetzt"
-                    subtitle="nutzt Wetter, ET und Wochenlimit"
-                    disabled={!selectedProgram || decision.running}
-                    onClick={() => selectedProgram && runProgram(selectedProgram, false)}
-                  />
-                  <ActionButton
-                    icon={<Play size={18} />}
-                    title={`Manuell ${manualMinutes} min`}
-                    subtitle="uebergeht Wetterpruefung"
-                    disabled={!selectedProgram || decision.running}
-                    onClick={() => selectedProgram && runProgram(selectedProgram, true, manualMinutes)}
-                  />
-                  <ActionButton
-                    icon={<Square size={18} />}
-                    title="Bewaesserung stoppen"
-                    subtitle="Zone und Pumpe stoppen"
-                    tone="danger"
-                    disabled={!decision.running}
-                    onClick={stopIrrigation}
-                  />
-                </div>
-              </div>
-
-              <div className="rounded-lg border border-white/70 bg-white/70 p-3 shadow-sm">
-                <div className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-500">Manuelle Laufzeit</div>
-                <div className="flex flex-wrap gap-2">
-                  {QUICK_MINUTES.map((m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => setManualMinutes(m)}
-                      className={cn(
-                        "h-10 min-w-12 rounded-lg border px-3 text-sm font-bold transition active:scale-[0.98]",
-                        manualMinutes === m
-                          ? "border-primary bg-primary text-white"
-                          : "border-white/80 bg-white text-slate-700 hover:bg-slate-50"
-                      )}
-                    >
-                      {m}
-                    </button>
-                  ))}
-                </div>
-                <label className="mt-3 block">
-                  <span className="mb-1 block text-xs font-semibold text-slate-500">Minuten</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={480}
-                    value={manualMinutes}
-                    onChange={(e) => setManualMinutes(Math.max(1, Math.min(480, Number(e.target.value) || 1)))}
-                    className="h-11 w-full rounded-lg border border-white/80 bg-white px-3 text-sm font-semibold text-slate-900 outline-none ring-primary/20 focus:ring-4"
-                  />
-                </label>
-              </div>
-            </div>
-
-            {actionError && (
-              <div className="mt-3 rounded-lg border border-danger/20 bg-danger/10 px-3 py-2 text-sm font-semibold text-danger">
-                {actionError}
+            {id === "live" && (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <KpiCard
+                  label="Druck"
+                  value={formatBar(status.pressure_bar)}
+                  unit="bar"
+                  tone={pressureTone}
+                  hint={`Ein ${formatBar(status.pi.p_on)} / Aus ${formatBar(status.pi.p_off)} bar`}
+                  size="lg"
+                />
+                <KpiCard
+                  label="Durchfluss"
+                  value={formatLpm(status.flow_rate)}
+                  unit="L/min"
+                  hint={status.flow_estimated ? "Geschaetzt" : "Sensor"}
+                  size="lg"
+                />
+                <KpiCard
+                  label="Pumpenfrequenz"
+                  value={formatHz(v.frequency)}
+                  unit="Hz"
+                  tone={v.running ? "ok" : "default"}
+                  hint={v.freq_setpoint ? `Soll ${formatHz(v.freq_setpoint)} Hz` : undefined}
+                  size="lg"
+                />
               </div>
             )}
-          </motion.div>
 
-          {decision.running && (
-            <motion.div
-              className="rounded-lg border border-white/70 bg-white/75 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.04, duration: 0.24 }}
-            >
-              <div className="mb-3 text-sm font-bold text-slate-900">Aktives Programm</div>
-              <div className="space-y-3">
-                <InfoRow label="Programm" value={decision.active_program_name || "-"} />
-                <InfoRow label="Zone" value={decision.active_zone_name || "-"} />
-                <InfoRow label="Startart" value={decision.started_by === "manual" ? "Manuell" : "Automatisch"} />
-                <InfoRow label="Phase" value={decision.phase === "soak" ? "Sickerpause" : "Laeuft"} />
-                <InfoRow label="Preset" value={decision.active_preset || status.active_preset || "Normal"} />
-                <InfoRow label="Rest gesamt" value={formatDuration(decision.remaining_s)} />
+            {id === "pump" && (
+              <motion.div
+                className="rounded-lg border border-white/70 bg-gradient-to-br from-white/95 via-white/80 to-sky-50/75 p-4 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.24 }}
+              >
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <StatusBadge tone={pumpTone} pulse={v.running}>{pumpLabel}</StatusBadge>
+                    <PumpInfo label="Preset" value={status.active_preset || "Normal"} />
+                    <PumpInfo label="Regelung" value={modeLabel(status.ctrl_mode)} />
+                    <PumpInfo label="FU" value={v.status || (v.connected ? "bereit" : "offline")} />
+                    <PumpInfo label="RTU" value={v.connected ? "verbunden" : "getrennt"} />
+                  </div>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <button
+                      type="button"
+                      onClick={handlePumpToggle}
+                      disabled={!v.running && (v.fault || status.vacation.enabled)}
+                      className={cn(
+                        "inline-flex h-14 min-w-44 items-center justify-center gap-2 rounded-lg px-5 text-sm font-bold uppercase tracking-wide text-white shadow-sm transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45",
+                        v.running ? "bg-danger hover:bg-danger/90" : "bg-ok hover:bg-ok/90"
+                      )}
+                    >
+                      {v.running ? <Square size={18} /> : <Play size={18} />}
+                      {v.running ? "Pumpe stoppen" : "Pumpe starten"}
+                    </button>
+                    {v.fault && (
+                      <button
+                        type="button"
+                        onClick={() => api.v20Reset()}
+                        className="inline-flex h-14 min-w-32 items-center justify-center gap-2 rounded-lg border border-warn/40 bg-warn/10 px-5 text-sm font-bold uppercase tracking-wide text-warn transition active:scale-[0.98] hover:bg-warn/15"
+                      >
+                        <RotateCcw size={18} />
+                        FU Reset
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {id === "irrigation" && (
+              <div className={cn("grid gap-4", decision.running && "xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,0.65fr)]")}>
+                <motion.div
+                  className="rounded-lg border border-white/70 bg-gradient-to-br from-white/95 via-white/80 to-cyan-50/75 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.09)] backdrop-blur"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.24 }}
+                >
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                      <div className="mb-2 flex flex-wrap items-center gap-2">
+                        <StatusBadge tone={decision.running ? "ok" : decision.allowed ? "muted" : "warn"} pulse={decision.running}>
+                          {decision.running ? "Bewaessert" : decision.allowed ? "Bereit" : "Wartet"}
+                        </StatusBadge>
+                        <span className="rounded-full border border-white/70 bg-white/70 px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm">
+                          {decision.running
+                            ? decision.started_by === "manual" ? "Manuell" : "Automatisch"
+                            : selectedProgram?.mode === "smart_et" ? "Smart ET" : "Fest"}
+                        </span>
+                        {decision.phase === "soak" && (
+                          <span className="rounded-full border border-ok/20 bg-ok/10 px-3 py-1 text-xs font-semibold text-ok">Sickerpause</span>
+                        )}
+                      </div>
+                      <h1 className="text-2xl font-bold text-slate-950">
+                        {decision.running ? decision.active_program_name || "Bewaesserung aktiv" : selectedProgram?.name || "Kein Programm"}
+                      </h1>
+                      <p className="mt-1 max-w-2xl text-sm text-slate-500">
+                        {decision.running
+                          ? `${decision.active_zone_name || "Zone"} ${decision.phase === "soak" ? "sickert" : "laeuft"} mit Preset ${decision.active_preset || status.active_preset || "Normal"}.`
+                          : `Naechster Automatikstart: ${nextStart}. ${decision.reason || "Bereit"}.`}
+                      </p>
+                    </div>
+                    <div className="grid min-w-[220px] grid-cols-2 gap-2 rounded-lg border border-white/65 bg-white/65 p-3 shadow-inner">
+                      <RunMetric icon={<TimerReset size={16} />} label="Gesamt" value={formatDuration(decision.remaining_s)} />
+                      <RunMetric icon={<Clock3 size={16} />} label="Aktueller Schritt" value={formatDuration(decision.zone_remaining_s)} />
+                    </div>
+                  </div>
+
+                  <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap gap-2">
+                        {programs.map((p) => {
+                          const selected = selectedProgram?.id === p.id;
+                          return (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => setSelectedProgramId(p.id)}
+                              className={cn(
+                                "rounded-lg border px-3 py-2 text-left text-sm font-semibold transition active:scale-[0.98]",
+                                selected
+                                  ? "border-primary/50 bg-primary text-white shadow-[0_10px_24px_rgba(37,136,235,0.22)]"
+                                  : "border-white/70 bg-white/70 text-slate-700 hover:bg-white"
+                              )}
+                            >
+                              <span>{p.name}</span>
+                              <span className={cn("ml-2 text-xs font-medium", selected ? "text-white/75" : "text-slate-400")}>
+                                {p.mode === "smart_et" ? "ET" : "Fest"} | {p.zones.length} Zone{p.zones.length === 1 ? "" : "n"}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-3">
+                        <ActionButton icon={<ShieldCheck size={18} />} title="Automatik jetzt" subtitle="nutzt Wetter, ET und Wochenlimit" disabled={!selectedProgram || decision.running} onClick={() => selectedProgram && runProgram(selectedProgram, false)} />
+                        <ActionButton icon={<Play size={18} />} title={`Manuell ${manualMinutes} min`} subtitle="uebergeht Wetterpruefung" disabled={!selectedProgram || decision.running} onClick={() => selectedProgram && runProgram(selectedProgram, true, manualMinutes)} />
+                        <ActionButton icon={<Square size={18} />} title="Bewaesserung stoppen" subtitle="Zone und Pumpe stoppen" tone="danger" disabled={!decision.running} onClick={stopIrrigation} />
+                      </div>
+                    </div>
+                    <div className="rounded-lg border border-white/70 bg-white/70 p-3 shadow-sm">
+                      <div className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-500">Manuelle Laufzeit</div>
+                      <div className="flex flex-wrap gap-2">
+                        {QUICK_MINUTES.map((m) => (
+                          <button
+                            key={m}
+                            type="button"
+                            onClick={() => setManualMinutes(m)}
+                            className={cn(
+                              "h-10 min-w-12 rounded-lg border px-3 text-sm font-bold transition active:scale-[0.98]",
+                              manualMinutes === m ? "border-primary bg-primary text-white" : "border-white/80 bg-white text-slate-700 hover:bg-slate-50"
+                            )}
+                          >
+                            {m}
+                          </button>
+                        ))}
+                      </div>
+                      <label className="mt-3 block">
+                        <span className="mb-1 block text-xs font-semibold text-slate-500">Minuten</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={480}
+                          value={manualMinutes}
+                          onChange={(e) => setManualMinutes(Math.max(1, Math.min(480, Number(e.target.value) || 1)))}
+                          className="h-11 w-full rounded-lg border border-white/80 bg-white px-3 text-sm font-semibold text-slate-900 outline-none ring-primary/20 focus:ring-4"
+                        />
+                      </label>
+                    </div>
+                  </div>
+                  {actionError && (
+                    <div className="mt-3 rounded-lg border border-danger/20 bg-danger/10 px-3 py-2 text-sm font-semibold text-danger">
+                      {actionError}
+                    </div>
+                  )}
+                </motion.div>
+
+                {decision.running && (
+                  <motion.div
+                    className="rounded-lg border border-white/70 bg-white/75 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur"
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.04, duration: 0.24 }}
+                  >
+                    <div className="mb-3 text-sm font-bold text-slate-900">Aktives Programm</div>
+                    <div className="space-y-3">
+                      <InfoRow label="Programm" value={decision.active_program_name || "-"} />
+                      <InfoRow label="Zone" value={decision.active_zone_name || "-"} />
+                      <InfoRow label="Startart" value={decision.started_by === "manual" ? "Manuell" : "Automatisch"} />
+                      <InfoRow label="Phase" value={decision.phase === "soak" ? "Sickerpause" : "Laeuft"} />
+                      <InfoRow label="Preset" value={decision.active_preset || status.active_preset || "Normal"} />
+                      <InfoRow label="Rest gesamt" value={formatDuration(decision.remaining_s)} />
+                    </div>
+                  </motion.div>
+                )}
               </div>
-            </motion.div>
-          )}
-        </div>
-      </Section>
+            )}
 
-      <Section title="Bewaesserungs-Zonen">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {dashboardZones(status.irrigation.programs).map((z) => {
-            const moisture = status.irrigation.weather.soil_moisture_pct ?? z.fallbackMoisture;
-            const isRunning = decision.running && decision.active_zone === z.id;
-            const dryBelow = moisture < 30;
-            const state = isRunning ? "laeuft" : dryBelow ? "trocken" : "ok";
-            return (
-              <ZoneCard
-                key={z.id}
-                name={z.name}
-                moisturePct={moisture}
-                state={state}
-                etTodayMm={status.irrigation.weather.et0_mm ?? null}
-                nextRun={decision.next_start
-                  ? new Date(decision.next_start).toLocaleString("de-DE", {
-                      weekday: "short",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })
-                  : null}
-                active={isRunning}
-              />
-            );
-          })}
-        </div>
-      </Section>
+            {id === "zones" && (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                {dashboardZones(status.irrigation.programs).map((z) => {
+                  const moisture = status.irrigation.weather.soil_moisture_pct ?? z.fallbackMoisture;
+                  const isRunning = decision.running && decision.active_zone === z.id;
+                  const dryBelow = moisture < 30;
+                  const state = isRunning ? "laeuft" : dryBelow ? "trocken" : "ok";
+                  return (
+                    <ZoneCard
+                      key={z.id}
+                      name={z.name}
+                      moisturePct={moisture}
+                      state={state}
+                      etTodayMm={status.irrigation.weather.et0_mm ?? null}
+                      nextRun={decision.next_start
+                        ? new Date(decision.next_start).toLocaleString("de-DE", { weekday: "short", hour: "2-digit", minute: "2-digit" })
+                        : null}
+                      active={isRunning}
+                    />
+                  );
+                })}
+              </div>
+            )}
 
-      {warnings.length > 0 && (
-        <Section title="Warnungen">
-          <WarningList warnings={warnings} />
-        </Section>
-      )}
+            {id === "warnings" && <WarningList warnings={warnings} />}
+          </DashboardPanel>
+        ))}
+      </Reorder.Group>
     </motion.div>
   );
 }
@@ -411,6 +420,62 @@ function RunMetric({ icon, label, value }: { icon: React.ReactNode; label: strin
   );
 }
 
+function DashboardPanel({
+  id,
+  title,
+  collapsed,
+  onToggle,
+  children,
+}: {
+  id: DashboardSectionId;
+  title: string;
+  collapsed: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <Reorder.Item value={id} layout="position" dragListener className="touch-pan-y list-none">
+      <section className="mb-0">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <button
+              type="button"
+              aria-label={`${title} verschieben`}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/70 bg-white/75 text-slate-400 shadow-sm active:scale-95"
+            >
+              <GripVertical size={18} />
+            </button>
+            <span className="h-5 w-1 rounded-full bg-gradient-to-b from-primary to-ok shadow-[0_0_16px_rgba(37,136,235,0.32)]" />
+            <h2 className="truncate text-xs font-bold uppercase tracking-widest text-slate-600">{title}</h2>
+          </div>
+          <button
+            type="button"
+            onClick={onToggle}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/70 bg-white/75 text-slate-500 shadow-sm transition active:scale-95"
+            aria-label={collapsed ? `${title} ausklappen` : `${title} einklappen`}
+          >
+            <ChevronDown size={18} className={cn("transition-transform", collapsed && "-rotate-90")} />
+          </button>
+        </div>
+        <AnimatePresence initial={false}>
+          {!collapsed && (
+            <motion.div
+              key="content"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
+              className="overflow-hidden"
+            >
+              {children}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </section>
+    </Reorder.Item>
+  );
+}
+
 function PumpInfo({ label, value }: { label: string; value: string }) {
   return (
     <span className="rounded-lg border border-white/70 bg-white/65 px-3 py-2 shadow-inner">
@@ -460,4 +525,18 @@ function modeLabel(mode: number) {
   if (mode === 2) return "Fix-Hz";
   if (mode === 3) return "Hahnmodus";
   return "Unbekannt";
+}
+
+function sectionTitle(id: DashboardSectionId) {
+  if (id === "live") return "Live-Werte";
+  if (id === "pump") return "Pumpe steuern";
+  if (id === "irrigation") return "Bewaesserung";
+  if (id === "zones") return "Bewaesserungs-Zonen";
+  return "Warnungen";
+}
+
+function mergeSectionOrder(items: DashboardSectionId[]) {
+  const visible = items.filter((id): id is DashboardSectionId => DEFAULT_SECTION_ORDER.includes(id));
+  const missing = DEFAULT_SECTION_ORDER.filter((id) => !visible.includes(id));
+  return [...visible, ...missing];
 }

@@ -2,13 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Clock3, Droplets, Play, ShieldCheck, Square, TimerReset } from "lucide-react";
+import { Clock3, Play, RotateCcw, ShieldCheck, Square, TimerReset } from "lucide-react";
 import { Section } from "@/components/section";
 import { KpiCard } from "@/components/kpi-card";
 import { ZoneCard } from "@/components/zone-card";
 import { WarningList } from "@/components/warning-list";
 import { StatusBadge } from "@/components/status-badge";
-import { HoldButton } from "@/components/hold-button";
 import { useStatus } from "@/lib/ws";
 import { api } from "@/lib/api";
 import { cn, formatBar, formatHz, formatLpm } from "@/lib/utils";
@@ -34,18 +33,13 @@ export default function DashboardPage() {
   }, [programs, selectedProgramId, decisionForSelection?.program_id]);
 
   if (!status) {
-    return (
-      <div className="flex h-64 items-center justify-center text-slate-400">
-        Verbinde mit Steuerung...
-      </div>
-    );
+    return <div className="flex h-64 items-center justify-center text-slate-400">Verbinde mit Steuerung...</div>;
   }
 
   const v = status.v20;
   const decision = status.irrigation.decision;
   const pumpTone = v.fault ? "danger" : v.running ? "ok" : "muted";
   const pumpLabel = v.fault ? "Fehler" : v.running ? "Laeuft" : "Aus";
-
   const pressureTone =
     status.pressure_bar > status.pi.p_off
       ? "danger"
@@ -72,6 +66,19 @@ export default function DashboardPage() {
     }
   };
 
+  const handlePumpToggle = async () => {
+    setActionError("");
+    try {
+      if (v.running) {
+        await api.v20Stop();
+      } else {
+        await api.v20Start();
+      }
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Pumpenbefehl fehlgeschlagen");
+    }
+  };
+
   const nextStart = decision.next_start
     ? new Date(decision.next_start).toLocaleString("de-DE", {
         weekday: "short",
@@ -87,8 +94,82 @@ export default function DashboardPage() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.28, ease: "easeOut" }}
     >
+      <Section title="Live-Werte">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <KpiCard
+            label="Druck"
+            value={formatBar(status.pressure_bar)}
+            unit="bar"
+            tone={pressureTone}
+            hint={`Ein ${formatBar(status.pi.p_on)} / Aus ${formatBar(status.pi.p_off)} bar`}
+            size="lg"
+          />
+          <KpiCard
+            label="Durchfluss"
+            value={formatLpm(status.flow_rate)}
+            unit="L/min"
+            hint={status.flow_estimated ? "Geschaetzt" : "Sensor"}
+            size="lg"
+          />
+          <KpiCard
+            label="Pumpenfrequenz"
+            value={formatHz(v.frequency)}
+            unit="Hz"
+            tone={v.running ? "ok" : "default"}
+            hint={v.freq_setpoint ? `Soll ${formatHz(v.freq_setpoint)} Hz` : undefined}
+            size="lg"
+          />
+        </div>
+      </Section>
+
+      <Section title="Pumpe steuern">
+        <motion.div
+          className="rounded-lg border border-white/70 bg-gradient-to-br from-white/95 via-white/80 to-sky-50/75 p-4 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.24 }}
+        >
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap items-center gap-3">
+              <StatusBadge tone={pumpTone} pulse={v.running}>
+                {pumpLabel}
+              </StatusBadge>
+              <PumpInfo label="Preset" value={status.active_preset || "Normal"} />
+              <PumpInfo label="Regelung" value={modeLabel(status.ctrl_mode)} />
+              <PumpInfo label="FU" value={v.status || (v.connected ? "bereit" : "offline")} />
+              <PumpInfo label="RTU" value={v.connected ? "verbunden" : "getrennt"} />
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <button
+                type="button"
+                onClick={handlePumpToggle}
+                disabled={!v.running && (v.fault || status.vacation.enabled)}
+                className={cn(
+                  "inline-flex h-14 min-w-44 items-center justify-center gap-2 rounded-lg px-5 text-sm font-bold uppercase tracking-wide text-white shadow-sm transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45",
+                  v.running ? "bg-danger hover:bg-danger/90" : "bg-ok hover:bg-ok/90"
+                )}
+              >
+                {v.running ? <Square size={18} /> : <Play size={18} />}
+                {v.running ? "Pumpe stoppen" : "Pumpe starten"}
+              </button>
+              {v.fault && (
+                <button
+                  type="button"
+                  onClick={() => api.v20Reset()}
+                  className="inline-flex h-14 min-w-32 items-center justify-center gap-2 rounded-lg border border-warn/40 bg-warn/10 px-5 text-sm font-bold uppercase tracking-wide text-warn transition active:scale-[0.98] hover:bg-warn/15"
+                >
+                  <RotateCcw size={18} />
+                  FU Reset
+                </button>
+              )}
+            </div>
+          </div>
+        </motion.div>
+      </Section>
+
       <Section title="Bewaesserung">
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,0.65fr)]">
+        <div className={cn("grid gap-4", decision.running && "xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,0.65fr)]")}>
           <motion.div
             className="rounded-lg border border-white/70 bg-gradient-to-br from-white/95 via-white/80 to-cyan-50/75 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.09)] backdrop-blur"
             initial={{ opacity: 0, y: 12 }}
@@ -149,7 +230,7 @@ export default function DashboardPage() {
                       >
                         <span>{p.name}</span>
                         <span className={cn("ml-2 text-xs font-medium", selected ? "text-white/75" : "text-slate-400")}>
-                          {p.mode === "smart_et" ? "ET" : "Fest"} · {p.zones.length} Zone{p.zones.length === 1 ? "" : "n"}
+                          {p.mode === "smart_et" ? "ET" : "Fest"} | {p.zones.length} Zone{p.zones.length === 1 ? "" : "n"}
                         </span>
                       </button>
                     );
@@ -222,94 +303,25 @@ export default function DashboardPage() {
             )}
           </motion.div>
 
-          <motion.div
-            className="rounded-lg border border-white/70 bg-white/75 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.04, duration: 0.24 }}
-          >
-            <div className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-900">
-              <Droplets size={18} className="text-primary" />
-              Aktives Programm
-            </div>
-            {selectedProgram ? (
-              <div className="space-y-3">
-                <InfoRow label="Name" value={selectedProgram.name} />
-                <InfoRow label="Modus" value={selectedProgram.mode === "smart_et" ? "Smart ET" : "Feste Laufzeit"} />
-                <InfoRow label="Zonen" value={String(selectedProgram.zones.length)} />
-                <InfoRow label="Automatik" value={selectedProgram.enabled ? "aktiv" : "deaktiviert"} />
-                <InfoRow label="Startzeit" value={`${pad2(selectedProgram.start_hour)}:${pad2(selectedProgram.start_min)}`} />
-                <InfoRow label="Status" value={selectedProgram.last_skip_reason || decision.reason || "Bereit"} />
-              </div>
-            ) : (
-              <p className="text-sm text-slate-500">Noch kein Bewaesserungsprogramm angelegt.</p>
-            )}
-          </motion.div>
-        </div>
-      </Section>
-
-      <Section title="Live-Werte">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <KpiCard
-            label="Druck"
-            value={formatBar(status.pressure_bar)}
-            unit="bar"
-            tone={pressureTone}
-            hint={`Ein ${formatBar(status.pi.p_on)} / Aus ${formatBar(status.pi.p_off)} bar`}
-            size="lg"
-          />
-          <KpiCard
-            label="Durchfluss"
-            value={formatLpm(status.flow_rate)}
-            unit="L/min"
-            hint={status.flow_estimated ? "Geschaetzt" : "Sensor"}
-            size="lg"
-          />
-          <KpiCard
-            label="Pumpenfrequenz"
-            value={formatHz(v.frequency)}
-            unit="Hz"
-            tone={v.running ? "ok" : "default"}
-            hint={v.freq_setpoint ? `Soll ${formatHz(v.freq_setpoint)} Hz` : undefined}
-            size="lg"
-          />
-        </div>
-      </Section>
-
-      <Section title="Pumpe">
-        <motion.div
-          className="flex flex-col gap-4 rounded-lg border border-white/70 bg-gradient-to-br from-white/90 via-white/75 to-sky-50/70 p-4 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur sm:flex-row sm:items-center sm:justify-between"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.24 }}
-        >
-          <div className="flex flex-wrap items-center gap-3">
-            <StatusBadge tone={pumpTone} pulse={v.running}>
-              {pumpLabel}
-            </StatusBadge>
-            <span className="text-sm text-slate-500">
-              {v.connected ? "RTU verbunden" : "RTU getrennt"}
-            </span>
-            {status.active_preset && (
-              <span className="text-sm text-slate-500">Preset: {status.active_preset}</span>
-            )}
-          </div>
-          <div className="flex items-center gap-3">
-            <HoldButton
-              label="Start halten"
-              tone="ok"
-              onTrigger={() => api.v20Start()}
-              disabled={v.fault || status.vacation.enabled}
-            />
-            <button
-              type="button"
-              onClick={() => api.v20Stop()}
-              className="h-14 min-w-28 rounded-lg border border-border bg-white px-5 text-sm font-bold uppercase tracking-wide text-slate-700 transition active:scale-[0.98] hover:bg-slate-50"
+          {decision.running && (
+            <motion.div
+              className="rounded-lg border border-white/70 bg-white/75 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.04, duration: 0.24 }}
             >
-              Stop
-            </button>
-          </div>
-        </motion.div>
+              <div className="mb-3 text-sm font-bold text-slate-900">Aktives Programm</div>
+              <div className="space-y-3">
+                <InfoRow label="Programm" value={decision.active_program_name || "-"} />
+                <InfoRow label="Zone" value={decision.active_zone_name || "-"} />
+                <InfoRow label="Startart" value={decision.started_by === "manual" ? "Manuell" : "Automatisch"} />
+                <InfoRow label="Phase" value={decision.phase === "soak" ? "Sickerpause" : "Laeuft"} />
+                <InfoRow label="Preset" value={decision.active_preset || status.active_preset || "Normal"} />
+                <InfoRow label="Rest gesamt" value={formatDuration(decision.remaining_s)} />
+              </div>
+            </motion.div>
+          )}
+        </div>
       </Section>
 
       <Section title="Bewaesserungs-Zonen">
@@ -399,6 +411,15 @@ function RunMetric({ icon, label, value }: { icon: React.ReactNode; label: strin
   );
 }
 
+function PumpInfo({ label, value }: { label: string; value: string }) {
+  return (
+    <span className="rounded-lg border border-white/70 bg-white/65 px-3 py-2 shadow-inner">
+      <span className="mr-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</span>
+      <span className="text-sm font-semibold text-slate-800">{value}</span>
+    </span>
+  );
+}
+
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-2 last:border-0 last:pb-0">
@@ -433,6 +454,10 @@ function formatDuration(seconds: number | undefined | null) {
   return `${h} h ${m.toString().padStart(2, "0")} min`;
 }
 
-function pad2(v: number) {
-  return String(v).padStart(2, "0");
+function modeLabel(mode: number) {
+  if (mode === 0) return "Druck";
+  if (mode === 1) return "Durchfluss";
+  if (mode === 2) return "Fix-Hz";
+  if (mode === 3) return "Hahnmodus";
+  return "Unbekannt";
 }

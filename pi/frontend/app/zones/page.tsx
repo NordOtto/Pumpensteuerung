@@ -5,7 +5,6 @@ import { StatusBadge } from "@/components/status-badge";
 import { WeatherWidget } from "@/components/weather-widget";
 import { IrrigationAdvisor } from "@/components/irrigation-advisor";
 import { useStatus } from "@/lib/ws";
-import { api } from "@/lib/api";
 import { moistureColor, cn } from "@/lib/utils";
 
 export default function ZonesPage() {
@@ -111,22 +110,6 @@ export default function ZonesPage() {
                     />
                   </div>
 
-                  <div className="flex gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => api.runProgram(program.id, true)}
-                      className="flex-1 rounded-lg bg-primary py-2 text-sm font-semibold text-white"
-                    >
-                      Start
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => api.stopProgram(program.id)}
-                      className="flex-1 rounded-lg border border-border bg-white py-2 text-sm font-semibold text-slate-700"
-                    >
-                      Stop
-                    </button>
-                  </div>
                 </div>
               );
             })}

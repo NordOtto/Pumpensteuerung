@@ -296,6 +296,7 @@ async def _run_ota(action: str, tag: str = "") -> None:
     app_state.ota.exit_code = None
     app_state.ota.phase = action
     app_state.ota.last_check = datetime.now(timezone.utc).isoformat()
+    _refresh_ota_token_state()
     try:
         cmd = ["/opt/pumpe/ota/update.sh"]
         if action == "check":

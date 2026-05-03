@@ -125,17 +125,19 @@ download_release() {
     log "Entpacke nach ${staging}"
     tar -xzf "${tmp}/pkg.tar.gz" -C "$staging"
 
-    log "Installiere venv-Dependencies"
-    python3 -m venv --clear "${staging}/backend/.venv"
-    "${staging}/backend/.venv/bin/pip" install --no-cache-dir --upgrade pip --quiet
-    "${staging}/backend/.venv/bin/pip" install --no-cache-dir -r "${staging}/backend/requirements.txt" --quiet
-
     if [[ -L "$CURRENT_LINK" ]]; then
         cp -n "${CURRENT_LINK}/backend/.env" "${staging}/backend/.env" 2>/dev/null || true
     fi
 
+    [[ "$(readlink -f "$CURRENT_LINK" 2>/dev/null || true)" != "$target" ]] || die "Aktives Release ${tag} wird nicht ueberschrieben"
     rm -rf "$target"
     mv "$staging" "$target"
+
+    log "Installiere venv-Dependencies"
+    python3 -m venv --clear "${target}/backend/.venv"
+    "${target}/backend/.venv/bin/pip" install --no-cache-dir --upgrade pip --quiet
+    "${target}/backend/.venv/bin/pip" install --no-cache-dir -r "${target}/backend/requirements.txt" --quiet
+    [[ -x "${target}/backend/.venv/bin/uvicorn" ]] || die "${tag}: uvicorn fehlt nach venv-Setup"
 }
 
 cmd_apply() {

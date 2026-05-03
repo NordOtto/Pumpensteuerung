@@ -1,141 +1,206 @@
-# Projektstand — Migration auf Pi 3B+ Solo-Brain
+# Projektstand - Pumpensteuerung und Bewaesserung
 
-Stand: 2026-05-01
+Stand: 2026-05-03
 
-## Ziel
+## Zielbild
 
-Pumpensteuerung **und** smarte Bewässerung laufen auf einem Raspberry Pi 3B+
-als alleinigem "Gehirn". Kein Docker, kein Heimserver, kein Home-Assistant
-als Pflicht-Abhängigkeit. HA bleibt **optional** über den bestehenden
-MQTT-Broker `192.168.1.136:1883` angebunden. Der Bewässerungsautomat ist
-ausschließlich lokal verfügbar, Updates per OTA aus GitHub-Releases.
+Die Pumpensteuerung laeuft als lokale Webapp auf dem Raspberry Pi. Der Pi ist
+das zentrale System fuer Druckregelung, V20-Ansteuerung, Presets,
+Bewaesserungsprogramme, Smart-ET-Empfehlungen, OTA-Updates und die HMI-UI.
+Home Assistant bleibt optional ueber MQTT angebunden, ist aber keine harte
+Abhaengigkeit fuer die Bedienung.
 
-Phase 1 (jetzt umgesetzt): LOGO bleibt für analoge Sensoren, Pi spricht V20
-direkt via TTL-RS485-Adapter am Pi-UART. Phase 2 (später): NORVI IIOT-AE02-I
-ersetzt LOGO+ESP32 vollständig.
+Aktueller Pi:
 
-## Was umgesetzt ist
-
-### Backend ([pi/backend/](pi/backend/))
-
-Komplett-Rewrite in Python (FastAPI + pymodbus + paho-mqtt + APScheduler).
-1:1-Port der Logik aus dem alten Docker-Backend mit identischen Tunings.
-
-| Modul | Inhalt |
+| Bereich | Stand |
 |---|---|
-| [app/main.py](pi/backend/app/main.py) | FastAPI-Lifespan, asyncio-Loops (PI 500 ms, RTU slow 2 s, Timeguard 10 s, Irrigation 5 s, MQTT-Publish 2 s, Pressure-Log 5 s, WS-Broadcast 1 s) |
-| [app/state.py](pi/backend/app/state.py) | Pydantic-State (Singleton `app_state`), Port von `state.js` |
-| [app/config.py](pi/backend/app/config.py) | `.env`-Settings: MQTT, RTU, TCP, Pfade |
-| [app/persistence.py](pi/backend/app/persistence.py) | Atomic-JSON-Schreib/Lese-Layer kompatibel zum alten `/data`-Layout |
-| [app/storage.py](pi/backend/app/storage.py) | **SQLite**: Bewässerungs-History + Druck/Flow/Hz-Time-Series. Retention 30 Tage / 5000 Einträge. WAL-Mode. |
-| [app/pressure_ctrl.py](pi/backend/app/pressure_ctrl.py) | **PI-Druckregler 1:1 aus `pressureCtrl.js`**: Kp=8, Ki=1, Anti-Windup, Trockenlauf-Lock+Grace+Retries, Spike-Detect 0.4 bar/3 s, Min-Freq-Timeout, Druck-Timeout, Fix-Hz-Modus |
-| [app/timeguard.py](pi/backend/app/timeguard.py) | Wochenschaltuhr, zoneinfo Europe/Berlin |
-| [app/presets.py](pi/backend/app/presets.py) | Preset-Verwaltung (Druck/Durchfluss/FixHz), max 20, Default "Normal" |
-| [app/irrigation.py](pi/backend/app/irrigation.py) | ET0-Bewässerung: Wetter-Schwellen, Wasserbilanz, Smart-ET, Wochenlimit, Zonen-Cycle, History → SQLite |
-| [app/modbus_rtu.py](pi/backend/app/modbus_rtu.py) | V20-Master via USB-RS485 oder TTL-Adapter am Pi-UART. Polling 500 ms (Status/Hz) + 2 s (U/I/P/Fault) |
-| [app/modbus_tcp.py](pi/backend/app/modbus_tcp.py) | TCP-Server :502 — LOGO schreibt Sensorwerte in Reg 2/3/4 |
-| [app/mqtt_client.py](pi/backend/app/mqtt_client.py) | paho-mqtt → bestehender Broker `192.168.1.136:1883`. Topic-Schema unverändert (`pumpensteuerung/raw/**`, `cmd/**`). Reconnect mit Republish. |
-| [app/ha_discovery.py](pi/backend/app/ha_discovery.py) | **Auto-Discovery** — V20, Druck/Flow/Wassertemp, PI-Tunings, Zeitfenster, Spike-Settings, Lüfter, Bewässerung, Presets-Select. Wird bei jedem MQTT-Connect gefeuert. |
-| [app/ws.py](pi/backend/app/ws.py) | WebSocket `/ws` — broadcasted vollen State 1 Hz |
-| [app/api/routes.py](pi/backend/app/api/routes.py) | REST: `/api/v20/{start,stop,reset,freq}`, `/api/pressure`, `/api/timeguard`, `/api/presets`, `/api/preset/apply`, `/api/vacation/set`, `/api/irrigation/*`, `/api/history/pressure` (mit Bucket-Aggregation) |
+| Pi-IP | `192.168.1.86` |
+| Backend | FastAPI auf `127.0.0.1:8000`, Service `pumpe-backend.service` |
+| Frontend | Next.js Standalone auf `127.0.0.1:3001`, Service `pumpe-frontend.service` |
+| Aktueller Release-Link | `/opt/pumpe/current` -> `/opt/pumpe/releases/b4b0c56-main` |
+| OTA-Repo | `NordOtto/Pumpensteuerung` |
 
-**MQTT-Broker bleibt der bestehende** `192.168.1.136:1883` — kein lokaler
-Mosquitto auf dem Pi.
+## Zuletzt umgesetzt
 
-### Frontend ([pi/frontend/](pi/frontend/))
+### UI-Redesign
 
-Next.js 15 + React 19 + Tailwind + shadcn-Style. Standalone-Build, läuft als
-systemd-Service hinter nginx.
+- Dashboard-Leitstand entfernt, weil die Werte bereits in der UI vorhanden sind.
+- Helle Webapp/HMI-Oberflaeche eingefuehrt:
+  - Tailwind-Glassmorphism mit `bg-white/75`, `backdrop-blur`, feinen Borders,
+    weichen Schatten und leichten Verlaeufen.
+  - Framer-Motion fuer Seiteneinstieg, Karten und Guide-Wechsel.
+  - App-Shell mit modernerem Profi-Look statt generischem Dashboard.
+- Bestehende Bereiche optisch aufgewertet statt neue doppelte Top-Metriken
+  einzubauen.
+- OTA-Log darf als funktionale dunkle Konsole bleiben; normale UI-Flaechen sind
+  hell gehalten.
 
-| Datei/Bereich | Inhalt |
-|---|---|
-| [app/layout.tsx](pi/frontend/app/layout.tsx) + [components/top-bar](pi/frontend/components/top-bar.tsx) + [bottom-nav](pi/frontend/components/bottom-nav.tsx) | App-Shell, Mode-Badge (AUTO/MANUELL/FEHLER), WLAN/MQTT-Indikator, Mobile-Bottom-Nav |
-| [lib/ws.tsx](pi/frontend/lib/ws.tsx) | WebSocket-Provider mit Auto-Reconnect, leitet Mode + Warnungen aus dem State ab |
-| [lib/api.ts](pi/frontend/lib/api.ts) | Typisierter REST-Client |
-| [components/{kpi-card, zone-card, status-badge, hold-button, warning-list, section}](pi/frontend/components/) | Wiederverwendbare Komponenten. HoldButton: 1.5 s Long-Press mit Progress-Ring |
-| [app/dashboard](pi/frontend/app/dashboard/page.tsx) | KPI Druck/Durchfluss/Hz (Tabular-Nums, Industrie-HMI-Stil), Pumpenstatus + Hold-Start, drei Zonen-Karten, Warnungsliste |
-| [app/control](pi/frontend/app/control/page.tsx) | Manuelle V20-Steuerung, Hz-Slider, Programm-Start/Stop |
-| [app/zones](pi/frontend/app/zones/page.tsx) | Wetter+ET0, alle Zonen mit Bodenfeuchte/Defizit/Laufzeit |
-| [app/analytics](pi/frontend/app/analytics/page.tsx) | **Echte historische Charts** aus SQLite (1 h / 6 h / 24 h / 7 T), Bewässerungs-Historie |
-| [app/settings](pi/frontend/app/settings/page.tsx) | PI-Tunings, Zeitfenster, Presets, Urlaubsmodus, Systeminfo |
+Wichtiger Commit:
 
-**Theme strikt nach Spec**: Hintergrund #ffffff, Primär #2588eb, OK #14c957,
-Warn #ffa000, Fehler #ff0000. Touch-Targets ≥48 px, deutsche UI-Strings.
+- `3feb4f1 feat: redesign pump ui shell`
 
-### Ops ([pi/ops/](pi/ops/) + [.github/workflows/](.github/workflows/))
+### Smart-ET-Guide
+
+- Dunklen Smart-ET-Assistenten durch hellen gefuehrten Guide ersetzt.
+- Guide fuehrt in vier Schritten:
+  1. Nutzung und Preset
+  2. Boden und Sonne
+  3. Messwerte
+  4. Empfehlung pruefen und uebernehmen
+- Empfehlung wird in das aktuell geoeffnete Programm uebernommen.
+- Live-Status-Updates ueberschreiben lokale, noch nicht gespeicherte
+  Programmaenderungen nicht mehr.
+- Umschalten von `fixed` auf `smart_et` bleibt nun erhalten.
+- Messfelder umbenannt:
+  - `Test-mm` -> `Gemessene Regenhoehe mm`
+  - `Test-min` -> `Testdauer min`
+  - zusaetzlich wird die berechnete Rate in `mm/h` gezeigt.
+
+Wichtige Commits:
+
+- `e63df02 fix: keep program edits during live updates`
+- `0abfd9b chore: clarify irrigation wizard measurement labels`
+
+### Smart-ET und Tiefenbewaesserung
+
+- Rasen-Profil realistischer gemacht:
+  - Ziel grob 25 mm pro Bewaesserung.
+  - Mindestdefizit grob 16 mm.
+  - Bei voller Sonne/Stress bis ca. 30 mm Ziel und 19.2 mm Mindestdefizit.
+- Lange Bewaesserung mit Cycle-and-Soak ergaenzt:
+  - Zonen koennen in Beregnungsbloecke und Sickerpausen aufgeteilt werden.
+  - Beispiel: 12 min beregnen, 25 min sickern, dann naechster Block.
+  - Backend stoppt waehrend der Sickerpause Zone und Pumpe, danach laeuft die
+    Zone weiter.
+- ZoneEditor hat Felder fuer `Beregnungsblock min` und `Sickerpause min`.
+
+Wichtiger Commit:
+
+- `dbb2ef5 feat: add deep watering cycle soak`
+
+### Hahnmodus und Presets
+
+- Neuer Preset-Modus `3`: Hahnmodus.
+- Hahnmodus ist als Standard gedacht fuer Wasserhahn, Schlauchtrommel,
+  Giesskanne und spontane Entnahme.
+- Hahnmodus regelt nicht per PI, sondern arbeitet mit:
+  - Einschaltdruck `p_on`
+  - Ausschaltdruck `p_off`
+  - fester Drehzahl in Hz
+- Beispiel auf dem Pi gesetzt:
+  - `Normal` als Hahnmodus
+  - `p_on=2.2`
+  - `p_off=3.7`
+  - `setpoint_hz=45`
+- Bewaesserungsmodi koennen weiterhin fuer Rasen, Tropfschlauch, Pool usw.
+  eigene Presets mit PI-Regelung oder Fix-Hz nutzen.
+- Presets sind jetzt im Zonen-Editor sichtbar; eigene Presets koennen einer Zone
+  zugewiesen werden.
+- Hahnmodus-Preset zeigt Ein-/Ausschaltdruck im Preset-Manager.
+- Zahlenfelder lassen sich wieder normal bearbeiten, ohne haengende fuehrende
+  Null.
+
+Wichtige Commits:
+
+- `f40c1f7 feat: add tap pressure preset mode`
+- `8154fc1 fix: share preset list with zone editor`
+- `de1a44b fix: allow editing numeric fields naturally`
+- `a33fb96 feat: configure tap pressure per preset`
+
+### OTA und Versionierung
+
+- OTA-Konfiguration auf das korrekte Release-Repo gesetzt:
+  - `GITHUB_REPO=NordOtto/Pumpensteuerung`
+- Pi-Konfiguration unter `/opt/pumpe/ota/config.env` entsprechend korrigiert.
+- OTA-Check konnte danach Release-Info laden und meldete den aktuellen Release.
+
+Wichtiger Commit:
+
+- `50fa271 fix: point ota config to release repo`
+
+Wichtig: Der direkte Pi-Deploy wurde zuletzt mehrfach per Datei-/Build-Kopie
+gemacht. Das funktioniert fuer schnelle Tests, ersetzt aber noch keinen sauber
+getaggten OTA-Release mit aktuellem Stand.
+
+### Programm-Speichern
+
+- Fehler `422 Field required body.body` beim Speichern von
+  Bewaesserungsprogrammen behoben.
+- Ursache: FastAPI interpretierte den Endpoint so, als muesste ein JSON-Feld
+  `body` existieren. Das Frontend sendet aber korrekt `{ "programs": [...] }`.
+- Backend-Endpoint nimmt nun den kompletten JSON-Body direkt an.
+- Auf dem Pi deployed, Backend neu gestartet und direkt gegen
+  `127.0.0.1:8000/api/irrigation/programs` getestet:
+  - Programme lesen: OK
+  - Programme speichern: `200 OK`
+
+Wichtiger Commit:
+
+- `829d80b fix: accept irrigation program save body`
+
+## Was aktuell funktioniert
+
+- Webapp auf dem Pi laeuft.
+- Backend-Service laeuft.
+- Frontend-Service laeuft.
+- Druck-/Pumpenstatus wird ueber WebSocket in der UI angezeigt.
+- Presets lassen sich verwalten und anwenden.
+- Zonen koennen Presets aus der Preset-Liste verwenden.
+- Hahnmodus kann als normaler Standard-Pumpenmodus genutzt werden.
+- Bewaesserungsprogramme koennen gespeichert werden.
+- Smart-ET-Guide kann Empfehlungen erzeugen und ins geoeffnete Programm
+  uebernehmen.
+- Cycle-and-Soak ist im Backend und in der UI konfigurierbar.
+- OTA-Check kann Release-Info laden.
+
+## Wichtige Dateien
 
 | Datei | Zweck |
 |---|---|
-| [systemd/pumpe-backend.service](pi/ops/systemd/pumpe-backend.service) | uvicorn als systemd-Unit, dialout-Gruppe für `/dev/ttyAMA0`, `CAP_NET_BIND_SERVICE` für Port 502 |
-| [systemd/pumpe-frontend.service](pi/ops/systemd/pumpe-frontend.service) | Next.js standalone als systemd-Unit |
-| [systemd/pumpe-ota.{timer,service}](pi/ops/systemd/) | OTA-Check alle 60 min |
-| [nginx/pumpe.conf](pi/ops/nginx/pumpe.conf) | TLS-Termination, `/api`+`/ws` → Backend, `/` → Next.js |
-| [ota/update.sh](pi/ops/ota/update.sh) | Pull GitHub-Release, minisign-Verify, atomarer Symlink-Swap, Smoke-Test, Rollback |
-| [setup.sh](pi/ops/setup.sh) | Erstinstallation: Pakete, User, UART-Konfig, Erst-Build aus Repo, nginx, TLS, Services |
-| [.github/workflows/pi-release.yml](.github/workflows/pi-release.yml) | Tag-Push → Backend+Frontend bauen → minisign-signiertes Tarball ans Release |
+| `pi/backend/app/pressure_ctrl.py` | Druckregelung, PI-Regler, Hahnmodus, Schutzlogik |
+| `pi/backend/app/presets.py` | Preset-Verwaltung und Preset-Normalisierung |
+| `pi/backend/app/irrigation.py` | Programme, Zonen, Smart-ET-Entscheidung, Cycle-and-Soak |
+| `pi/backend/app/irrigation_wizard.py` | Smart-ET-Empfehlungslogik |
+| `pi/backend/app/api/routes.py` | REST-API, inklusive Programmspeichern und OTA |
+| `pi/frontend/app/dashboard/page.tsx` | Dashboard/UI-Hauptseite |
+| `pi/frontend/app/settings/page.tsx` | Programme, Smart-ET-Guide, Presets, OTA, Settings |
+| `pi/frontend/lib/api.ts` | Frontend-REST-Client |
+| `pi/frontend/lib/types.ts` | Gemeinsame Frontend-Typen |
+| `pi/ops/ota/config.env.example` | Beispielkonfiguration fuer OTA |
+| `pi/ops/ota/update.sh` | OTA-Check, Install und Rollback |
 
-## Was funktioniert (sobald deployed)
+## Test- und Deploy-Stand
 
-- V20 direkt via Modbus-RTU steuern (Start/Stop/Reset/Sollfrequenz)
-- LOGO-Sensoren via Modbus-TCP entgegennehmen
-- PI-Druckregelung mit allen Schutzmechanismen
-- Wochenschaltuhr Europe/Berlin
-- Presets (Druck/Durchfluss/FixHz)
-- Smart-ET-Bewässerung mit Wetter+Wasserbilanz
-- HA-Auto-Discovery — alle Entitäten erscheinen automatisch
-- REST-API + WebSocket fürs Frontend
-- Echte Druck/Flow/Hz-Historie 30 Tage in SQLite, Charts in `/analytics`
-- Bewässerungs-Historie 5000 Einträge in SQLite
-- OTA-Updates aus GitHub-Releases mit minisign-Verifizierung und Rollback
+Lokal zuletzt erfolgreich:
 
-## Datenpersistenz auf dem Pi
+- `npm run typecheck` in `pi/frontend`
+- `npm run build` in `pi/frontend`
+- Python Compile-Check fuer `pi/backend/app/api/routes.py`
 
-```
-/var/lib/pumpe/
-├── data/                          # JSON-Configs (kompatibel zu alten /data)
-│   ├── pressure_ctrl.json
-│   ├── timeguard.json
-│   ├── presets.json
-│   ├── irrigation_programs.json
-│   └── irrigation_weather.json
-└── state.db                       # SQLite — Druckhistorie + Bewässerungs-History
-```
+Auf dem Pi zuletzt geprueft:
 
-JSON-Bestand vom alten Docker-Backend lässt sich per `scp` 1:1 übernehmen.
-Beim ersten Start migriert das Backend `irrigation_history.json` automatisch
-in die SQLite-Tabelle.
+- `pumpe-frontend.service`: active
+- `/settings`: HTTP 200
+- `pumpe-backend.service`: active
+- `GET /api/irrigation/programs`: OK
+- `POST /api/irrigation/programs`: HTTP 200
 
-## Was noch offen ist
+Hinweis: Lokale Windows-Python-Umgebung ist nicht vollstaendig fuer Backend-Tests
+eingerichtet (`fastapi` fehlt dort). Backend-Tests sollten in der Backend-venv
+oder auf dem Pi laufen.
 
-### Hard nötig vor Inbetriebnahme
+## Bekannte offene Punkte
 
-| Aufgabe | Aufwand |
-|---|---|
-| **TTL-Adapter vom ESP32 abstecken und an Pi GPIO 14/15 verkabeln** | 5 min, siehe [INSTALL.md](INSTALL.md) |
-| **Pi 3B+ aufsetzen** (Raspbian Bookworm Lite, statische IP, SSH) | 20 min |
-| **`bash pi/ops/setup.sh`** ausführen (baut Erst-Release lokal) | 15 min, davon ~10 min `npm run build` auf dem Pi |
-| **`.env` füllen** (MQTT-Credentials aus dem alten ESP32 oder Heimserver) | 2 min |
-| **LOGO Modbus-TCP-Ziel-IP** im LOGO-Soft Comfort von ESP32-IP auf Pi-IP umstellen | 5 min |
-| **Reboot** damit die UART-Umschaltung greift | 1 min |
-
-### Nice-to-have (kann später)
-
-- **Auth-Layer** ([app/auth.py](pi/backend/app/auth.py) folgt) — PBKDF2-SHA512 Login wie im alten Backend, erzwungener Passwortwechsel beim ersten Login. Bis dahin: nginx auf LAN beschränken (`ufw allow from 192.168.0.0/16 to 443`).
-- **Preset-CRUD-UI** im Frontend (aktuell nur "anwenden" — Erstellen/Editieren über REST `/api/presets`).
-- **Aufräumen alte Codebase**: Wenn Pi stabil läuft, alten Docker-Stack auf Heimserver stoppen+entfernen, ESP32-V20-RTU-Code in [src/modbus_v20.cpp](src/modbus_v20.cpp) entfernen oder ESP32 als Sub-Node für Lüfter+DS18B20 weiterlaufen lassen.
-- **Phase 2: NORVI IIOT-AE02-I-Migration** — LOGO ersetzen, Druck/Flow/Wassertemp direkt am NORVI 4–20 mA. Backend bleibt unverändert, nur Sensor-Quellen-Konfiguration in `modbus_*.py` umstellen.
-
-## Migration-Reihenfolge (Empfehlung)
-
-1. Pi parallel zum bestehenden System aufsetzen (anderer IP)
-2. **Trockentest ohne LOGO-Umkonfiguration**: Pi spricht V20, aber LOGO schreibt weiter zum ESP32. → Pi-Backend-Logs prüfen, RTU-Verbindung testet sich selbst.
-3. **Erst dann LOGO umschwenken**: in LOGO-Soft Comfort die TCP-Ziel-IP auf Pi ändern. Sensoren erscheinen jetzt auf dem Pi.
-4. **ESP32 stilllegen** (Stromversorgung trennen) oder als reinen Lüfter-Sub-Node weiterlaufen lassen.
-5. **Eine Woche parallel zum alten Stack**: Watchtower auf Heimserver pausieren, alten Backend-Container stoppen aber **nicht löschen** (Schnell-Rollback wenn nötig).
-6. **Endabnahme**: Trockenlaufschutz manuell auslösen, PI-Regelung beobachten, Spike-Detect mit Schlauchventil testen, alte Backend-Container final entfernen.
-
-## Bekannte Risiken
-
-- **Galvanische Trennung fehlt** beim TTL-Adapter direkt am Pi-UART — bei einem V20-Erdfehler kann der Pi sterben. Übergangslösung. Mittelfristig isolierten USB-RS485-Stick (Waveshare USB-to-RS485-B) nachrüsten.
-- **Pi 3B+ ist beim Erst-Build von Next.js am Limit** — `npm run build` auf dem Pi dauert 5–10 min und kann RAM-knapp werden. Alternative: Frontend lokal vorbauen und Tarball auf den Pi kopieren (das macht der OTA-Pfad sowieso).
-- **Self-Signed-TLS** bedeutet Browser-Warnung bei jedem Erstbesuch. Nicht öffentlich exponieren.
+- Aktueller Code ist lokal committed, aber ein sauberer OTA-Release mit den
+  neuesten Commits muss noch erstellt und getestet werden.
+- Version in der App/Backend-Meldung zeigt noch nicht zwingend die aktuellsten
+  lokalen Commits, weil Direktdeploys am Release-System vorbei gingen.
+- Smart-ET-Bewaesserung sollte real mit Regenmesser/Messbecher kalibriert
+  werden, damit `mm/h` stimmt.
+- Cycle-and-Soak muss im echten Betrieb beobachtet werden:
+  - Ventile sauber aus?
+  - Pumpe waehrend Sickerpause wirklich aus?
+  - Home-Assistant/MQTT-Zonen reagieren korrekt auf Start/Stop?
+- Hahnmodus-Werte muessen in der Praxis feinjustiert werden, damit die Pumpe
+  bei kleiner Entnahme angenehm startet und nicht taktet.
+- OTA-Flow braucht noch eine End-to-End-Probe mit neuem Tag und Rollback.

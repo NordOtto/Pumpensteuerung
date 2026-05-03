@@ -48,10 +48,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ programs }),
     }),
-  runProgram: (program_id: string, force_weather = true) =>
+  runProgram: (program_id: string, force_weather = true, duration_min?: number) =>
     request("/api/irrigation/run", {
       method: "POST",
-      body: JSON.stringify({ program_id, force_weather }),
+      body: JSON.stringify({ program_id, force_weather, duration_min }),
     }),
   stopProgram: (program_id?: string) =>
     request("/api/irrigation/stop", {

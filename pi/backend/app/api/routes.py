@@ -173,11 +173,17 @@ async def irrigation_wizard_recommend(body: dict):
 class RunBody(BaseModel):
     program_id: str
     force_weather: bool = True
+    duration_min: float | None = None
 
 
 @router.post("/irrigation/run")
 async def irrigation_run(body: RunBody):
-    res = deps.irrigation.run_program(body.program_id, manual=True, force_weather=body.force_weather)
+    res = deps.irrigation.run_program(
+        body.program_id,
+        manual=True,
+        force_weather=body.force_weather,
+        duration_min=body.duration_min,
+    )
     if not res["ok"]:
         raise HTTPException(status_code=400, detail=res["error"])
     return res

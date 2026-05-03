@@ -163,6 +163,8 @@ class _ActiveRun:
     runtime_factor: float
     water_budget_mm: float
     started_at: float
+    started_by: str = "auto"
+    restore_preset: str = "Normal"
     zone_index: int = 0
     zone: dict[str, Any] | None = None
     zone_started_at: float = 0.0
@@ -170,6 +172,17 @@ class _ActiveRun:
     total_runtime_s: int = 0
     zone_remaining_s: float = 0.0
     soaking: bool = False
+
+    def remaining_s(self, now: float) -> int:
+        current = max(0, self.zone_ends_at - now) if self.zone_ends_at else 0
+        future = max(0, self.zone_remaining_s)
+        for zone in self.zones[self.zone_index + 1:]:
+            smart = (self.zone_runtimes or {}).get(zone["id"])
+            if smart:
+                future += max(30, round(float(smart.get("runtime_s", 30))))
+            else:
+                future += max(30, round(float(zone.get("duration_min", 1)) * 60 * self.runtime_factor))
+        return max(0, round(current + future))
 
 
 class IrrigationManager:
@@ -483,6 +496,15 @@ class IrrigationManager:
         d.running = self._active is not None
         d.active_zone = (self._active.zone or {}).get("id", "") if self._active else ""
         d.active_program = self._active.program["id"] if self._active else ""
+        d.active_zone_name = (self._active.zone or {}).get("name", "") if self._active else ""
+        d.active_program_name = self._active.program["name"] if self._active else ""
+        d.active_preset = (self._active.zone or {}).get("preset", "") if self._active else ""
+        d.phase = "soak" if self._active and self._active.soaking else ("run" if self._active else "idle")
+        d.started_by = self._active.started_by if self._active else ""
+        now = datetime.now(_TZ).timestamp()
+        d.remaining_s = self._active.remaining_s(now) if self._active else 0
+        d.zone_remaining_s = max(0, round((self._active.zone_ends_at or now) - now)) if self._active else 0
+        d.ends_at = datetime.fromtimestamp(self._active.zone_ends_at, tz=_TZ).isoformat() if self._active and self._active.zone_ends_at else None
 
     def publish_decision(self) -> None:
         d = app_state.irrigation.decision
@@ -603,6 +625,7 @@ class IrrigationManager:
             self._publish_zone_command(self._active.zone, "stop", self._active.program, 0)
         self._v20_stop()
         program = self._active.program
+        restore_preset = self._active.restore_preset or "Normal"
         if result == "completed" and program["mode"] == "smart_et":
             for zone in self._active.zones:
                 smart = (self._active.zone_runtimes or {}).get(zone["id"])
@@ -623,11 +646,22 @@ class IrrigationManager:
         })
         web_log(f"[IRR] Programm {program['name']} beendet: {result}{f' ({reason})' if reason else ''}")
         self._active = None
+        if restore_preset:
+            if self._presets_apply(restore_preset):
+                web_log(f"[IRR] Rueckfall-Preset aktiviert: {restore_preset}")
+            else:
+                web_log(f"[IRR] Rueckfall-Preset nicht gefunden: {restore_preset}")
         self._save_programs()
         self.recompute_decision(program["id"])
         self.publish_decision()
 
-    def run_program(self, program_id: str, manual: bool = False, force_weather: bool = False) -> dict[str, Any]:
+    def run_program(
+        self,
+        program_id: str,
+        manual: bool = False,
+        force_weather: bool = False,
+        duration_min: float | None = None,
+    ) -> dict[str, Any]:
         program = next((p for p in app_state.irrigation.programs if p["id"] == program_id), None)
         ev = self.evaluate_program(program, manual=manual, force_weather=force_weather)
         if not ev["allowed"]:
@@ -654,13 +688,20 @@ class IrrigationManager:
         if not zones:
             return {"ok": False, "error": "Keine aktive Zone"}
 
+        zone_runtimes = ev.get("zone_runtimes")
+        if manual and duration_min is not None:
+            duration_s = max(30, min(8 * 3600, round(float(duration_min) * 60)))
+            zone_runtimes = {z["id"]: {"runtime_s": duration_s, "applied_mm": 0.0, "factor": 1.0} for z in zones}
+
         self._active = _ActiveRun(
             program=program,
             zones=zones,
-            zone_runtimes=ev.get("zone_runtimes"),
+            zone_runtimes=zone_runtimes,
             runtime_factor=ev.get("runtime_factor", 1),
             water_budget_mm=ev.get("water_budget_mm", 0),
             started_at=datetime.now(_TZ).timestamp(),
+            started_by="manual" if manual else "auto",
+            restore_preset="Normal",
         )
         web_log(f"[IRR] Programm {program['name']} gestartet ({ev['reason']})")
         self._start_zone()

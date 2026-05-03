@@ -1,6 +1,8 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import { Clock3, Droplets, Play, ShieldCheck, Square, TimerReset } from "lucide-react";
 import { Section } from "@/components/section";
 import { KpiCard } from "@/components/kpi-card";
 import { ZoneCard } from "@/components/zone-card";
@@ -9,30 +11,74 @@ import { StatusBadge } from "@/components/status-badge";
 import { HoldButton } from "@/components/hold-button";
 import { useStatus } from "@/lib/ws";
 import { api } from "@/lib/api";
-import { formatBar, formatHz, formatLpm } from "@/lib/utils";
+import { cn, formatBar, formatHz, formatLpm } from "@/lib/utils";
+import type { IrrigationProgram } from "@/lib/types";
+
+const QUICK_MINUTES = [10, 20, 30, 45, 60];
 
 export default function DashboardPage() {
   const { status, warnings } = useStatus();
+  const [selectedProgramId, setSelectedProgramId] = useState("");
+  const [manualMinutes, setManualMinutes] = useState(30);
+  const [actionError, setActionError] = useState("");
+
+  const programs = status?.irrigation.programs ?? [];
+  const decisionForSelection = status?.irrigation.decision;
+  const selectedProgram = useMemo(() => {
+    if (!programs.length) return null;
+    return (
+      programs.find((p) => p.id === selectedProgramId) ??
+      programs.find((p) => p.id === decisionForSelection?.program_id) ??
+      programs[0]
+    );
+  }, [programs, selectedProgramId, decisionForSelection?.program_id]);
 
   if (!status) {
     return (
       <div className="flex h-64 items-center justify-center text-slate-400">
-        Verbinde mit Steuerung…
+        Verbinde mit Steuerung...
       </div>
     );
   }
 
   const v = status.v20;
+  const decision = status.irrigation.decision;
   const pumpTone = v.fault ? "danger" : v.running ? "ok" : "muted";
-  const pumpLabel = v.fault ? "Fehler" : v.running ? "Läuft" : "Aus";
+  const pumpLabel = v.fault ? "Fehler" : v.running ? "Laeuft" : "Aus";
 
   const pressureTone =
     status.pressure_bar > status.pi.p_off
       ? "danger"
       : status.pressure_bar < status.pi.p_on
-      ? "warn"
-      : "default";
-  const decision = status.irrigation.decision;
+        ? "warn"
+        : "default";
+
+  const runProgram = async (program: IrrigationProgram, forceWeather: boolean, duration?: number) => {
+    setActionError("");
+    try {
+      await api.runProgram(program.id, forceWeather, duration);
+      setSelectedProgramId(program.id);
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Start fehlgeschlagen");
+    }
+  };
+
+  const stopIrrigation = async () => {
+    setActionError("");
+    try {
+      await api.stopProgram(decision.active_program || selectedProgram?.id);
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Stop fehlgeschlagen");
+    }
+  };
+
+  const nextStart = decision.next_start
+    ? new Date(decision.next_start).toLocaleString("de-DE", {
+        weekday: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "kein Start geplant";
 
   return (
     <motion.div
@@ -41,31 +87,164 @@ export default function DashboardPage() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.28, ease: "easeOut" }}
     >
-      <Section title="Schnellstart">
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          {status.irrigation.programs.map((p, index) => (
-            <motion.div
-              key={p.id}
-              className="overflow-hidden rounded-lg border border-white/70 bg-gradient-to-br from-white/90 via-white/75 to-primary/5 p-4 shadow-[0_14px_35px_rgba(37,136,235,0.10)] backdrop-blur"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.04, duration: 0.22 }}
-            >
-              <div className="mb-3 h-1 w-14 rounded-full bg-gradient-to-r from-primary to-ok" />
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="font-semibold text-slate-900">{p.name}</div>
-                  <div className="text-xs text-slate-500">{p.mode === "smart_et" ? "Smart ET" : "Fest"} | {p.zones.length} Zone(n)</div>
+      <Section title="Bewaesserung">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,0.65fr)]">
+          <motion.div
+            className="rounded-lg border border-white/70 bg-gradient-to-br from-white/95 via-white/80 to-cyan-50/75 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.09)] backdrop-blur"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.24 }}
+          >
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <StatusBadge tone={decision.running ? "ok" : decision.allowed ? "muted" : "warn"} pulse={decision.running}>
+                    {decision.running ? "Bewaessert" : decision.allowed ? "Bereit" : "Wartet"}
+                  </StatusBadge>
+                  <span className="rounded-full border border-white/70 bg-white/70 px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm">
+                    {decision.running
+                      ? decision.started_by === "manual" ? "Manuell" : "Automatisch"
+                      : selectedProgram?.mode === "smart_et" ? "Smart ET" : "Fest"}
+                  </span>
+                  {decision.phase === "soak" && (
+                    <span className="rounded-full border border-ok/20 bg-ok/10 px-3 py-1 text-xs font-semibold text-ok">
+                      Sickerpause
+                    </span>
+                  )}
                 </div>
-                <StatusBadge tone={p.enabled ? "ok" : "muted"}>{p.enabled ? "aktiv" : "aus"}</StatusBadge>
+                <h1 className="text-2xl font-bold text-slate-950">
+                  {decision.running
+                    ? decision.active_program_name || "Bewaesserung aktiv"
+                    : selectedProgram?.name || "Kein Programm"}
+                </h1>
+                <p className="mt-1 max-w-2xl text-sm text-slate-500">
+                  {decision.running
+                    ? `${decision.active_zone_name || "Zone"} ${decision.phase === "soak" ? "sickert" : "laeuft"} mit Preset ${decision.active_preset || status.active_preset || "Normal"}.`
+                    : `Naechster Automatikstart: ${nextStart}. ${decision.reason || "Bereit"}.`}
+                </p>
               </div>
-              <div className="mt-3 text-xs text-slate-500">{p.last_skip_reason || decision.reason}</div>
-              <div className="mt-4 flex gap-2">
-                <button type="button" onClick={() => api.runProgram(p.id, false)} className="flex-1 rounded-lg bg-primary py-2 text-sm font-bold text-white">Smart Start</button>
-                <button type="button" onClick={() => api.stopProgram(p.id)} className="rounded-lg border border-border px-3 py-2 text-sm font-bold text-slate-700">Stop</button>
+
+              <div className="grid min-w-[220px] grid-cols-2 gap-2 rounded-lg border border-white/65 bg-white/65 p-3 shadow-inner">
+                <RunMetric icon={<TimerReset size={16} />} label="Gesamt" value={formatDuration(decision.remaining_s)} />
+                <RunMetric icon={<Clock3 size={16} />} label="Aktueller Schritt" value={formatDuration(decision.zone_remaining_s)} />
               </div>
-            </motion.div>
-          ))}
+            </div>
+
+            <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-2">
+                  {programs.map((p) => {
+                    const selected = selectedProgram?.id === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setSelectedProgramId(p.id)}
+                        className={cn(
+                          "rounded-lg border px-3 py-2 text-left text-sm font-semibold transition active:scale-[0.98]",
+                          selected
+                            ? "border-primary/50 bg-primary text-white shadow-[0_10px_24px_rgba(37,136,235,0.22)]"
+                            : "border-white/70 bg-white/70 text-slate-700 hover:bg-white"
+                        )}
+                      >
+                        <span>{p.name}</span>
+                        <span className={cn("ml-2 text-xs font-medium", selected ? "text-white/75" : "text-slate-400")}>
+                          {p.mode === "smart_et" ? "ET" : "Fest"} · {p.zones.length} Zone{p.zones.length === 1 ? "" : "n"}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-3">
+                  <ActionButton
+                    icon={<ShieldCheck size={18} />}
+                    title="Automatik jetzt"
+                    subtitle="nutzt Wetter, ET und Wochenlimit"
+                    disabled={!selectedProgram || decision.running}
+                    onClick={() => selectedProgram && runProgram(selectedProgram, false)}
+                  />
+                  <ActionButton
+                    icon={<Play size={18} />}
+                    title={`Manuell ${manualMinutes} min`}
+                    subtitle="uebergeht Wetterpruefung"
+                    disabled={!selectedProgram || decision.running}
+                    onClick={() => selectedProgram && runProgram(selectedProgram, true, manualMinutes)}
+                  />
+                  <ActionButton
+                    icon={<Square size={18} />}
+                    title="Bewaesserung stoppen"
+                    subtitle="Zone und Pumpe stoppen"
+                    tone="danger"
+                    disabled={!decision.running}
+                    onClick={stopIrrigation}
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-white/70 bg-white/70 p-3 shadow-sm">
+                <div className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-500">Manuelle Laufzeit</div>
+                <div className="flex flex-wrap gap-2">
+                  {QUICK_MINUTES.map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setManualMinutes(m)}
+                      className={cn(
+                        "h-10 min-w-12 rounded-lg border px-3 text-sm font-bold transition active:scale-[0.98]",
+                        manualMinutes === m
+                          ? "border-primary bg-primary text-white"
+                          : "border-white/80 bg-white text-slate-700 hover:bg-slate-50"
+                      )}
+                    >
+                      {m}
+                    </button>
+                  ))}
+                </div>
+                <label className="mt-3 block">
+                  <span className="mb-1 block text-xs font-semibold text-slate-500">Minuten</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={480}
+                    value={manualMinutes}
+                    onChange={(e) => setManualMinutes(Math.max(1, Math.min(480, Number(e.target.value) || 1)))}
+                    className="h-11 w-full rounded-lg border border-white/80 bg-white px-3 text-sm font-semibold text-slate-900 outline-none ring-primary/20 focus:ring-4"
+                  />
+                </label>
+              </div>
+            </div>
+
+            {actionError && (
+              <div className="mt-3 rounded-lg border border-danger/20 bg-danger/10 px-3 py-2 text-sm font-semibold text-danger">
+                {actionError}
+              </div>
+            )}
+          </motion.div>
+
+          <motion.div
+            className="rounded-lg border border-white/70 bg-white/75 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.04, duration: 0.24 }}
+          >
+            <div className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-900">
+              <Droplets size={18} className="text-primary" />
+              Aktives Programm
+            </div>
+            {selectedProgram ? (
+              <div className="space-y-3">
+                <InfoRow label="Name" value={selectedProgram.name} />
+                <InfoRow label="Modus" value={selectedProgram.mode === "smart_et" ? "Smart ET" : "Feste Laufzeit"} />
+                <InfoRow label="Zonen" value={String(selectedProgram.zones.length)} />
+                <InfoRow label="Automatik" value={selectedProgram.enabled ? "aktiv" : "deaktiviert"} />
+                <InfoRow label="Startzeit" value={`${pad2(selectedProgram.start_hour)}:${pad2(selectedProgram.start_min)}`} />
+                <InfoRow label="Status" value={selectedProgram.last_skip_reason || decision.reason || "Bereit"} />
+              </div>
+            ) : (
+              <p className="text-sm text-slate-500">Noch kein Bewaesserungsprogramm angelegt.</p>
+            )}
+          </motion.div>
         </div>
       </Section>
 
@@ -76,14 +255,14 @@ export default function DashboardPage() {
             value={formatBar(status.pressure_bar)}
             unit="bar"
             tone={pressureTone}
-            hint={`Sollwert ${formatBar(status.pi.setpoint)} bar`}
+            hint={`Ein ${formatBar(status.pi.p_on)} / Aus ${formatBar(status.pi.p_off)} bar`}
             size="lg"
           />
           <KpiCard
             label="Durchfluss"
             value={formatLpm(status.flow_rate)}
             unit="L/min"
-            hint={status.flow_estimated ? "Geschätzt" : "Sensor"}
+            hint={status.flow_estimated ? "Geschaetzt" : "Sensor"}
             size="lg"
           />
           <KpiCard
@@ -91,17 +270,12 @@ export default function DashboardPage() {
             value={formatHz(v.frequency)}
             unit="Hz"
             tone={v.running ? "ok" : "default"}
-            hint={
-              v.freq_setpoint
-                ? `Soll ${formatHz(v.freq_setpoint)} Hz`
-                : undefined
-            }
+            hint={v.freq_setpoint ? `Soll ${formatHz(v.freq_setpoint)} Hz` : undefined}
             size="lg"
           />
         </div>
       </Section>
 
-      {/* Pumpenstatus */}
       <Section title="Pumpe">
         <motion.div
           className="flex flex-col gap-4 rounded-lg border border-white/70 bg-gradient-to-br from-white/90 via-white/75 to-sky-50/70 p-4 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur sm:flex-row sm:items-center sm:justify-between"
@@ -109,7 +283,7 @@ export default function DashboardPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.24 }}
         >
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <StatusBadge tone={pumpTone} pulse={v.running}>
               {pumpLabel}
             </StatusBadge>
@@ -117,12 +291,12 @@ export default function DashboardPage() {
               {v.connected ? "RTU verbunden" : "RTU getrennt"}
             </span>
             {status.active_preset && (
-              <span className="text-sm text-slate-500">· Preset: {status.active_preset}</span>
+              <span className="text-sm text-slate-500">Preset: {status.active_preset}</span>
             )}
           </div>
           <div className="flex items-center gap-3">
             <HoldButton
-              label="Start (halten)"
+              label="Start halten"
               tone="ok"
               onTrigger={() => api.v20Start()}
               disabled={v.fault || status.vacation.enabled}
@@ -138,15 +312,11 @@ export default function DashboardPage() {
         </motion.div>
       </Section>
 
-      {/* Zonen-Übersicht (Hecke / Garten / Vorgarten) — fällt auf irrigation.zones zurück */}
-      <Section title="Bewässerungs-Zonen">
+      <Section title="Bewaesserungs-Zonen">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {DASHBOARD_ZONES.map((z) => {
-            const moisture =
-              status.irrigation.weather.soil_moisture_pct ?? z.fallbackMoisture;
-            const decision = status.irrigation.decision;
-            const isRunning =
-              decision.running && decision.active_zone === z.id;
+          {dashboardZones(status.irrigation.programs).map((z) => {
+            const moisture = status.irrigation.weather.soil_moisture_pct ?? z.fallbackMoisture;
+            const isRunning = decision.running && decision.active_zone === z.id;
             const dryBelow = moisture < 30;
             const state = isRunning ? "laeuft" : dryBelow ? "trocken" : "ok";
             return (
@@ -156,15 +326,13 @@ export default function DashboardPage() {
                 moisturePct={moisture}
                 state={state}
                 etTodayMm={status.irrigation.weather.et0_mm ?? null}
-                nextRun={
-                  decision.next_start
-                    ? new Date(decision.next_start).toLocaleString("de-DE", {
-                        weekday: "short",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })
-                    : null
-                }
+                nextRun={decision.next_start
+                  ? new Date(decision.next_start).toLocaleString("de-DE", {
+                      weekday: "short",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })
+                  : null}
                 active={isRunning}
               />
             );
@@ -172,7 +340,6 @@ export default function DashboardPage() {
         </div>
       </Section>
 
-      {/* Warnungen — nur wenn vorhanden */}
       {warnings.length > 0 && (
         <Section title="Warnungen">
           <WarningList warnings={warnings} />
@@ -182,11 +349,90 @@ export default function DashboardPage() {
   );
 }
 
-// Dashboard zeigt diese drei festen Zonen — die echten Zonen kommen aus
-// der Programm-Konfiguration (siehe /zones), aber für die Übersicht halten
-// wir uns an den Spec-Brief: Hecke / Garten / Vorgarten.
-const DASHBOARD_ZONES = [
-  { id: "hecke", name: "Hecke", fallbackMoisture: 70 },
-  { id: "garten", name: "Garten", fallbackMoisture: 55 },
-  { id: "vorgarten", name: "Vorgarten", fallbackMoisture: 45 },
-];
+function ActionButton({
+  icon,
+  title,
+  subtitle,
+  onClick,
+  disabled,
+  tone = "primary",
+}: {
+  icon: React.ReactNode;
+  title: string;
+  subtitle: string;
+  onClick: () => void;
+  disabled?: boolean;
+  tone?: "primary" | "danger";
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        "flex min-h-24 flex-col items-start justify-between rounded-lg border p-3 text-left shadow-sm transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45",
+        tone === "danger"
+          ? "border-danger/20 bg-danger/10 text-danger hover:bg-danger/15"
+          : "border-white/70 bg-white/75 text-slate-900 hover:bg-white"
+      )}
+    >
+      <span className={cn("rounded-lg p-2", tone === "danger" ? "bg-danger/10" : "bg-primary/10 text-primary")}>
+        {icon}
+      </span>
+      <span>
+        <span className="block text-sm font-bold">{title}</span>
+        <span className={cn("mt-0.5 block text-xs", tone === "danger" ? "text-danger/75" : "text-slate-500")}>{subtitle}</span>
+      </span>
+    </button>
+  );
+}
+
+function RunMetric({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div>
+      <div className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+        {icon}
+        {label}
+      </div>
+      <div className="mt-1 text-xl font-bold tabular-nums text-slate-950">{value}</div>
+    </div>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-2 last:border-0 last:pb-0">
+      <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">{label}</span>
+      <span className="text-right text-sm font-semibold text-slate-800">{value}</span>
+    </div>
+  );
+}
+
+function dashboardZones(programs: IrrigationProgram[]) {
+  const zones = programs.flatMap((p) => p.zones).slice(0, 3);
+  if (zones.length) {
+    return zones.map((z, idx) => ({
+      id: z.id,
+      name: z.name,
+      fallbackMoisture: [70, 55, 45][idx] ?? 50,
+    }));
+  }
+  return [
+    { id: "hecke", name: "Hecke", fallbackMoisture: 70 },
+    { id: "garten", name: "Garten", fallbackMoisture: 55 },
+    { id: "vorgarten", name: "Vorgarten", fallbackMoisture: 45 },
+  ];
+}
+
+function formatDuration(seconds: number | undefined | null) {
+  const total = Math.max(0, Math.round(seconds ?? 0));
+  if (total <= 0) return "--";
+  const h = Math.floor(total / 3600);
+  const m = Math.ceil((total % 3600) / 60);
+  if (h <= 0) return `${m} min`;
+  return `${h} h ${m.toString().padStart(2, "0")} min`;
+}
+
+function pad2(v: number) {
+  return String(v).padStart(2, "0");
+}

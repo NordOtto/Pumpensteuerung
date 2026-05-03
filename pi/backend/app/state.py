@@ -115,6 +115,14 @@ class IrrigationDecision(BaseModel):
     active_zone: str = ""
     active_program: str = ""
     running: bool = False
+    active_zone_name: str = ""
+    active_program_name: str = ""
+    active_preset: str = ""
+    phase: str = "idle"
+    started_by: str = ""
+    remaining_s: int = 0
+    zone_remaining_s: int = 0
+    ends_at: str | None = None
 
 
 class IrrigationState(BaseModel):

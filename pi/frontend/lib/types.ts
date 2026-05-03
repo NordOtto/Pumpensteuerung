@@ -90,6 +90,14 @@ export interface IrrigationDecision {
   active_zone: string;
   active_program: string;
   running: boolean;
+  active_zone_name: string;
+  active_program_name: string;
+  active_preset: string;
+  phase: "idle" | "run" | "soak";
+  started_by: "" | "manual" | "auto";
+  remaining_s: number;
+  zone_remaining_s: number;
+  ends_at: string | null;
   water_budget_mm: number;
   runtime_factor: number;
 }

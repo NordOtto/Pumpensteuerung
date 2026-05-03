@@ -319,6 +319,9 @@ async def _run_ota(action: str, tag: str = "") -> None:
         await proc.wait()
         _apply_ota_json("\n".join(output_lines))
         app_state.ota.exit_code = proc.returncode
+        if proc.returncode == 0 and app_state.ota.token_configured:
+            app_state.ota.token_ok = True
+            app_state.ota.token_message = "Token gueltig, Release-Info konnte geladen werden"
     except Exception as exc:
         app_state.ota.log.append(f"Fehler: {exc}")
         app_state.ota.exit_code = -1

@@ -138,6 +138,32 @@ Wichtiger Commit:
 
 - `829d80b fix: accept irrigation program save body`
 
+### Dashboard-Bewaesserungssteuerung
+
+- Hauptseite hat jetzt eine kompakte Bewaesserungs-Karte statt nur einzelner
+  Schnellstart-Karten.
+- Programme koennen direkt auf dem Dashboard gewaehlt werden.
+- Zwei Startarten sind sichtbar getrennt:
+  - `Automatik jetzt`: nutzt Wetter, ET, Defizit und Wochenlimit.
+  - `Manuell X min`: uebergeht Wetterpruefung und nutzt die eingestellte
+    Laufzeit.
+- Manuelle Laufzeit hat Schnellwerte und ein Minutenfeld.
+- Stop-Button stoppt die aktive Bewaesserung.
+- Waerend eines Laufs zeigt das Dashboard:
+  - manuell oder automatisch gestartet
+  - aktives Programm
+  - aktive Zone
+  - Lauf-/Sickerphase
+  - aktives Zonen-Preset
+  - Restzeit gesamt und aktueller Schritt
+- Backend liefert diese Laufstatus-Felder im WebSocket-State.
+- Nach Bewaesserungsende wird automatisch wieder das Rueckfall-Preset `Normal`
+  aktiviert, damit der Hahnmodus wieder Standard ist.
+
+Wichtiger Commit:
+
+- `70ed4ca feat: add dashboard irrigation controls`
+
 ## Was aktuell funktioniert
 
 - Webapp auf dem Pi laeuft.
@@ -148,6 +174,9 @@ Wichtiger Commit:
 - Zonen koennen Presets aus der Preset-Liste verwenden.
 - Hahnmodus kann als normaler Standard-Pumpenmodus genutzt werden.
 - Bewaesserungsprogramme koennen gespeichert werden.
+- Bewaesserung kann auf der Hauptseite automatisch oder manuell mit Minutenwert
+  gestartet und gestoppt werden.
+- Aktive Bewaesserung zeigt Restzeit, Zone, Phase und Startart.
 - Smart-ET-Guide kann Empfehlungen erzeugen und ins geoeffnete Programm
   uebernehmen.
 - Cycle-and-Soak ist im Backend und in der UI konfigurierbar.

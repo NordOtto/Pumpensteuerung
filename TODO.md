@@ -40,7 +40,32 @@ Ziel: Standardbetrieb fuer Wasserhahn/Schlauchtrommel.
   - `p_off` etwas anheben oder senken
   - feste Hz leicht anpassen
 
-### 3. Smart-ET-Messung kalibrieren
+### 3. Dashboard-Bewaesserung real testen
+
+Status: UI und Backend sind umgesetzt und auf dem Pi deployed.
+
+- Auf der Hauptseite ein Programm waehlen.
+- `Automatik jetzt` testen:
+  - Erwartung: startet nur, wenn Wetter/ET/Defizit es erlauben.
+- `Manuell X min` testen:
+  - Erwartung: startet mit der eingestellten Laufzeit und uebergeht die
+    Wetterpruefung.
+- Waerend des Laufs pruefen:
+  - Restzeit gesamt
+  - aktueller Schritt
+  - manuell/automatisch
+  - aktive Zone
+  - Laufphase oder Sickerpause
+- `Bewaesserung stoppen` pruefen.
+- Nach Ende/Stop pruefen:
+  - aktives Preset springt zurueck auf `Normal`.
+
+Technischer Stand:
+
+- Commit `70ed4ca feat: add dashboard irrigation controls`
+- Auf Pi deployed; `/dashboard`, Backend und Frontend antworten mit HTTP 200.
+
+### 4. Smart-ET-Messung kalibrieren
 
 Ziel: Wizard soll echte Laufzeiten liefern, nicht Schaetzwerte.
 
@@ -168,17 +193,6 @@ Vorschlaege:
 
 ## Features, die fachlich nuetzlich waeren
 
-### Bewaesserungsmodus automatisch setzen
-
-Wenn ein Bewaesserungsprogramm startet:
-
-- passendes Preset der Zone anwenden
-- Regelmodus auf Bewaesserung setzen
-- nach Programmende zurueck auf Hahnmodus
-
-Wichtig: Rueckfall auf Hahnmodus nur, wenn kein anderes Programm aktiv ist und
-kein manueller Modus gesetzt wurde.
-
 ### Trockenlauf- und Leckage-Diagnose
 
 Moegliche Logik:
@@ -268,3 +282,6 @@ Nuetzlich vor groesseren Aenderungen:
 - Cycle-and-Soak fuer Sickerphasen ergaenzt.
 - Wizard-Messlabels erklaert und `mm/h` sichtbar gemacht.
 - Programmspeichern-422 behoben und auf Pi getestet.
+- Dashboard-Bewaesserungssteuerung mit Automatikstart, manuellem Minutenstart,
+  Stop und Restzeit umgesetzt.
+- Nach Bewaesserung wird wieder `Normal` als Rueckfall-Preset aktiviert.

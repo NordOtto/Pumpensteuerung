@@ -90,9 +90,18 @@ entscheidend sind.
 
 Problem: Es gab direkte Deploys auf den Pi. Das ist fuer Entwicklung schnell,
 aber die angezeigte Version und GitHub-Releases koennen hinterherhinken.
+Zusatzbefund: Der Pi erreicht GitHub, aber
+`https://api.github.com/repos/NordOtto/Pumpensteuerung/releases/latest`
+antwortet mit 404. Das spricht fuer ein privates Repo ohne Token auf dem Pi.
 
 Vorschlag:
 
+- GitHub Fine-Grained Token mit Repository `NordOtto/Pumpensteuerung` und
+  `Contents: Read-only` erstellen.
+- Token auf dem Pi unter `/opt/pumpe/ota/.github_token` ablegen.
+- In `/opt/pumpe/ota/config.env` setzen:
+  `GITHUB_TOKEN_FILE=/opt/pumpe/ota/.github_token`
+- Datei auf `chmod 600` setzen und `update.sh check` testen.
 - App-Version aus Git-Commit/Tag in Build schreiben.
 - UI zeigt:
   - installierte Version
@@ -280,3 +289,5 @@ Nuetzlich vor groesseren Aenderungen:
 - Bedienlogik bereinigt: Live-Werte oben, Pumpensteuerung darunter,
   Bewaesserung zentral auf der Hauptseite, Steuerungsseite entfernt,
   Zonenseite ohne Start/Stop.
+- Dashboard-Bereiche sind einklappbar und per Drag-and-Drop verschiebbar;
+  Zustand wird im Browser gespeichert.

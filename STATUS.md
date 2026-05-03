@@ -184,6 +184,18 @@ Wichtiger Commit:
 
 - `a13c843 refactor: centralize dashboard controls`
 
+### Mobile Dashboard anpassbar
+
+- Hauptseite ist jetzt mobile-first gedacht; Desktop ist nur sekundaere
+  Darstellung.
+- Dashboard-Bereiche sind einklappbar.
+- Dashboard-Bereiche koennen per Drag-and-Drop verschoben werden.
+- Reihenfolge und Einklappstatus werden lokal im Browser gespeichert.
+
+Wichtiger Commit:
+
+- `afd4a5e feat: make dashboard panels reorderable`
+
 ## Was aktuell funktioniert
 
 - Webapp auf dem Pi laeuft.
@@ -259,3 +271,6 @@ oder auf dem Pi laufen.
 - Hahnmodus-Werte muessen in der Praxis feinjustiert werden, damit die Pumpe
   bei kleiner Entnahme angenehm startet und nicht taktet.
 - OTA-Flow braucht noch eine End-to-End-Probe mit neuem Tag und Rollback.
+- OTA-Check gegen GitHub liefert aktuell 404 fuer
+  `NordOtto/Pumpensteuerung`, obwohl GitHub erreichbar ist. Wahrscheinliche
+  Ursache: privates Repo ohne GitHub-Token auf dem Pi.

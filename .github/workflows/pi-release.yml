@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version ohne v, leer = 0.1.<run_number>"
+        description: "Version ohne v, leer = naechstes Patch-Release aus letztem Tag"
         required: false
 
 permissions:
@@ -17,6 +17,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Compute version
         id: version
@@ -24,10 +26,21 @@ jobs:
           if [[ -n "${{ inputs.version }}" ]]; then
             VERSION="${{ inputs.version }}"
           else
-            BASE="$(cat VERSION 2>/dev/null || echo 0.1.0)"
-            MAJOR="$(echo "$BASE" | cut -d. -f1)"
-            MINOR="$(echo "$BASE" | cut -d. -f2)"
-            VERSION="${MAJOR}.${MINOR}.${GITHUB_RUN_NUMBER}"
+            LATEST_TAG="$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -1)"
+            BASE="${LATEST_TAG#v}"
+            if [[ -z "$LATEST_TAG" ]]; then
+              BASE="$(cat VERSION 2>/dev/null || echo 0.1.0)"
+            fi
+            IFS=. read -r MAJOR MINOR PATCH <<< "$BASE"
+            MAJOR="${MAJOR:-0}"
+            MINOR="${MINOR:-1}"
+            PATCH="${PATCH:-0}"
+            PATCH="$((PATCH + 1))"
+            VERSION="${MAJOR}.${MINOR}.${PATCH}"
+            while git rev-parse "v${VERSION}" >/dev/null 2>&1; do
+              PATCH="$((PATCH + 1))"
+              VERSION="${MAJOR}.${MINOR}.${PATCH}"
+            done
           fi
           echo "$VERSION" > VERSION
           echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"

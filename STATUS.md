@@ -164,6 +164,26 @@ Wichtiger Commit:
 
 - `70ed4ca feat: add dashboard irrigation controls`
 
+### Bedienlogik bereinigt
+
+- Hauptseite ist jetzt der zentrale Bedienort.
+- Live-Werte stehen oben nebeneinander.
+- Pumpensteuerung steht direkt unter den Live-Werten.
+- Pumpensteuerung hat einen dynamischen Hauptbutton:
+  - `Pumpe starten`, wenn sie aus ist.
+  - `Pumpe stoppen`, wenn sie laeuft.
+- `FU Reset` wird nur bei FU-Fehler angezeigt.
+- Die aktive Programmuebersicht wird nur waehrend einer laufenden
+  Bewaesserung angezeigt.
+- `Steuerung` wurde aus der Navigation entfernt.
+- `/control` leitet auf `/dashboard` weiter.
+- Start/Stop-Buttons wurden von der Zonenseite entfernt; Zonen ist jetzt
+  Uebersicht/Diagnose.
+
+Wichtiger Commit:
+
+- `a13c843 refactor: centralize dashboard controls`
+
 ## Was aktuell funktioniert
 
 - Webapp auf dem Pi laeuft.
@@ -177,6 +197,9 @@ Wichtiger Commit:
 - Bewaesserung kann auf der Hauptseite automatisch oder manuell mit Minutenwert
   gestartet und gestoppt werden.
 - Aktive Bewaesserung zeigt Restzeit, Zone, Phase und Startart.
+- Pumpenstart/-stop und Bewaesserungsstart/-stop sind nur noch auf der
+  Hauptseite bedienbar.
+- Zonenseite ist eine reine Uebersicht.
 - Smart-ET-Guide kann Empfehlungen erzeugen und ins geoeffnete Programm
   uebernehmen.
 - Cycle-and-Soak ist im Backend und in der UI konfigurierbar.
@@ -210,6 +233,9 @@ Auf dem Pi zuletzt geprueft:
 
 - `pumpe-frontend.service`: active
 - `/settings`: HTTP 200
+- `/dashboard`: HTTP 200
+- `/zones`: HTTP 200
+- `/control`: Redirect 307 auf Dashboard
 - `pumpe-backend.service`: active
 - `GET /api/irrigation/programs`: OK
 - `POST /api/irrigation/programs`: HTTP 200

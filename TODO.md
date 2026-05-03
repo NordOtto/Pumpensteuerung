@@ -42,7 +42,8 @@ Ziel: Standardbetrieb fuer Wasserhahn/Schlauchtrommel.
 
 ### 3. Dashboard-Bewaesserung real testen
 
-Status: UI und Backend sind umgesetzt und auf dem Pi deployed.
+Status: UI und Backend sind umgesetzt und auf dem Pi deployed. Die
+Bedienlogik wurde danach weiter aufgeraeumt.
 
 - Auf der Hauptseite ein Programm waehlen.
 - `Automatik jetzt` testen:
@@ -63,7 +64,9 @@ Status: UI und Backend sind umgesetzt und auf dem Pi deployed.
 Technischer Stand:
 
 - Commit `70ed4ca feat: add dashboard irrigation controls`
-- Auf Pi deployed; `/dashboard`, Backend und Frontend antworten mit HTTP 200.
+- Commit `a13c843 refactor: centralize dashboard controls`
+- Auf Pi deployed; `/dashboard` und `/zones` antworten mit HTTP 200,
+  `/control` leitet auf `/dashboard` weiter.
 
 ### 4. Smart-ET-Messung kalibrieren
 
@@ -132,26 +135,15 @@ Sinnvolle Validierungen:
 
 ### Mehr HMI-Profi-Gefuehl
 
-Die Webapp darf modern aussehen, soll aber weiterhin wie eine Steuerung wirken.
+Die grobe Bedienhierarchie ist jetzt bereinigt. Weitere sinnvolle Schritte:
 
-Vorschlaege:
-
-- Einheitliche Statusleiste oben:
-  - Modus: Hahnmodus / Bewaesserung / Manuell / Fehler
-  - Druck
-  - Pumpenstatus
-  - aktives Preset
-  - MQTT/RTU
-- Bessere Hierarchie auf dem Dashboard:
-  - zuerst aktueller Betriebszustand
-  - dann Bedienaktionen
-  - dann Zonen/Programme
-  - dann Warnungen/Logs
 - Kleine Verlaufslinie fuer Druck direkt auf Dashboard.
-- Aktive Regelart klar anzeigen:
+- Aktive Regelart noch praevisueller darstellen:
   - `Hahnmodus: Ein/Aus nach Druck`
   - `PI-Regelung: haelt Solldruck`
   - `Fix-Hz: feste Drehzahl`
+- Warnungen/Interlocks als ruhige, aber klare Statuszeile direkt unter der
+  Pumpensteuerung.
 
 ### Preset-Manager besser erklaeren
 
@@ -285,3 +277,6 @@ Nuetzlich vor groesseren Aenderungen:
 - Dashboard-Bewaesserungssteuerung mit Automatikstart, manuellem Minutenstart,
   Stop und Restzeit umgesetzt.
 - Nach Bewaesserung wird wieder `Normal` als Rueckfall-Preset aktiviert.
+- Bedienlogik bereinigt: Live-Werte oben, Pumpensteuerung darunter,
+  Bewaesserung zentral auf der Hauptseite, Steuerungsseite entfernt,
+  Zonenseite ohne Start/Stop.

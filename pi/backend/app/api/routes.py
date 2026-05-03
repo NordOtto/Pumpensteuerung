@@ -311,21 +311,13 @@ async def _run_ota(action: str, tag: str = "") -> None:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
         )
+        output_lines: list[str] = []
         async for line in proc.stdout:
             decoded = line.decode().rstrip()
+            output_lines.append(decoded)
             app_state.ota.log.append(decoded)
-            if decoded.startswith("{") and decoded.endswith("}"):
-                try:
-                    info = json.loads(decoded)
-                    app_state.ota.current_version = info.get("current") or app_state.ota.current_version
-                    app_state.ota.latest_version = info.get("latest") or app_state.ota.latest_version
-                    app_state.ota.latest_commit = info.get("commit") or app_state.ota.latest_commit
-                    app_state.ota.latest_date = info.get("published_at") or app_state.ota.latest_date
-                    app_state.ota.changelog = info.get("changelog") or app_state.ota.changelog
-                    app_state.ota.update_available = bool(info.get("update_available"))
-                except json.JSONDecodeError:
-                    pass
         await proc.wait()
+        _apply_ota_json("\n".join(output_lines))
         app_state.ota.exit_code = proc.returncode
     except Exception as exc:
         app_state.ota.log.append(f"Fehler: {exc}")
@@ -334,6 +326,24 @@ async def _run_ota(action: str, tag: str = "") -> None:
         app_state.ota.running = False
         app_state.ota.phase = "idle"
         _refresh_ota_token_state()
+
+
+def _apply_ota_json(text: str) -> None:
+    import json
+    start = text.find("{")
+    end = text.rfind("}")
+    if start < 0 or end <= start:
+        return
+    try:
+        info = json.loads(text[start:end + 1])
+    except json.JSONDecodeError:
+        return
+    app_state.ota.current_version = info.get("current") or app_state.ota.current_version
+    app_state.ota.latest_version = info.get("latest") or app_state.ota.latest_version
+    app_state.ota.latest_commit = info.get("commit") or app_state.ota.latest_commit
+    app_state.ota.latest_date = info.get("published_at") or app_state.ota.latest_date
+    app_state.ota.changelog = info.get("changelog") or app_state.ota.changelog
+    app_state.ota.update_available = bool(info.get("update_available"))
 
 
 def _refresh_ota_token_state() -> None:

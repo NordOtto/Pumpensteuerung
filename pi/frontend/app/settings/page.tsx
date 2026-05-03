@@ -282,12 +282,90 @@ function TimeguardSettings({ tg }: { tg: { enabled: boolean; start_hour: number;
 function SystemSettings({ sys }: { sys: { ip: string; fw: string; uptime: number; mqtt: boolean; rtu_connected: boolean } }) {
   const [ota, setOta] = useState<OtaStatus | null>(null);
   const [checking, setChecking] = useState(false);
+  const [installing, setInstalling] = useState(false);
   const [checked, setChecked] = useState(false);
+  const [tokenDraft, setTokenDraft] = useState("");
+  const [tokenBusy, setTokenBusy] = useState(false);
+  const [tokenMessage, setTokenMessage] = useState("");
 
-  useEffect(() => { api.otaStatus().then(setOta).catch(() => {}); }, []);
+  const refreshOta = useCallback(() => api.otaStatus().then(setOta).catch(() => {}), []);
+
+  useEffect(() => { refreshOta(); }, [refreshOta]);
+
+  const pollOta = useCallback(async () => {
+    for (let i = 0; i < 90; i += 1) {
+      const next = await api.otaStatus();
+      setOta(next);
+      if (!next.running) return next;
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+    return null;
+  }, []);
+
+  const checkUpdates = async () => {
+    setChecking(true);
+    setTokenMessage("");
+    try {
+      await api.otaCheck();
+      await pollOta();
+      setChecked(true);
+    } finally {
+      setChecking(false);
+      refreshOta();
+    }
+  };
+
+  const installUpdate = async () => {
+    setInstalling(true);
+    setTokenMessage("");
+    try {
+      await api.otaInstall(ota?.latest_version ?? undefined);
+      await pollOta();
+      setChecked(true);
+    } finally {
+      setInstalling(false);
+      refreshOta();
+    }
+  };
+
+  const saveToken = async () => {
+    const token = tokenDraft.trim();
+    if (!token) return;
+    setTokenBusy(true);
+    setTokenMessage("");
+    try {
+      const res = await api.otaTokenSet(token);
+      setTokenDraft("");
+      setTokenMessage(res.message || "Token gespeichert.");
+      await refreshOta();
+    } catch (err) {
+      setTokenMessage(err instanceof Error ? err.message : "Token konnte nicht gespeichert werden.");
+    } finally {
+      setTokenBusy(false);
+    }
+  };
+
+  const deleteToken = async () => {
+    setTokenBusy(true);
+    setTokenMessage("");
+    try {
+      await api.otaTokenDelete();
+      setTokenDraft("");
+      setTokenMessage("Token entfernt.");
+      await refreshOta();
+    } catch (err) {
+      setTokenMessage(err instanceof Error ? err.message : "Token konnte nicht entfernt werden.");
+    } finally {
+      setTokenBusy(false);
+    }
+  };
 
   const upH = Math.floor(sys.uptime / 3600);
   const upD = Math.floor(upH / 24);
+  const otaBusy = checking || installing || Boolean(ota?.running);
+  const updateAvailable = Boolean(ota?.update_available && ota.latest_version);
+  const tokenTone = ota?.token_ok ? "ok" : ota?.token_configured ? "warn" : "muted";
+  const tokenLabel = ota?.token_ok ? "OK" : ota?.token_configured ? "Pruefen" : "Nicht gesetzt";
 
   return (
     <div className="flex flex-col gap-2">
@@ -313,16 +391,49 @@ function SystemSettings({ sys }: { sys: { ip: string; fw: string; uptime: number
             <SettingField key={l} label={l} value={v} />
           ))}
         </div>
-        <div className="flex gap-2">
-          <button type="button" disabled={checking}
-            onClick={() => { setChecking(true); api.otaCheck().finally(() => { setChecking(false); setChecked(true); api.otaStatus().then(setOta).catch(() => {}); }); }}
+        <div className="mb-3 rounded-tile border border-border bg-bg2 p-3">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-tx3">GitHub-Token</div>
+              <div className="mt-0.5 text-[11px] text-tx3">Wird verdeckt auf dem Pi gespeichert und nur fuer private Releases genutzt.</div>
+            </div>
+            <Badge tone={tokenTone}>{tokenLabel}</Badge>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              type="password"
+              autoComplete="off"
+              value={tokenDraft}
+              onChange={(e) => setTokenDraft(e.target.value)}
+              placeholder={ota?.token_configured ? "Neuen Token eintragen" : "GitHub Token eintragen"}
+              className="min-h-10 flex-1 rounded-tile border border-border bg-bg1 px-3 text-sm font-semibold text-tx outline-none placeholder:text-tx3"
+            />
+            <button type="button" disabled={tokenBusy || tokenDraft.trim().length < 20} onClick={saveToken}
+              className="rounded-tile bg-primary px-4 py-2 text-xs font-bold text-white disabled:opacity-40">
+              Speichern
+            </button>
+            {ota?.token_configured && (
+              <button type="button" disabled={tokenBusy} onClick={deleteToken}
+                className="rounded-tile border border-border bg-bg1 px-4 py-2 text-xs font-semibold text-tx2 disabled:opacity-40">
+                Entfernen
+              </button>
+            )}
+          </div>
+          {(tokenMessage || ota?.token_message) && (
+            <div className="mt-2 text-[11px] text-tx3">{tokenMessage || ota?.token_message}</div>
+          )}
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <button type="button" disabled={otaBusy}
+            onClick={checkUpdates}
             className="inline-flex items-center gap-2 rounded-tile border border-border bg-bg2 px-4 py-2 text-xs font-bold text-tx2 disabled:opacity-50">
-            <RefreshCw className={cn("h-3.5 w-3.5", checking && "animate-spin")} />
+            <RefreshCw className={cn("h-3.5 w-3.5", otaBusy && "animate-spin")} />
             {checking ? "Prüfe…" : "Auf Updates prüfen"}
           </button>
-          <button type="button" disabled
-            className="inline-flex items-center gap-2 rounded-tile bg-primary px-4 py-2 text-xs font-bold text-white opacity-40">
-            Update installieren
+          <button type="button" disabled={!updateAvailable || otaBusy} onClick={installUpdate}
+            className="inline-flex items-center gap-2 rounded-tile bg-primary px-4 py-2 text-xs font-bold text-white disabled:opacity-40">
+            {installing || ota?.running ? "Installiert..." : "Update installieren"}
           </button>
         </div>
       </div>

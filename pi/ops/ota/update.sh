@@ -118,19 +118,24 @@ download_release() {
     fi
 
     local target="${RELEASES_DIR}/${tag}"
-    rm -rf "$target"
-    mkdir -p "$target"
-    log "Entpacke nach ${target}"
-    tar -xzf "${tmp}/pkg.tar.gz" -C "$target"
+    local staging="${target}.tmp.$$"
+    trap "rm -rf '$tmp' '$staging'" EXIT
+    rm -rf "$staging"
+    mkdir -p "$staging"
+    log "Entpacke nach ${staging}"
+    tar -xzf "${tmp}/pkg.tar.gz" -C "$staging"
 
     log "Installiere venv-Dependencies"
-    python3 -m venv "${target}/backend/.venv"
-    "${target}/backend/.venv/bin/pip" install --no-cache-dir --upgrade pip --quiet
-    "${target}/backend/.venv/bin/pip" install --no-cache-dir -r "${target}/backend/requirements.txt" --quiet
+    python3 -m venv --clear "${staging}/backend/.venv"
+    "${staging}/backend/.venv/bin/pip" install --no-cache-dir --upgrade pip --quiet
+    "${staging}/backend/.venv/bin/pip" install --no-cache-dir -r "${staging}/backend/requirements.txt" --quiet
 
     if [[ -L "$CURRENT_LINK" ]]; then
-        cp -n "${CURRENT_LINK}/backend/.env" "${target}/backend/.env" 2>/dev/null || true
+        cp -n "${CURRENT_LINK}/backend/.env" "${staging}/backend/.env" 2>/dev/null || true
     fi
+
+    rm -rf "$target"
+    mv "$staging" "$target"
 }
 
 cmd_apply() {

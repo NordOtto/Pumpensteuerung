@@ -53,7 +53,7 @@ export function SortablePanels<T extends PanelId>({
   const visibleOrder = order.filter((id) => !hidden?.[id]);
 
   return (
-    <Reorder.Group axis="y" values={visibleOrder} onReorder={(items) => setOrder(mergeOrder(items, defaultOrder))} className="flex flex-col gap-5">
+    <Reorder.Group axis="y" values={visibleOrder} onReorder={(items) => setOrder(mergeOrder(items, defaultOrder))} className="flex flex-col gap-4">
       {visibleOrder.map((id) => (
         <SortablePanel
           key={id}
@@ -93,17 +93,17 @@ function SortablePanel({
               type="button"
               aria-label={`${title} verschieben`}
               onPointerDown={(event) => controls.start(event)}
-              className="flex h-9 w-9 shrink-0 touch-none items-center justify-center rounded-lg border border-white/70 bg-white/75 text-slate-400 shadow-sm active:scale-95"
+              className="flex h-9 w-9 shrink-0 touch-none items-center justify-center rounded-tile border border-border bg-bg1 text-tx3 shadow-card active:scale-95"
             >
               <GripVertical size={18} />
             </button>
-            <span className="h-5 w-1 rounded-full bg-gradient-to-b from-primary to-ok shadow-[0_0_16px_rgba(37,136,235,0.32)]" />
-            <h2 className="truncate text-xs font-bold uppercase tracking-widest text-slate-600">{title}</h2>
+            <span className="h-5 w-1 rounded-full bg-primary" />
+            <h2 className="truncate text-xs font-bold uppercase tracking-widest text-tx2">{title}</h2>
           </div>
           <button
             type="button"
             onClick={onToggle}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/70 bg-white/75 text-slate-500 shadow-sm transition active:scale-95"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-tile border border-border bg-bg1 text-tx2 shadow-card transition active:scale-95"
             aria-label={collapsed ? `${title} ausklappen` : `${title} einklappen`}
           >
             <ChevronDown size={18} className={cn("transition-transform", collapsed && "-rotate-90")} />

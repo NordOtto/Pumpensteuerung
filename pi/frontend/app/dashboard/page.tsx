@@ -3,11 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Clock3, Play, RotateCcw, ShieldCheck, Square, TimerReset } from "lucide-react";
-import { KpiCard } from "@/components/kpi-card";
-import { ZoneCard } from "@/components/zone-card";
 import { WarningList } from "@/components/warning-list";
-import { StatusBadge } from "@/components/status-badge";
 import { SortablePanels } from "@/components/sortable-panels";
+import { Badge } from "@/components/ui/badge";
+import { KpiTile } from "@/components/ui/kpi-tile";
+import { ZoneChip } from "@/components/ui/zone-chip";
 import { useStatus } from "@/lib/ws";
 import { api } from "@/lib/api";
 import { cn, formatBar, formatHz, formatLpm } from "@/lib/utils";
@@ -42,7 +42,7 @@ export default function DashboardPage() {
   }, [programs, selectedProgramId, decisionForSelection?.program_id]);
 
   if (!status) {
-    return <div className="flex h-64 items-center justify-center text-slate-400">Verbinde mit Steuerung...</div>;
+    return <div className="flex h-64 items-center justify-center text-tx3">Verbinde mit Steuerung...</div>;
   }
 
   const v = status.v20;
@@ -123,42 +123,40 @@ export default function DashboardPage() {
         {{
           live: (
               <div className="grid grid-cols-3 gap-2 sm:gap-3">
-                <KpiCard
+                <KpiTile
                   label="Druck"
                   value={formatBar(status.pressure_bar)}
                   unit="bar"
-                  tone={pressureTone}
-                  hint={`Ein ${formatBar(status.pi.p_on)} / Aus ${formatBar(status.pi.p_off)} bar`}
-                  size="sm"
+                  colorClass={pressureTone === "danger" ? "text-danger" : pressureTone === "warn" ? "text-warn" : "text-primary"}
+                  sub={`Ein ${formatBar(status.pi.p_on)} / Aus ${formatBar(status.pi.p_off)}`}
                 />
-                <KpiCard
+                <KpiTile
                   label="Durchfluss"
                   value={formatLpm(status.flow_rate)}
                   unit="L/min"
-                  hint={status.flow_estimated ? "Geschaetzt" : "Sensor"}
-                  size="sm"
+                  colorClass="text-ok"
+                  sub={status.flow_estimated ? "Geschaetzt" : "Sensor"}
                 />
-                <KpiCard
+                <KpiTile
                   label="Pumpenfrequenz"
                   value={formatHz(v.frequency)}
                   unit="Hz"
-                  tone={v.running ? "ok" : "default"}
-                  hint={v.freq_setpoint ? `Soll ${formatHz(v.freq_setpoint)} Hz` : undefined}
-                  size="sm"
+                  colorClass={v.running ? "text-ok" : "text-primary"}
+                  sub={v.freq_setpoint ? `Soll ${formatHz(v.freq_setpoint)}` : undefined}
                 />
               </div>
           ),
 
           pump: (
               <motion.div
-                className="rounded-lg border border-white/70 bg-gradient-to-br from-white/95 via-white/80 to-sky-50/75 p-4 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur"
+                className="rounded-card border border-border bg-bg1 p-4 shadow-card"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.24 }}
               >
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div className="flex flex-wrap items-center gap-3">
-                    <StatusBadge tone={pumpTone} pulse={v.running}>{pumpLabel}</StatusBadge>
+                    <Badge tone={pumpTone} pulse={v.running}>{pumpLabel}</Badge>
                     <PumpInfo label="Preset" value={status.active_preset || "Normal"} />
                     <PumpInfo label="Regelung" value={modeLabel(status.ctrl_mode)} />
                     <PumpInfo label="FU" value={v.status || (v.connected ? "bereit" : "offline")} />
@@ -170,7 +168,7 @@ export default function DashboardPage() {
                       onClick={handlePumpToggle}
                       disabled={!decision.paused && !v.running && (v.fault || status.vacation.enabled)}
                       className={cn(
-                        "inline-flex h-14 min-w-44 items-center justify-center gap-2 rounded-lg px-5 text-sm font-bold uppercase tracking-wide text-white shadow-sm transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45",
+                        "inline-flex h-14 min-w-44 items-center justify-center gap-2 rounded-tile px-5 text-sm font-bold uppercase tracking-wide text-white transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45",
                         v.running ? "bg-danger hover:bg-danger/90" : "bg-ok hover:bg-ok/90"
                       )}
                     >
@@ -181,7 +179,7 @@ export default function DashboardPage() {
                       <button
                         type="button"
                         onClick={() => api.v20Reset()}
-                        className="inline-flex h-14 min-w-32 items-center justify-center gap-2 rounded-lg border border-warn/40 bg-warn/10 px-5 text-sm font-bold uppercase tracking-wide text-warn transition active:scale-[0.98] hover:bg-warn/15"
+                        className="inline-flex h-14 min-w-32 items-center justify-center gap-2 rounded-tile border border-[var(--color-amber)]/35 bg-[var(--color-amber-dim)] px-5 text-sm font-bold uppercase tracking-wide text-warn transition active:scale-[0.98]"
                       >
                         <RotateCcw size={18} />
                         FU Reset
@@ -195,7 +193,7 @@ export default function DashboardPage() {
           irrigation: (
               <div className={cn("grid gap-4", decision.running && "xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,0.65fr)]")}>
                 <motion.div
-                  className="rounded-lg border border-white/70 bg-gradient-to-br from-white/95 via-white/80 to-cyan-50/75 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.09)] backdrop-blur"
+                  className="rounded-card border border-border bg-bg1 p-4 shadow-card"
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.24 }}
@@ -203,25 +201,25 @@ export default function DashboardPage() {
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div>
                       <div className="mb-2 flex flex-wrap items-center gap-2">
-                        <StatusBadge tone={decision.paused ? "warn" : decision.running ? "ok" : decision.allowed ? "muted" : "warn"} pulse={decision.running && !decision.paused}>
+                        <Badge tone={decision.paused ? "warn" : decision.running ? "ok" : decision.allowed ? "muted" : "warn"} pulse={decision.running && !decision.paused}>
                           {decision.paused ? "Pausiert" : decision.running ? "Bewaessert" : decision.allowed ? "Bereit" : "Wartet"}
-                        </StatusBadge>
-                        <span className="rounded-full border border-white/70 bg-white/70 px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm">
+                        </Badge>
+                        <span className="rounded border border-border bg-bg2 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-tx2">
                           {decision.running
                             ? decision.started_by === "manual" ? "Manuell" : "Automatisch"
                             : selectedProgram?.mode === "smart_et" ? "Smart ET" : "Fest"}
                         </span>
                         {decision.phase === "soak" && (
-                          <span className="rounded-full border border-ok/20 bg-ok/10 px-3 py-1 text-xs font-semibold text-ok">Sickerpause</span>
+                          <Badge tone="ok">Sickerpause</Badge>
                         )}
                         {decision.paused && (
-                          <span className="rounded-full border border-warn/25 bg-warn/10 px-3 py-1 text-xs font-semibold text-warn">Sicher gestoppt</span>
+                          <Badge tone="warn">Sicher gestoppt</Badge>
                         )}
                       </div>
-                      <h1 className="text-2xl font-bold text-slate-950">
+                      <h1 className="text-2xl font-bold text-tx">
                         {decision.running ? decision.active_program_name || "Bewaesserung aktiv" : selectedProgram?.name || "Kein Programm"}
                       </h1>
-                      <p className="mt-1 max-w-2xl text-sm text-slate-500">
+                      <p className="mt-1 max-w-2xl text-sm text-tx2">
                         {decision.running
                           ? decision.paused
                             ? `${decision.active_zone_name || "Zone"} ist pausiert. Du kannst heute fortsetzen oder die Bewaesserung beenden.`
@@ -229,7 +227,7 @@ export default function DashboardPage() {
                           : `Naechster Automatikstart: ${nextStart}. ${decision.reason || "Bereit"}.`}
                       </p>
                     </div>
-                    <div className="grid min-w-[220px] grid-cols-2 gap-2 rounded-lg border border-white/65 bg-white/65 p-3 shadow-inner">
+                    <div className="grid min-w-[220px] grid-cols-2 gap-2 rounded-tile border border-border bg-bg2 p-3">
                       <RunMetric icon={<TimerReset size={16} />} label="Gesamt" value={formatDuration(decision.remaining_s)} />
                       <RunMetric icon={<Clock3 size={16} />} label="Aktueller Schritt" value={formatDuration(decision.zone_remaining_s)} />
                     </div>
@@ -246,14 +244,14 @@ export default function DashboardPage() {
                               type="button"
                               onClick={() => setSelectedProgramId(p.id)}
                               className={cn(
-                                "rounded-lg border px-3 py-2 text-left text-sm font-semibold transition active:scale-[0.98]",
+                                "rounded-tile border px-3 py-2 text-left text-sm font-semibold transition active:scale-[0.98]",
                                 selected
-                                  ? "border-primary/50 bg-primary text-white shadow-[0_10px_24px_rgba(37,136,235,0.22)]"
-                                  : "border-white/70 bg-white/70 text-slate-700 hover:bg-white"
+                                  ? "border-[var(--color-blue)]/35 bg-primary text-white"
+                                  : "border-border bg-bg2 text-tx2 hover:bg-bg1"
                               )}
                             >
                               <span>{p.name}</span>
-                              <span className={cn("ml-2 text-xs font-medium", selected ? "text-white/75" : "text-slate-400")}>
+                              <span className={cn("ml-2 text-xs font-medium", selected ? "text-white/75" : "text-tx3")}>
                                 {p.mode === "smart_et" ? "ET" : "Fest"} | {p.zones.length} Zone{p.zones.length === 1 ? "" : "n"}
                               </span>
                             </button>
@@ -270,8 +268,8 @@ export default function DashboardPage() {
                         <ActionButton icon={<Square size={18} />} title={decision.paused ? "Bewaesserung beenden" : "Bewaesserung stoppen"} subtitle={decision.paused ? "setzt den Lauf zurueck" : "Zone und Pumpe stoppen"} tone="danger" disabled={!decision.running} onClick={stopIrrigation} />
                       </div>
                     </div>
-                    <div className="rounded-lg border border-white/70 bg-white/70 p-3 shadow-sm">
-                      <div className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-500">Manuelle Laufzeit</div>
+                    <div className="rounded-card border border-border bg-bg2 p-3">
+                      <div className="mb-2 text-xs font-bold uppercase tracking-widest text-tx3">Manuelle Laufzeit</div>
                       <div className="flex flex-wrap gap-2">
                         {QUICK_MINUTES.map((m) => (
                           <button
@@ -279,8 +277,8 @@ export default function DashboardPage() {
                             type="button"
                             onClick={() => setManualMinutes(m)}
                             className={cn(
-                              "h-10 min-w-12 rounded-lg border px-3 text-sm font-bold transition active:scale-[0.98]",
-                              manualMinutes === m ? "border-primary bg-primary text-white" : "border-white/80 bg-white text-slate-700 hover:bg-slate-50"
+                              "h-10 min-w-12 rounded-tile border px-3 text-sm font-bold transition active:scale-[0.98]",
+                              manualMinutes === m ? "border-primary bg-primary text-white" : "border-border bg-bg1 text-tx2 hover:bg-bg2"
                             )}
                           >
                             {m}
@@ -288,20 +286,20 @@ export default function DashboardPage() {
                         ))}
                       </div>
                       <label className="mt-3 block">
-                        <span className="mb-1 block text-xs font-semibold text-slate-500">Minuten</span>
+                        <span className="mb-1 block text-xs font-semibold text-tx3">Minuten</span>
                         <input
                           type="number"
                           min={1}
                           max={480}
                           value={manualMinutes}
                           onChange={(e) => setManualMinutes(Math.max(1, Math.min(480, Number(e.target.value) || 1)))}
-                          className="h-11 w-full rounded-lg border border-white/80 bg-white px-3 text-sm font-semibold text-slate-900 outline-none ring-primary/20 focus:ring-4"
+                          className="h-11 w-full rounded-tile border border-border bg-bg1 px-3 text-sm font-semibold text-tx outline-none ring-primary/20 focus:ring-4"
                         />
                       </label>
                     </div>
                   </div>
                   {actionError && (
-                    <div className="mt-3 rounded-lg border border-danger/20 bg-danger/10 px-3 py-2 text-sm font-semibold text-danger">
+                    <div className="mt-3 rounded-tile border border-[var(--color-red)]/25 bg-[var(--color-red-dim)] px-3 py-2 text-sm font-semibold text-danger">
                       {actionError}
                     </div>
                   )}
@@ -309,12 +307,12 @@ export default function DashboardPage() {
 
                 {decision.running && (
                   <motion.div
-                    className="rounded-lg border border-white/70 bg-white/75 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur"
+                    className="rounded-card border border-border bg-bg1 p-4 shadow-card"
                     initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.04, duration: 0.24 }}
                   >
-                    <div className="mb-3 text-sm font-bold text-slate-900">Aktives Programm</div>
+                    <div className="mb-3 text-sm font-bold text-tx">Aktives Programm</div>
                     <div className="space-y-3">
                       <InfoRow label="Programm" value={decision.active_program_name || "-"} />
                       <InfoRow label="Zone" value={decision.active_zone_name || "-"} />
@@ -333,14 +331,11 @@ export default function DashboardPage() {
                 {dashboardZones(status.irrigation.programs).map((z) => {
                   const moisture = status.irrigation.weather.soil_moisture_pct ?? z.fallbackMoisture;
                   const isRunning = decision.running && decision.active_zone === z.id;
-                  const dryBelow = moisture < 30;
-                  const state = isRunning ? "laeuft" : dryBelow ? "trocken" : "ok";
                   return (
-                    <ZoneCard
+                    <ZoneChip
                       key={z.id}
                       name={z.name}
                       moisturePct={moisture}
-                      state={state}
                       etTodayMm={status.irrigation.weather.et0_mm ?? null}
                       nextRun={decision.next_start
                         ? new Date(decision.next_start).toLocaleString("de-DE", { weekday: "short", hour: "2-digit", minute: "2-digit" })
@@ -380,18 +375,18 @@ function ActionButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "flex min-h-24 flex-col items-start justify-between rounded-lg border p-3 text-left shadow-sm transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45",
+        "flex min-h-24 flex-col items-start justify-between rounded-tile border p-3 text-left shadow-card transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45",
         tone === "danger"
-          ? "border-danger/20 bg-danger/10 text-danger hover:bg-danger/15"
-          : "border-white/70 bg-white/75 text-slate-900 hover:bg-white"
+          ? "border-[var(--color-red)]/25 bg-[var(--color-red-dim)] text-danger"
+          : "border-border bg-bg2 text-tx hover:bg-bg1"
       )}
     >
-      <span className={cn("rounded-lg p-2", tone === "danger" ? "bg-danger/10" : "bg-primary/10 text-primary")}>
+      <span className={cn("rounded-tile p-2", tone === "danger" ? "bg-[var(--color-red-dim)]" : "bg-[var(--color-blue-dim)] text-primary")}>
         {icon}
       </span>
       <span>
         <span className="block text-sm font-bold">{title}</span>
-        <span className={cn("mt-0.5 block text-xs", tone === "danger" ? "text-danger/75" : "text-slate-500")}>{subtitle}</span>
+        <span className={cn("mt-0.5 block text-xs", tone === "danger" ? "text-danger/75" : "text-tx3")}>{subtitle}</span>
       </span>
     </button>
   );
@@ -400,29 +395,29 @@ function ActionButton({
 function RunMetric({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
     <div>
-      <div className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+      <div className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-tx3">
         {icon}
         {label}
       </div>
-      <div className="mt-1 text-xl font-bold tabular-nums text-slate-950">{value}</div>
+      <div className="num mt-1 text-xl font-bold text-tx">{value}</div>
     </div>
   );
 }
 
 function PumpInfo({ label, value }: { label: string; value: string }) {
   return (
-    <span className="rounded-lg border border-white/70 bg-white/65 px-3 py-2 shadow-inner">
-      <span className="mr-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</span>
-      <span className="text-sm font-semibold text-slate-800">{value}</span>
+    <span className="rounded-tile border border-border bg-bg2 px-3 py-2">
+      <span className="mr-2 text-[10px] font-bold uppercase tracking-wider text-tx3">{label}</span>
+      <span className="text-sm font-semibold text-tx">{value}</span>
     </span>
   );
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-2 last:border-0 last:pb-0">
-      <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">{label}</span>
-      <span className="text-right text-sm font-semibold text-slate-800">{value}</span>
+    <div className="flex items-start justify-between gap-3 border-b border-border2 pb-2 last:border-0 last:pb-0">
+      <span className="text-xs font-semibold uppercase tracking-wider text-tx3">{label}</span>
+      <span className="text-right text-sm font-semibold text-tx">{value}</span>
     </div>
   );
 }

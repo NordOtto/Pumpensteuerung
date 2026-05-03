@@ -83,7 +83,7 @@
   /* Tabellarische Zahlen — Inter hat gute Unterstützung */
   .num {
     font-variant-numeric: tabular-nums;
-    letter-spacing: 0;
+    letter-spacing: -0.02em;
   }
   .num-xl  { @apply num text-4xl font-bold leading-none; }
   .num-2xl { @apply num text-5xl font-bold leading-none; }

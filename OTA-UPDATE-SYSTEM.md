@@ -1,382 +1,375 @@
-# OTA-Update-System — Wie es funktioniert
+# OTA-Update-System - Pumpensteuerung
 
-Dieses Dokument erklärt das vollständige Update-System der Störmeldeanlage:
-Versionierung, automatische Bumps, CI-Pipeline, GitHub Releases und die
-In-App-Update-Funktion (OTA). So gebaut, dass es sich auf andere Projekte
-übertragen lässt.
+Dieses Dokument beschreibt das OTA- und Versionssystem dieses Projekts.
+Es ist bewusst auf die Pumpensteuerung angepasst und enthaelt keine Pfade
+oder Begriffe aus dem alten Stoermelder-Projekt.
 
----
+## 1) Zielbild
 
-## Überblick: Der komplette Weg eines Updates
+Der normale Arbeitsablauf ist:
 
+1. Aenderungen lokal umsetzen.
+2. Frontend/Backend pruefen.
+3. Commit erstellen.
+4. Direkt auf den Pi deployen, damit die Aenderung sofort getestet werden kann.
+5. Commits nach GitHub pushen.
+6. GitHub Actions baut ein Release-Archiv.
+7. Die Pi-UI zeigt ueber OTA die neue Version an.
+8. Das Update kann in der UI installiert werden.
+
+Der Direkt-Deploy ersetzt das Release nicht. Er ist nur der schnelle Testpfad.
+Das OTA-System bleibt die saubere Versionierung fuer nachvollziehbare Releases.
+
+## 2) Wichtige Projektpfade
+
+| Bereich | Datei/Pfad |
+|---|---|
+| Release Workflow | `.github/workflows/pi-release.yml` |
+| OTA-Script fuer den Pi | `pi/ops/ota/update.sh` |
+| OTA-Beispielkonfig | `pi/ops/ota/config.env.example` |
+| Backend OTA-API | `pi/backend/app/api/routes.py` |
+| Backend Version-State | `pi/backend/app/state.py` |
+| Frontend OTA-UI | `pi/frontend/app/settings/page.tsx` |
+| Frontend API Client | `pi/frontend/lib/api.ts` |
+| Frontend Typen | `pi/frontend/lib/types.ts` |
+| Systemd Backend | `pi/ops/systemd/pumpe-backend.service` |
+| Systemd OTA Timer | `pi/ops/systemd/pumpe-ota.timer` |
+| Installationshilfe | `pi/ops/setup.sh` |
+
+## 3) GitHub Release Workflow
+
+Der Release Workflow liegt in `.github/workflows/pi-release.yml`.
+
+Ausloeser:
+
+- Push auf `main`
+- manueller Start ueber `workflow_dispatch`
+
+Versionierung:
+
+- Wenn beim manuellen Start eine Version angegeben wird, nutzt der Workflow diese.
+- Ohne Eingabe wird aus `VERSION` die Major/Minor-Basis gelesen und die Patch-Nummer aus `GITHUB_RUN_NUMBER` gebildet.
+- Beispiel: `VERSION=0.1.0` und Run `42` ergibt `0.1.42`.
+- Der GitHub-Tag wird als `vX.Y.Z` erzeugt.
+
+Release-Artefakte:
+
+- `pumpe-vX.Y.Z.tar.gz`
+- `pumpe-vX.Y.Z.tar.gz.sha256`
+- optional `pumpe-vX.Y.Z.tar.gz.minisig`
+
+Das Archiv enthaelt:
+
+- `VERSION`
+- `COMMIT`
+- `manifest.json`
+- Backend-App unter `backend/`
+- Frontend-Standalone-Build unter `frontend/.next`
+
+## 4) GitHub-Berechtigungen und Secrets
+
+Der Workflow braucht:
+
+- `permissions: contents: write`
+
+Fuer signierte OTA-Updates werden diese Secrets genutzt:
+
+- `MINISIGN_KEY`
+- `MINISIGN_PASSWORD`
+
+Wenn `MINISIGN_KEY` fehlt, wird das Release ohne Signatur hochgeladen.
+Der aktuelle Pi-Updater erwartet aber eine `.minisig` und einen Public Key.
+Fuer echte OTA-Installationen muss Signierung deshalb sauber eingerichtet sein.
+
+## 5) Pi-Dateisystem
+
+Auf dem Pi wird dieses Layout verwendet:
+
+```text
+/opt/pumpe/
+  current -> /opt/pumpe/releases/<tag>
+  releases/
+    <tag>/
+  ota/
+    update.sh
+    config.env
+    minisign.pub
+    .github_token
 ```
-Entwickler (lokal)
-    │
-    ├── bump_version.py patch       ← Version erhöhen
-    ├── git add -A && git commit    ← Commit (hook erkennt, ob bump nötig)
-    └── git push
-              │
-              ▼
-    GitHub Actions (auto-release.yml)
-              │
-              ├── CI: ruff + pytest
-              ├── VERSION prüfen: lokal gebumpt? → überspringen
-              ├── sonst: auto-bump aus Commit-Messages
-              ├── git tag vX.Y.Z
-              └── GitHub Release mit stoermelder-update-X.Y.Z.tar.gz
-                          │
-                          ▼
-              Pi (läuft 24/7)
-                          │
-                          ├── USBUpdateManager prüft alle 60s GitHub API
-                          └── Update verfügbar → Badge in UI
-                                      │
-                                      ▼
-                          Nutzer klickt "Installieren"
-                                      │
-                                      ├── Download + Fortschrittsanzeige
-                                      ├── Backup der aktuellen Installation
-                                      ├── Entpacken + Dateien überschreiben
-                                      ├── pip install -e .
-                                      └── systemctl restart
-```
 
----
+Wichtige Dateien:
 
-## Teil 1: Versionierung
+- `/opt/pumpe/ota/update.sh`
+- `/opt/pumpe/ota/config.env`
+- `/opt/pumpe/ota/.github_token`
+- `/opt/pumpe/ota/minisign.pub`
 
-### Die VERSION-Datei
-
-```
-1.19.45
-```
-
-Einzige Quelle der Wahrheit. Wird von `bump_version.py` und `pyproject.toml` gelesen.
-Die App liest sie beim Start:
-
-```python
-# src/stoermeldeanlage/__init__.py
-VERSION_FILE = BASE_DIR / "VERSION"
-app.config["APP_VERSION"] = VERSION_FILE.read_text().strip()
-```
-
-### pyproject.toml — Version synchron halten
-
-```toml
-[project]
-name = "stoermeldeanlage"
-version = "1.19.45"   # wird von bump_version.py automatisch aktualisiert
-```
-
-`bump_version.py` aktualisiert **beide** Dateien gleichzeitig (VERSION + pyproject.toml).
-
-### bump_version.py
+`config.env` enthaelt mindestens:
 
 ```bash
-python bump_version.py patch   # 1.2.3 → 1.2.4  (Bugfix)
-python bump_version.py minor   # 1.2.3 → 1.3.0  (Feature)
-python bump_version.py major   # 1.2.3 → 2.0.0  (Breaking Change)
-python bump_version.py auto    # erkennt Typ aus Commit-Messages
+GITHUB_REPO=NordOtto/Pumpensteuerung
+MINISIGN_PUBKEY=/opt/pumpe/ota/minisign.pub
+GITHUB_TOKEN_FILE=/opt/pumpe/ota/.github_token
 ```
 
-**Auto-Erkennung** aus Conventional Commits:
-- `feat!:` oder `BREAKING CHANGE` → major
-- `feat:` → minor
-- alles andere (`fix:`, `chore:`, …) → patch
+## 6) Token fuer private GitHub-Repos
 
-```python
-# Aus bump_version.py (vereinfacht)
-def detect_bump_type() -> str:
-    log = git log seit letztem Tag
-    if "feat!" oder "BREAKING CHANGE" in log: return "major"
-    if "feat:" in log: return "minor"
-    return "patch"
+Da das Repository privat ist, braucht der Pi einen GitHub Token.
+
+Empfehlung:
+
+- Fine-grained Personal Access Token
+- Zugriff nur auf `NordOtto/Pumpensteuerung`
+- Repository permissions: `Contents: Read-only`
+
+Der Token wird ueber die UI eingetragen:
+
+- Seite: `Einstellungen`
+- Panel: `System-Update`
+- Feld: `GitHub Token`
+
+Backend-Endpunkte:
+
+| Zweck | Endpoint | Datei |
+|---|---|---|
+| Token speichern | `POST /api/ota/token` | `pi/backend/app/api/routes.py` |
+| Token entfernen | `DELETE /api/ota/token` | `pi/backend/app/api/routes.py` |
+| OTA-Status inkl. Tokenstatus | `GET /api/ota/status` | `pi/backend/app/api/routes.py` |
+
+Der Token wird auf dem Pi in `/opt/pumpe/ota/.github_token` gespeichert.
+Er wird nie im Klartext an das Frontend zurueckgegeben.
+
+Wichtig wegen systemd-Hardening:
+
+- `pumpe-backend.service` nutzt `ProtectSystem=strict`.
+- Deshalb muss `/opt/pumpe/ota` explizit beschreibbar sein.
+- In `pi/ops/systemd/pumpe-backend.service` ist dafuer gesetzt:
+
+```ini
+ReadWritePaths=/var/lib/pumpe /opt/pumpe/ota
 ```
 
-### Pre-Commit Hook (optional, aber empfohlen)
+## 7) OTA-Check und Installation
 
-Sorgt dafür, dass VERSION nie vergessen wird:
+Das OTA-Script `pi/ops/ota/update.sh` unterstuetzt:
 
 ```bash
-# .git/hooks/pre-commit
-STAGED=$(git diff --cached --name-only | tr -d '\r')
-if echo "$STAGED" | grep -q "^VERSION$"; then
-    exit 0   # Version schon gestaged → kein Auto-Bump
-fi
-python bump_version.py patch
-git add VERSION pyproject.toml
+/opt/pumpe/ota/update.sh status
+/opt/pumpe/ota/update.sh check
+/opt/pumpe/ota/update.sh install [tag]
+/opt/pumpe/ota/update.sh check-and-apply
+/opt/pumpe/ota/update.sh apply <tag>
+/opt/pumpe/ota/update.sh rollback
 ```
 
-> **Windows-Gotcha:** `git diff --cached` gibt `\r\n` aus. `tr -d '\r'` ist zwingend,
-> sonst erkennt grep `VERSION` nicht.
+### Check
 
----
+`check` ruft GitHub Releases ab:
 
-## Teil 2: GitHub Actions CI/CD
-
-### ci.yml — Tests bei jedem Push
-
-Läuft auf Python 3.9, 3.11, 3.12 (Matrix):
-
-```yaml
-- run: ruff check src/ tests/
-- run: ruff format --check src/ tests/
-- run: pytest --tb=short -q
+```text
+https://api.github.com/repos/NordOtto/Pumpensteuerung/releases/latest
 ```
 
-Schlägt CI fehl → kein Release. Fehlschlag bei `ruff format --check` bedeutet:
-Code wurde nicht mit `ruff format` formatiert. Vor dem Push immer `ruff format` ausführen.
-
-### auto-release.yml — Automatisches Release bei Push auf master
-
-**Ablauf:**
-
-```
-1. Checkout (fetch-depth: 0 — damit git log/tag funktioniert)
-2. CI: ruff + pytest
-3. Prüfen: Wurde VERSION im letzten Commit bereits geändert?
-   → ja:  Version schon lokal gebumpt, Schritt überspringen
-   → nein: Auto-Bump via bump_version.py auto
-4. VERSION + pyproject.toml committen ([skip ci] verhindert Endlosschleife)
-5. git tag vX.Y.Z erstellen (falls noch nicht vorhanden)
-6. tar.gz Release-Archiv bauen
-7. GitHub Release erstellen mit Asset
-```
-
-**[skip ci] Pattern — Endlosschleife verhindern:**
-
-Der Bump-Commit muss mit `[skip ci]` markiert sein:
-```bash
-git commit -m "chore: bump version to 1.19.45 [skip ci]"
-```
-Das Workflow-`if` prüft: `!contains(github.event.head_commit.message, '[skip ci]')`
-
-**Lokal gebumpt erkennen:**
-```yaml
-- name: Check if version already bumped locally
-  run: |
-    if git diff HEAD~1 --name-only | grep -q "^VERSION$"; then
-      echo "skipped=true" >> "$GITHUB_OUTPUT"
-    fi
-```
-→ Wenn der Entwickler Version schon lokal erhöht hat, springt CI direkt zu Tag + Release.
-
-**Tag-Duplikat-Schutz:**
-```bash
-if git ls-remote --tags origin | grep -q "refs/tags/v${VERSION}$"; then
-  echo "Tag already exists, skipping"
-else
-  git tag -a "v${VERSION}" -m "Release v${VERSION}"
-  git push origin "v${VERSION}"
-fi
-```
-
-**Release-Archiv-Format:**
-
-Das Archiv heißt **exakt** `stoermelder-update-X.Y.Z.tar.gz` und enthält:
-```
-stoermeldeanlage/
-├── VERSION
-├── pyproject.toml
-├── requirements.txt
-├── factory-defaults.json
-├── src/
-├── templates/
-└── static/
-```
-
-> Das Dateinamens-Pattern ist kritisch: `USBUpdateManager` erkennt nur
-> `stoermelder-update-*.tar.gz` und extrahiert die Version per Regex daraus.
-
----
-
-## Teil 3: In-App OTA-Update (USBUpdateManager)
-
-### Wie die App die GitHub API abfragt
-
-```python
-# Alle 60 Sekunden (im Hintergrund-Thread)
-url = "https://api.github.com/repos/NordOtto/stoermeldeanlage/releases/latest"
-req.add_header("Authorization", f"token {self._github_token}")
-
-data = json.loads(response.read())
-tag = data["tag_name"]        # z.B. "v1.19.45"
-version = tag.lstrip("v")     # "1.19.45"
-
-if version > self.app_version:  # Versionsvergleich per int-Tupel
-    # Speichert Download-URL des .tar.gz Assets
-```
-
-**Warum ein GitHub-Token?**
-- Private Repos brauchen Authentifizierung
-- Auch bei public Repos: Rate-Limit ohne Token = 60 Req/h, mit Token = 5000 Req/h
-- Token wird **nicht** in config.json gespeichert, sondern in `.github_token` (nicht im Backup, nicht im Git)
-
-### Versionsvergleich
-
-```python
-def _is_newer(self, new_version, current_version):
-    new_parts = [int(x) for x in new_version.split(".")]
-    cur_parts = [int(x) for x in current_version.split(".")]
-    return new_parts > cur_parts  # Python-Tuple-Vergleich: [1,19,45] > [1,19,44]
-```
-
-### Install-Ablauf (wenn Nutzer auf "Installieren" klickt)
-
-```
-1. Download tar.gz von GitHub API (mit Authorization-Header + Accept: application/octet-stream)
-   → Fortschritt in Prozent per /api/update/progress
-2. Backup: aktuelles INSTALL_DIR als tar.gz in backups/
-   → Geschützte Dateien (config.json, users.json, db) bleiben immer erhalten
-3. Entpacken nach /tmp/stoermelder-update/
-4. rsync/copy: neue Dateien → INSTALL_DIR
-   → PROTECTED_FILES und PROTECTED_DIRS nie überschreiben
-5. pip install -e . (im venv)
-6. systemctl restart stoermeldeanlage (via subprocess)
-7. Laufende Verbindung bricht ab → UI zeigt "Neustart..." Overlay
-   → UI pollt /api/version bis neue Version antwortet
-   → Automatisches location.reload()
-```
-
-**Geschützte Dateien** (werden bei Update nie überschrieben):
-```python
-PROTECTED_FILES = {"config.json", "users.json", "stoermelder.db"}
-PROTECTED_DIRS  = {"logs", "audio", "backups", "venv", ".baresip", ".linphone"}
-```
-
-### Fortschritts-Anzeige (Polling)
-
-Die UI pollt `/api/update/progress` alle 800ms:
+Bei Erfolg gibt das Script JSON aus:
 
 ```json
-{"phase": "download", "percent": 45, "detail": "234 / 512 KB", "installing": true}
-{"phase": "install",  "percent": 70, "detail": "Entpacke...",   "installing": true}
-{"phase": "done",     "percent": 100, "detail": "Neustart...",  "installing": false}
-{"phase": "error",    "percent": 0,   "detail": "Fehlermeldung","installing": false}
+{
+  "current": "b4b0c56-main",
+  "latest": "v0.1.2",
+  "commit": "...",
+  "published_at": "...",
+  "changelog": "...",
+  "update_available": true
+}
 ```
 
-Nach `phase: done` zeigt die UI ein Overlay und pollt `/api/version` bis die neue Version antwortet.
+Das Backend liest diese Ausgabe ein und uebernimmt sie in `app_state.ota`.
 
----
+### Installation
 
-## Teil 4: USB-Update (Offline-Variante)
+`install` macht:
 
-Identischer Install-Pfad wie OTA, aber Erkennung läuft lokal:
+1. Release-JSON laden.
+2. `.tar.gz` und `.tar.gz.minisig` aus dem GitHub Release laden.
+3. Signatur mit `minisign.pub` pruefen.
+4. Archiv nach `/opt/pumpe/releases/<tag>` entpacken.
+5. Backend-Venv im Release erzeugen.
+6. Python-Abhaengigkeiten aus `backend/requirements.txt` installieren.
+7. `.env` vom aktuellen Release uebernehmen.
+8. Symlink `/opt/pumpe/current` atomar auf das neue Release setzen.
+9. `pumpe-backend.service` und `pumpe-frontend.service` neu starten.
+10. Smoke-Test auf `http://127.0.0.1:8000/api/health`.
+11. Bei Fehler Rollback.
 
-```
-USB-Stick mit stoermelder-update-X.Y.Z.tar.gz einstecken
-→ udev-Rule triggert usb-mount@.service → Stick wird unter /media/<name> gemountet
-→ USBUpdateManager._scan_loop() findet die Datei alle 10s
-→ Update-Badge erscheint in UI
-→ Nutzer klickt "Installieren" → gleicher Ablauf wie OTA
-```
+## 8) Backend API fuer OTA
 
-Jumper-Alternative: GPIO 27 Low → automatische Installation ohne UI-Klick (Fabrik-Setup).
+Die API sitzt in `pi/backend/app/api/routes.py`.
 
----
+| Zweck | Endpoint |
+|---|---|
+| Status lesen | `GET /api/ota/status` |
+| Token speichern | `POST /api/ota/token` |
+| Token entfernen | `DELETE /api/ota/token` |
+| Online pruefen | `POST /api/ota/check` |
+| Update installieren | `POST /api/ota/install` |
+| Rollback starten | `POST /api/ota/rollback` |
+| Live-Log lesen | `GET /api/ota/log` |
 
-## Teil 5: API-Endpunkte
+Die API startet `update.sh` asynchron und speichert:
 
-| Endpunkt | Methode | Funktion |
-|----------|---------|----------|
-| `/api/update/check` | GET | Aktuellen Update-Status abfragen |
-| `/api/update/install` | POST | Update (USB) installieren |
-| `/api/update/ota/check` | POST | GitHub sofort abfragen |
-| `/api/update/ota/install` | POST | OTA-Update herunterladen + installieren |
-| `/api/update/progress` | GET | Fortschritt während Installation |
-| `/api/update/log` | GET | Installations-Log |
-| `/api/update/rollback` | POST | Zum letzten Backup zurückrollen |
-| `/api/update/ota/token` | POST/GET | GitHub-Token setzen / Status prüfen |
-| `/api/version` | GET | Aktuelle Version (für UI-Reload nach Update) |
+- `running`
+- `log`
+- `exit_code`
+- `current_version`
+- `latest_version`
+- `latest_commit`
+- `latest_date`
+- `changelog`
+- `update_available`
+- `token_configured`
+- `token_ok`
+- `token_message`
 
----
+## 9) Frontend UI
 
-## In ein anderes Projekt übertragen — Checkliste
+Die UI liegt in `pi/frontend/app/settings/page.tsx`.
 
-### Dateien übertragen
+Sichtbare Funktionen im Panel `System-Update`:
 
-- [ ] `bump_version.py` — anpassen: Projektname im Docstring, Pfad zu pyproject.toml
-- [ ] `VERSION` — mit `0.1.0` initialisieren
-- [ ] `.github/workflows/auto-release.yml` — anpassen:
-  - Release-Archiv-Name (`stoermelder-update-*.tar.gz` → `meinprojekt-update-*.tar.gz`)
-  - Inhalt des Archivs (welche Verzeichnisse?)
-  - `[skip ci]` Pattern beibehalten
-- [ ] `.github/workflows/ci.yml` — anpassen: Linter, Test-Runner
-- [ ] `src/.../usb_updater.py` — anpassen:
-  - `_github_repo` → eigenes Repo
-  - `UPDATE_PATTERN` → eigenes Dateinamens-Pattern
-  - `PROTECTED_FILES` / `PROTECTED_DIRS` → projektspezifisch
-  - `install_dir` → wo die App liegt
+- installierte Version
+- neueste Version
+- Release-Commit
+- GitHub Token speichern/pruefen/entfernen
+- Online pruefen
+- Installieren
+- Rollback
+- Fortschrittsanzeige
+- Live-Log
 
-### pyproject.toml
+Der API-Client liegt in `pi/frontend/lib/api.ts`:
 
-```toml
-[project]
-name = "meinprojekt"
-version = "0.1.0"   # bump_version.py aktualisiert diese Zeile
-```
+- `api.otaStatus()`
+- `api.otaCheck()`
+- `api.otaInstall(tag?)`
+- `api.otaRollback()`
+- `api.otaTokenSet(token)`
+- `api.otaTokenDelete()`
+- `api.otaLog()`
 
-`bump_version.py` sucht nach `version = "..."` mit Regex — Zeile muss genau so aussehen.
+Die Typen liegen in `pi/frontend/lib/types.ts`, Interface `OtaStatus`.
 
-### GitHub Token (Laufzeit)
+## 10) Aktueller Teststand
 
-Ein **Fine-grained Personal Access Token** mit:
-- Repository: Read access zu `contents` (für releases/latest API)
-- Ablauf: 1 Jahr (Kalender-Erinnerung setzen!)
+Auf dem Pi wurde geprueft:
 
-Token in App hinterlegen über UI oder direkt:
+- Token kann gespeichert werden.
+- `/opt/pumpe/ota/.github_token` wird angelegt.
+- Backend darf trotz `ProtectSystem=strict` nach `/opt/pumpe/ota` schreiben.
+- `POST /api/ota/check` kann das private GitHub Release lesen.
+- `GET /api/ota/status` zeigt:
+  - `token_configured: true`
+  - `token_ok: true`
+  - `latest_version: v0.1.2`
+  - `update_available: true`
+
+Damit funktioniert der Versionscheck. Die eigentliche Installation haengt davon ab,
+dass das Release signiert ist und `minisign.pub` auf dem Pi zum Release-Key passt.
+
+## 11) Direkter Deploy vs. OTA Release
+
+Direkter Deploy:
+
+- gut fuer schnelles Testen
+- kopiert gebaute Dateien direkt nach `/opt/pumpe/current`
+- erzeugt kein neues GitHub Release
+- aendert nicht automatisch `latest_version`
+
+OTA Release:
+
+- entsteht durch Push nach GitHub und Workflow-Lauf
+- erzeugt reproduzierbares Release-Artefakt
+- ist in der UI als neue Version sichtbar
+- kann ueber `Installieren` aktiviert werden
+
+Gewuenschter Ablauf fuer zukuenftige Arbeit:
+
+1. Lokal implementieren.
+2. `npm run typecheck` im Frontend.
+3. `npm run build` im Frontend.
+4. Backend-Syntax pruefen, wenn Python-Dateien geaendert wurden.
+5. Commit erstellen.
+6. Direkt auf den Pi deployen.
+7. Auf dem Pi testen.
+8. Push nach GitHub.
+9. Release Workflow abwarten.
+10. OTA-Status pruefen.
+
+## 12) Typische Fehler
+
+### Release-Info kann nicht geladen werden
+
+Moegliche Ursachen:
+
+- Token fehlt.
+- Token hat keine `Contents: Read-only` Berechtigung.
+- `GITHUB_REPO` in `/opt/pumpe/ota/config.env` ist falsch.
+- GitHub Release existiert nicht.
+
+Pruefen:
+
 ```bash
-echo "ghp_xxxx" > /opt/meinprojekt/.github_token
-chmod 600 /opt/meinprojekt/.github_token
+/opt/pumpe/ota/update.sh check
+curl http://127.0.0.1:8000/api/ota/status
 ```
 
-### Kritische Details
+### Token kann nicht gespeichert werden
 
-**Dateiname des Release-Assets muss dem Pattern entsprechen:**
-```
-meinprojekt-update-1.2.3.tar.gz
-               └──────┘ Versionsnummer muss per Regex extrahierbar sein
-```
+Moegliche Ursache:
 
-**fetch-depth: 0 im Checkout ist Pflicht:**
-```yaml
-- uses: actions/checkout@v4
-  with:
-    fetch-depth: 0   # sonst kann git describe --tags nicht den letzten Tag finden
+- systemd macht `/opt` read-only.
+
+Pruefen:
+
+```bash
+systemctl cat pumpe-backend.service | grep ReadWritePaths
 ```
 
-**git config vor git tag (nicht im konditionalen Schritt!):**
-```yaml
-- name: Configure git          # ← eigener Step, IMMER ausgeführt
-  run: |
-    git config user.name "github-actions[bot]"
-    git config user.email "github-actions[bot]@users.noreply.github.com"
+Erwartet:
 
-- name: Create tag             # ← nach git config
-  run: git tag -a "v..." -m "..."
+```text
+ReadWritePaths=/var/lib/pumpe /opt/pumpe/ota
 ```
-Wenn `git config` im selben Step wie der konditionalen Bump-Commit steht, schlägt
-`git tag` fehl mit „Committer identity unknown" weil der git-Config-Step übersprungen wurde.
 
-**systemctl restart nach Update:**
-Der Service läuft als root. Subprocess-Aufruf aus dem laufenden Prozess:
-```python
-subprocess.run(["sudo", "systemctl", "restart", "meinprojekt"], ...)
+### Update wird angezeigt, Installation schlaegt aber fehl
+
+Moegliche Ursachen:
+
+- `.minisig` fehlt im Release.
+- `minisign.pub` fehlt auf dem Pi.
+- Public Key passt nicht zur Signatur.
+- Release-Archiv enthaelt keinen Frontend-Standalone-Build.
+- Backend-Venv oder `requirements.txt` fehlt.
+
+Pruefen:
+
+```bash
+journalctl -u pumpe-backend.service -n 80 --no-pager
+journalctl -u pumpe-ota.service -n 80 --no-pager
+/opt/pumpe/ota/update.sh install vX.Y.Z
 ```
-Der Service bricht die eigene TCP-Verbindung ab — das ist gewollt. Die UI zeigt
-ein "Neustart..."-Overlay und pollt bis der neue Prozess antwortet.
 
----
+### UI zeigt Release im Log, aber nicht im Status
 
-## Bekannte Fallstricke
+Das Backend muss die JSON-Ausgabe von `update.sh check` parsen.
+Der Fix dafuer liegt in `pi/backend/app/api/routes.py` in `_apply_ota_json`.
 
-| Problem | Ursache | Lösung |
-|---------|---------|--------|
-| CI Endlosschleife | Bump-Commit triggert wieder CI | `[skip ci]` in Commit-Message |
-| „Committer identity unknown" bei git tag | `git config` im übersprungenen Schritt | Eigenen unbedingten Step für `git config` |
-| Tag existiert bereits, Push schlägt fehl | Manuell und CI bumpen gleichzeitig | Tag-Existenz prüfen vor `git tag` |
-| GitHub API 401 | Token abgelaufen oder falsch | Neues Token in UI hinterlegen |
-| GitHub API 403 | Rate-Limit (ohne Token) oder fehlendes Scope | Token mit `contents: read` verwenden |
-| Versionsvergleich falsch | String-Vergleich: "1.9" > "1.10" | Int-Tupel-Vergleich (siehe `_is_newer`) |
-| Update überschreibt Config | PROTECTED_FILES fehlt | Konfigurationsdateien in `PROTECTED_FILES` eintragen |
-| `ruff format --check` schlägt fehl | Code vor Push nicht formatiert | `ruff format src/ tests/` vor jedem Commit |
+## 13) Offene Verbesserungen
+
+Nuetzlich fuer spaeter:
+
+- Release-Workflow nach erfolgreichen Commits automatisch in der UI verlinken.
+- OTA-Installation mit echter Prozentanzeige statt grober Fortschrittslogik.
+- Nach erfolgreicher Installation automatisch reconnecten und UI neu laden.
+- `/api/ota/status` beim Backend-Start optional einmal automatisch initialisieren.
+- Signaturstatus in der UI explizit anzeigen.
+- GitHub Actions Status in Settings anzeigen, wenn ein Release gerade gebaut wird.

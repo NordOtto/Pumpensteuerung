@@ -589,7 +589,18 @@ function ZoneEditor({ value, presets, onChange, onCancel, onSave }: {
     >
       <div className="mb-3 text-sm font-bold text-slate-800">Zone bearbeiten</div>
       <div className="grid gap-3 md:grid-cols-3">
-        <TextField label="Name" value={value.name} hint="Anzeigename, z. B. Garten, Hecke oder Schlauchtrommel." onChange={(v) => onChange({ ...value, name: v })} />
+        <TextField
+          label="Name"
+          value={value.name}
+          hint="Anzeigename, z. B. Garten, Hecke oder Schlauchtrommel."
+          onChange={(v) => onChange({ ...value, name: v, id: value.id ? value.id : slugId(v) })}
+        />
+        <TextField
+          label="MQTT-ID"
+          value={value.id}
+          hint="Muss zum HA-Topic passen, z. B. garten fuer .../zone/garten/command."
+          onChange={(v) => onChange({ ...value, id: slugId(v) })}
+        />
         <Select label="Preset" value={value.preset} options={[...presets, "Benutzerdefiniert"]} hint="Wird vor dem Zonenstart aktiviert, z. B. Beregnung mit Druckregelung." onChange={(v) => onChange({ ...value, preset: v })} />
         <Select label="Pflanzentyp" value={value.plant_type || "Rasen"} options={PLANTS} onChange={(v) => onChange({ ...value, plant_type: v })} />
         <NumField label="Laufzeit min" value={value.duration_min} step={1} hint="Basislaufzeit fuer diese Zone." onChange={(v) => onChange({ ...value, duration_min: v })} />
@@ -609,6 +620,18 @@ function ZoneEditor({ value, presets, onChange, onCancel, onSave }: {
       </div>
     </motion.div>
   );
+}
+
+function slugId(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/ä/g, "ae")
+    .replace(/ö/g, "oe")
+    .replace(/ü/g, "ue")
+    .replace(/ß/g, "ss")
+    .replace(/[^a-z0-9_-]+/g, "_")
+    .replace(/^_+|_+$/g, "");
 }
 
 const EMPTY_PRESET: Preset = {

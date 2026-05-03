@@ -60,8 +60,8 @@ DEFAULT_PROGRAM: dict[str, Any] = {
     "max_runtime_factor": 1.5,
     "thresholds": dict(DEFAULT_THRESHOLDS),
     "zones": [{
-        "id": "zone_1",
-        "name": "Zone 1",
+        "id": "garten",
+        "name": "Garten",
         "enabled": True,
         "duration_min": 10,
         "water_mm": 6,

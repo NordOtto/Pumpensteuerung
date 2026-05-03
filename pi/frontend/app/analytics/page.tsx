@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { SortablePanels } from "@/components/sortable-panels";
+import { Card } from "@/components/ui/card";
 import { useStatus } from "@/lib/ws";
 import { api } from "@/lib/api";
 
@@ -46,7 +47,7 @@ function HistoryChart({
     const tMax = samples[samples.length - 1].ts;
     const tRange = tMax - tMin || 1;
 
-    ctx.strokeStyle = "#e5eaf0";
+    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--color-border").trim() || "#dde2ea";
     ctx.lineWidth = 1;
     for (let i = 0; i <= 3; i++) {
       const y = (h * i) / 3;
@@ -56,7 +57,10 @@ function HistoryChart({
       ctx.stroke();
     }
 
-    ctx.strokeStyle = color;
+    const lineColor = color.startsWith("var(")
+      ? getComputedStyle(document.documentElement).getPropertyValue(color.slice(4, -1)).trim()
+      : color;
+    ctx.strokeStyle = lineColor;
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     samples.forEach((s, i) => {
@@ -67,13 +71,13 @@ function HistoryChart({
     });
     ctx.stroke();
 
-    ctx.fillStyle = color + "1a";
+    ctx.fillStyle = `${lineColor}1a`;
     ctx.lineTo(w, h);
     ctx.lineTo(0, h);
     ctx.closePath();
     ctx.fill();
 
-    ctx.fillStyle = "#5b6b7a";
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--color-text2").trim() || "#4a5568";
     ctx.font = "10px ui-sans-serif";
     ctx.textAlign = "left";
     ctx.fillText(`${max.toFixed(1)} ${unit}`, 4, 12);
@@ -82,15 +86,15 @@ function HistoryChart({
 
   const last = samples[samples.length - 1];
   return (
-    <div className="rounded-lg border border-border bg-white p-4 shadow-sm">
+    <Card>
       <div className="mb-2 flex items-baseline justify-between">
-        <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{label}</span>
-        <span className="num text-sm font-medium text-slate-700">
+        <span className="text-xs font-bold uppercase tracking-wider text-tx3">{label}</span>
+        <span className="num text-sm font-medium text-tx2">
           {last ? `${accessor(last).toFixed(2)} ${unit}` : "-"}
         </span>
       </div>
       <canvas ref={ref} className="h-48 w-full" />
-    </div>
+    </Card>
   );
 }
 
@@ -140,14 +144,14 @@ export default function AnalyticsPage() {
     charts: (
       <>
         <div className="mb-3 flex justify-end">
-          <div className="flex gap-1 rounded-lg border border-border bg-white p-1 shadow-sm">
+          <div className="flex gap-1 rounded-tile border border-border bg-bg1 p-1 shadow-card">
             {RANGES.map((r) => (
               <button
                 key={r.label}
                 onClick={() => setRange(r)}
                 className={
                   "rounded-md px-3 py-1 text-xs font-semibold uppercase tracking-wider transition " +
-                  (r.seconds === range.seconds ? "bg-primary text-white" : "text-slate-500")
+                  (r.seconds === range.seconds ? "bg-primary text-white" : "text-tx3")
                 }
               >
                 {r.label}
@@ -156,39 +160,39 @@ export default function AnalyticsPage() {
           </div>
         </div>
         {loading && samples.length === 0 ? (
-          <div className="rounded-lg border border-border bg-white p-8 text-center text-sm text-slate-400">
+          <Card className="p-8 text-center text-sm text-tx3">
             Lade Verlauf...
-          </div>
+          </Card>
         ) : chartSamples.length < 2 ? (
-          <div className="rounded-lg border border-border bg-white p-8 text-center text-sm text-slate-400">
+          <Card className="p-8 text-center text-sm text-tx3">
             Noch nicht genug Daten. Backend sammelt alle 5 s einen Sample.
-          </div>
+          </Card>
         ) : (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <HistoryChart samples={chartSamples} accessor={(s) => s.pressure} color="#2588eb" unit="bar" label="Druck" />
-            <HistoryChart samples={chartSamples} accessor={(s) => s.flow} color="#14c957" unit="L/min" label="Durchfluss" />
-            <HistoryChart samples={chartSamples} accessor={(s) => s.frequency} color="#ffa000" unit="Hz" label="Pumpenfrequenz" />
+            <HistoryChart samples={chartSamples} accessor={(s) => s.pressure} color="var(--color-blue)" unit="bar" label="Druck" />
+            <HistoryChart samples={chartSamples} accessor={(s) => s.flow} color="var(--color-green)" unit="L/min" label="Durchfluss" />
+            <HistoryChart samples={chartSamples} accessor={(s) => s.frequency} color="var(--color-amber)" unit="Hz" label="Pumpenfrequenz" />
           </div>
         )}
       </>
     ),
     irrigation: (
-      <div className="rounded-lg border border-border bg-white p-4 shadow-sm">
+      <Card>
         {history.length === 0 ? (
-          <div className="text-sm text-slate-500">Noch keine Laeufe protokolliert.</div>
+          <div className="text-sm text-tx3">Noch keine Laeufe protokolliert.</div>
         ) : (
           <ul className="divide-y divide-border">
             {history.slice(0, 30).map((h, i) => (
               <li key={i} className="flex items-baseline justify-between gap-2 py-2 text-sm">
-                <span className="font-medium text-slate-700">{String(h.program_name ?? h.program_id ?? "-")}</span>
-                <span className="text-xs text-slate-500">{String(h.reason ?? h.result ?? "")}</span>
-                <span className="num text-slate-700">{h.runtime_s ? `${Math.round(Number(h.runtime_s) / 60)} min` : "-"}</span>
-                <span className="text-xs text-slate-400">{h.at ? new Date(String(h.at)).toLocaleString("de-DE") : ""}</span>
+                <span className="font-medium text-tx2">{String(h.program_name ?? h.program_id ?? "-")}</span>
+                <span className="text-xs text-tx3">{String(h.reason ?? h.result ?? "")}</span>
+                <span className="num text-tx2">{h.runtime_s ? `${Math.round(Number(h.runtime_s) / 60)} min` : "-"}</span>
+                <span className="text-xs text-tx3">{h.at ? new Date(String(h.at)).toLocaleString("de-DE") : ""}</span>
               </li>
             ))}
           </ul>
         )}
-      </div>
+      </Card>
     ),
   };
 

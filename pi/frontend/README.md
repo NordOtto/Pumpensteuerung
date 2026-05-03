@@ -1,57 +1,49 @@
 # Pumpe-Frontend (Next.js + Tailwind)
 
-Industrie-HMI-Dashboard für die Brunnenpumpe. Kommuniziert mit dem
-Python-Backend über REST (`/api/*`) und WebSocket (`/ws`).
+Industrie-HMI-Dashboard fuer die Brunnenpumpe. Kommuniziert mit dem
+Python-Backend ueber REST (`/api/*`) und WebSocket (`/ws`).
 
 ## Design-System
 
-Strikt eingehalten gemäß Spec:
-- Hintergrund weiß (#ffffff), Primär #2588eb, OK #14c957, Warn #ffa000, Fehler #ff0000
-- Light-Mode, große Zahlen (Tabular-Nums), Touch-Targets ≥48 px
-- Sprache deutsch (Druck/Durchfluss/Bewässerung), Aktionen englisch (Start/Stop/Auto)
+Das Frontend nutzt das Theme aus `../../handoff`:
+- CSS-Variablen in `app/globals.css` fuer Light/Dark-Theme
+- kompakte HMI/Webapp-Dichte mit `bg-bg1`, `bg-bg2`, `border-border`, `text-tx*`
+- UI-Bausteine in `components/ui/*` fuer Cards, Badges, Buttons, KPI-Tiles und Zonen-Chips
+- Touch-Targets >=44 px und tabellarische Zahlen
 
 ## Pages
 
 | Pfad | Inhalt |
 |---|---|
-| `/dashboard` | KPI-Karten (Druck/Durchfluss/Hz), Pumpenstatus + Hold-Start, Zonen-Übersicht, Warnungen |
-| `/control` | Manuelle Pumpensteuerung (Hold-Start/Stop/Reset), Hz-Slider, manuelle Zonen |
-| `/zones` | Wetter+ET0-Übersicht, alle Programme + Zonen mit Bodenfeuchte/Defizit/Laufzeit |
+| `/dashboard` | Live-Werte, sicherer Pumpenstop/Pause, Bewaesserungssteuerung, Zonen-Status, Warnungen |
+| `/control` | Redirect auf `/dashboard` |
+| `/zones` | Wetter+ET0-Uebersicht, alle Programme + Zonen mit Bodenfeuchte/Defizit/Laufzeit |
 | `/analytics` | Live-Charts (Druck/Flow/Hz), Lauf-Historie |
-| `/settings` | PI-Tunings, Zeitfenster, Presets, Urlaubsmodus, Systeminfo |
+| `/settings` | Programme, Presets, PI-Tunings, Zeitfenster, OTA, Urlaubsmodus |
 
 ## Lokal entwickeln
 
 ```bash
 cd pi/frontend
 npm install
-# Backend lokal laufen lassen (siehe pi/backend/README.md)
 BACKEND_URL=http://127.0.0.1:8000 npm run dev
 ```
-Browser: http://localhost:3001 — Vite-ähnliche HMR.
 
-WebSocket geht direkt gegen `ws://localhost:3001/ws` (Next leitet weiter).
-Im Production-Build übernimmt nginx das.
+Browser: http://localhost:3001
 
-## Production-Build (für den Pi)
+## Production-Build
 
 ```bash
 npm run build
-# Erzeugt .next/standalone/server.js — wird via systemd gestartet
 ```
 
-Im systemd-Unit (siehe Plan):
-```
-ExecStart=/usr/bin/node /opt/pumpe/frontend/.next/standalone/server.js
-Environment=PORT=3001
-```
+Erzeugt `.next/standalone/server.js`, das auf dem Pi via systemd gestartet wird.
 
 ## Wiederverwendbare Komponenten
 
-[components/kpi-card.tsx](components/kpi-card.tsx), [zone-card.tsx](components/zone-card.tsx),
-[status-badge.tsx](components/status-badge.tsx), [hold-button.tsx](components/hold-button.tsx),
-[warning-list.tsx](components/warning-list.tsx), [section.tsx](components/section.tsx),
-[top-bar.tsx](components/top-bar.tsx), [bottom-nav.tsx](components/bottom-nav.tsx).
+[components/ui](components/ui), [warning-list.tsx](components/warning-list.tsx),
+[weather-widget.tsx](components/weather-widget.tsx), [irrigation-advisor.tsx](components/irrigation-advisor.tsx),
+[sortable-panels.tsx](components/sortable-panels.tsx), [top-bar.tsx](components/top-bar.tsx),
+[bottom-nav.tsx](components/bottom-nav.tsx).
 
-State-Provider: [lib/ws.tsx](lib/ws.tsx) — globaler WebSocket-Hook mit
-Auto-Reconnect, leitet System-Modus + Warnungen ab.
+State-Provider: [lib/ws.tsx](lib/ws.tsx) mit Auto-Reconnect, System-Modus und Warnungen.

@@ -68,13 +68,13 @@ export function HoldButton({
       onPointerLeave={cancel}
       onPointerCancel={cancel}
       className={cn(
-        "relative flex h-20 min-w-48 items-center justify-center overflow-hidden rounded-xl px-6 text-lg font-semibold uppercase tracking-wide ring-4 ring-transparent transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40",
+        "relative flex h-20 min-w-48 items-center justify-center overflow-hidden rounded-card px-6 text-lg font-semibold uppercase tracking-wide ring-4 ring-transparent transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40",
         t.bg
       )}
     >
       <span
         aria-hidden
-        className="absolute inset-y-0 left-0 bg-white/20 transition-[width]"
+        className="absolute inset-y-0 left-0 bg-bg1/20 transition-[width]"
         style={{ width: `${progress * 100}%` }}
       />
       <span className="relative">
@@ -83,3 +83,4 @@ export function HoldButton({
     </button>
   );
 }
+

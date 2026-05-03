@@ -18,13 +18,13 @@ export function WeatherWidget({ weather: w }: WeatherWidgetProps) {
 
   if (!hasAny) {
     return (
-      <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border bg-slate-50/60 px-6 py-8 text-center">
-        <CloudOff className="h-8 w-8 text-slate-300" />
-        <div className="text-sm font-semibold text-slate-600">Keine Wetterdaten</div>
-        <div className="text-xs text-slate-500">
+      <div className="flex flex-col items-center gap-2 rounded-card border border-dashed border-border bg-bg2 px-6 py-8 text-center">
+        <CloudOff className="h-8 w-8 text-tx3" />
+        <div className="text-sm font-semibold text-tx2">Keine Wetterdaten</div>
+        <div className="text-xs text-tx3">
           Home Assistant pusht via MQTT-Topic
           <br />
-          <code className="mt-1 inline-block rounded bg-white px-1.5 py-0.5 text-[11px] text-slate-700">
+          <code className="mt-1 inline-block rounded bg-bg1 px-1.5 py-0.5 text-[11px] text-tx2">
             pumpensteuerung/irrigation/weather/input
           </code>
         </div>
@@ -87,11 +87,11 @@ export function WeatherWidget({ weather: w }: WeatherWidgetProps) {
 }
 
 const TONE_BG = {
-  primary: "bg-primary/5 border-primary/20",
-  ok: "bg-ok/5 border-ok/20",
-  warn: "bg-warn/5 border-warn/20",
-  danger: "bg-danger/5 border-danger/20",
-  muted: "bg-slate-50 border-border",
+  primary: "bg-[var(--color-blue-dim)] border-[var(--color-blue)]/20",
+  ok: "bg-[var(--color-green-dim)] border-[var(--color-green)]/20",
+  warn: "bg-[var(--color-amber-dim)] border-[var(--color-amber)]/20",
+  danger: "bg-[var(--color-red-dim)] border-[var(--color-red)]/20",
+  muted: "bg-bg2 border-border",
 } as const;
 
 const TONE_TEXT = {
@@ -99,7 +99,7 @@ const TONE_TEXT = {
   ok: "text-ok",
   warn: "text-warn",
   danger: "text-danger",
-  muted: "text-slate-400",
+  muted: "text-tx3",
 } as const;
 
 function Tile({
@@ -118,16 +118,17 @@ function Tile({
   hint?: string;
 }) {
   return (
-    <div className={cn("rounded-xl border p-3 shadow-sm transition", TONE_BG[tone])}>
+    <div className={cn("rounded-card border p-3 shadow-card transition", TONE_BG[tone])}>
       <div className="mb-1 flex items-center gap-1.5">
         <Icon className={cn("h-3.5 w-3.5", TONE_TEXT[tone])} />
-        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{label}</span>
+        <span className="text-[10px] font-bold uppercase tracking-wider text-tx3">{label}</span>
       </div>
       <div className="flex items-baseline gap-1">
         <span className={cn("num text-2xl font-semibold leading-none", TONE_TEXT[tone])}>{value}</span>
-        <span className="text-xs font-medium text-slate-400">{unit}</span>
+        <span className="text-xs font-medium text-tx3">{unit}</span>
       </div>
-      {hint && <div className="mt-1 text-[10px] text-slate-500">{hint}</div>}
+      {hint && <div className="mt-1 text-[10px] text-tx3">{hint}</div>}
     </div>
   );
 }
+

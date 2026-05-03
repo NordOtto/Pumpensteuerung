@@ -1,10 +1,11 @@
 "use client";
 
 import type React from "react";
-import { StatusBadge } from "@/components/status-badge";
 import { SortablePanels } from "@/components/sortable-panels";
 import { WeatherWidget } from "@/components/weather-widget";
 import { IrrigationAdvisor } from "@/components/irrigation-advisor";
+import { Badge } from "@/components/ui/badge";
+import { StatBox } from "@/components/ui/card";
 import { useStatus } from "@/lib/ws";
 import { moistureColor, cn } from "@/lib/utils";
 import type { AppStatus, IrrigationProgram } from "@/lib/types";
@@ -12,7 +13,7 @@ import type { AppStatus, IrrigationProgram } from "@/lib/types";
 export default function ZonesPage() {
   const { status } = useStatus();
 
-  if (!status) return <div className="flex h-64 items-center justify-center text-slate-400">Lade...</div>;
+  if (!status) return <div className="flex h-64 items-center justify-center text-tx3">Lade...</div>;
 
   const programs = status.irrigation.programs;
   const decision = status.irrigation.decision;
@@ -53,13 +54,13 @@ function ProgramOverview({
   return (
     <>
       <div className="mb-3 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <ControllerStat label="Modus" value={program.mode === "smart_et" ? "Smart ET" : "Fest"} />
-        <ControllerStat label="Max/Woche" value={String(program.max_runs_per_week ?? 3)} />
-        <ControllerStat
+        <StatBox label="Modus" value={program.mode === "smart_et" ? "Smart ET" : "Fest"} />
+        <StatBox label="Max/Woche" value={String(program.max_runs_per_week ?? 3)} />
+        <StatBox
           label="Naechster Lauf"
           value={decision.next_start ? new Date(decision.next_start).toLocaleString("de-DE", { weekday: "short", hour: "2-digit", minute: "2-digit" }) : "-"}
         />
-        <ControllerStat label="Entscheidung" value={program.last_skip_reason || decision.reason} />
+        <StatBox label="Entscheidung" value={program.last_skip_reason || decision.reason} />
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {program.zones.map((zone) => {
@@ -82,29 +83,29 @@ function ProgramOverview({
             <div
               key={zone.id}
               className={cn(
-                "flex flex-col gap-3 rounded-lg border border-l-4 bg-white p-5 shadow-sm",
+                "flex flex-col gap-3 rounded-card border border-l-4 bg-bg1 p-4 shadow-card",
                 borderL,
                 isActive ? "border-primary ring-2 ring-primary/20" : "border-border"
               )}
             >
               <div className="flex items-start justify-between">
                 <div>
-                  <div className="font-semibold text-slate-900">{zone.name}</div>
-                  <div className="text-xs text-slate-500">{zone.plant_type || "-"}</div>
+                  <div className="font-semibold text-tx">{zone.name}</div>
+                  <div className="text-xs text-tx3">{zone.plant_type || "-"}</div>
                 </div>
                 {isActive && (
-                  <StatusBadge tone="ok" pulse>
+                  <Badge tone="ok" pulse>
                     Laeuft
-                  </StatusBadge>
+                  </Badge>
                 )}
               </div>
 
               <div>
                 <div className="mb-1 flex items-baseline justify-between">
-                  <span className="text-xs uppercase tracking-wider text-slate-500">Bodenfeuchte</span>
+                  <span className="text-xs uppercase tracking-wider text-tx3">Bodenfeuchte</span>
                   <span className="num-xl">{Math.round(moisture)}%</span>
                 </div>
-                <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                <div className="h-2 w-full overflow-hidden rounded-full bg-bg3">
                   <div className={cn("h-full", barColor)} style={{ width: `${Math.max(0, Math.min(100, moisture))}%` }} />
                 </div>
               </div>
@@ -141,17 +142,8 @@ function ProgramOverview({
 function KV({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between border-b border-border/60 py-1">
-      <span className="text-slate-500">{label}</span>
-      <span className="font-medium text-slate-700">{value}</span>
-    </div>
-  );
-}
-
-function ControllerStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg border border-border bg-white p-3 shadow-sm">
-      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{label}</div>
-      <div className="truncate text-sm font-semibold text-slate-800">{value}</div>
+      <span className="text-tx3">{label}</span>
+      <span className="font-medium text-tx2">{value}</span>
     </div>
   );
 }

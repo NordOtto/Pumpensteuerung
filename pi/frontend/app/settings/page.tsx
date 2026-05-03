@@ -36,7 +36,7 @@ export default function SettingsPage() {
 
   useEffect(() => { loadPresets(); }, [loadPresets]);
 
-  if (!status) return <div className="flex h-64 items-center justify-center text-slate-400">Lade...</div>;
+  if (!status) return <div className="flex h-64 items-center justify-center text-tx3">Lade...</div>;
 
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
@@ -272,7 +272,7 @@ function ProgramsSection({ programs, presets }: { programs: IrrigationProgram[];
             return (
               <motion.div
                 key={p.id || i}
-                className="overflow-hidden rounded-lg border border-white/70 bg-white/80 shadow-[0_14px_36px_rgba(15,23,42,0.08)] backdrop-blur"
+                className="overflow-hidden rounded-tile border border-border bg-bg1 shadow-card "
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.03, duration: 0.22 }}
@@ -280,19 +280,19 @@ function ProgramsSection({ programs, presets }: { programs: IrrigationProgram[];
                 <button type="button" onClick={() => setOpenIdx(isOpen ? -1 : i)} className="flex w-full items-center gap-3 px-4 py-3 text-left">
                   <Toggle checked={p.enabled} onChange={(v) => updateProg(i, { enabled: v })} />
                   <div className="min-w-0 flex-1">
-                    <div className="truncate font-semibold text-slate-900">{p.name || "Unbenannt"}</div>
-                    <div className="text-xs text-slate-500">
+                    <div className="truncate font-semibold text-tx">{p.name || "Unbenannt"}</div>
+                    <div className="text-xs text-tx3">
                       {p.mode === "smart_et" ? "Smart ET" : "Fest"} | {timeLabel(p)} | {p.zones.length} Zone(n) | Defizit {maxDeficit.toFixed(1)} mm
                     </div>
                   </div>
-                  <span className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">
+                  <span className="rounded bg-bg2 px-2 py-1 text-xs font-semibold text-tx2">
                     {p.last_skip_reason || "bereit"}
                   </span>
                 </button>
 
                 {isOpen && (
                   <motion.div
-                    className="border-t border-white/70 bg-gradient-to-br from-slate-50/80 to-primary/5 p-4"
+                    className="border-t border-border bg-gradient-to-br from-bg2 to-bg2 p-4"
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: "auto" }}
                     transition={{ duration: 0.2 }}
@@ -312,7 +312,7 @@ function ProgramsSection({ programs, presets }: { programs: IrrigationProgram[];
                             days[d] = !days[d];
                             updateProg(i, { days });
                           }}
-                          className={`h-10 w-10 rounded-lg text-sm font-bold ${p.days[d] ? "bg-primary text-white" : "bg-slate-100 text-slate-500"}`}
+                          className={`h-10 w-10 rounded-tile text-sm font-bold ${p.days[d] ? "bg-primary text-white" : "bg-bg2 text-tx3"}`}
                         >
                           {name}
                         </button>
@@ -327,7 +327,7 @@ function ProgramsSection({ programs, presets }: { programs: IrrigationProgram[];
 
                     <div className="mt-4 grid gap-3 md:grid-cols-2">
                       {p.zones.map((z, j) => <ZoneRow key={z.id || j} zone={z} onEdit={() => setEditingZone({ pIdx: i, zIdx: j, z: { ...z } })} onDelete={() => updateProg(i, { zones: p.zones.filter((_, idx) => idx !== j) })} />)}
-                      <button type="button" onClick={() => setEditingZone({ pIdx: i, zIdx: null, z: { ...EMPTY_ZONE } })} className="rounded-lg border border-dashed border-primary p-4 text-sm font-bold text-primary">
+                      <button type="button" onClick={() => setEditingZone({ pIdx: i, zIdx: null, z: { ...EMPTY_ZONE } })} className="rounded-tile border border-dashed border-primary p-4 text-sm font-bold text-primary">
                         + Zone hinzufugen
                       </button>
                     </div>
@@ -347,10 +347,10 @@ function ProgramsSection({ programs, presets }: { programs: IrrigationProgram[];
             />
           )}
 
-          {err && <div className="rounded-lg border border-danger/30 bg-danger/5 p-3 text-sm text-danger">{err}</div>}
+          {err && <div className="rounded-tile border border-danger/30 bg-[var(--color-red-dim)] p-3 text-sm text-danger">{err}</div>}
           <div className="flex flex-wrap gap-3">
-            <button type="button" onClick={addProgram} className="rounded-lg border border-dashed border-primary px-4 py-2 text-sm font-bold text-primary">+ Neues Programm</button>
-            <button type="button" onClick={savePrograms} className="rounded-lg bg-primary px-5 py-2 text-sm font-bold text-white">Alle Programme speichern</button>
+            <button type="button" onClick={addProgram} className="rounded-tile border border-dashed border-primary px-4 py-2 text-sm font-bold text-primary">+ Neues Programm</button>
+            <button type="button" onClick={savePrograms} className="rounded-tile bg-primary px-5 py-2 text-sm font-bold text-white">Alle Programme speichern</button>
           </div>
         </div>
       </div>
@@ -388,19 +388,19 @@ function SmartEtGuide({
 
   return (
     <motion.aside
-      className="overflow-hidden rounded-lg border border-white/70 bg-gradient-to-br from-white/90 via-white/75 to-cyan-50/80 p-4 shadow-[0_18px_45px_rgba(37,136,235,0.14)] backdrop-blur"
+      className="overflow-hidden rounded-tile border border-border bg-gradient-to-br from-bg1 via-bg1 to-bg2 p-4 shadow-card "
       initial={{ opacity: 0, x: -14 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.28, ease: "easeOut" }}
     >
       <div className="mb-4 flex items-start gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary shadow-inner">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-tile bg-[var(--color-blue-dim)] text-primary ">
           <Sparkles className="h-5 w-5" />
         </div>
         <div className="min-w-0">
           <div className="text-xs font-bold uppercase tracking-widest text-primary">Smart-ET Guide</div>
-          <div className="mt-1 text-sm text-slate-600">
-            Fuehrt die Empfehlung fuer <span className="font-semibold text-slate-900">{programName}</span>.
+          <div className="mt-1 text-sm text-tx2">
+            Fuehrt die Empfehlung fuer <span className="font-semibold text-tx">{programName}</span>.
           </div>
         </div>
       </div>
@@ -411,7 +411,7 @@ function SmartEtGuide({
             key={label}
             type="button"
             onClick={() => onStep(index)}
-            className={`h-2 rounded-full transition ${index <= step ? "bg-primary shadow-[0_0_16px_rgba(37,136,235,0.35)]" : "bg-slate-200"}`}
+            className={`h-2 rounded-full transition ${index <= step ? "bg-primary shadow-card" : "bg-bg3"}`}
             aria-label={label}
           />
         ))}
@@ -425,7 +425,7 @@ function SmartEtGuide({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.2 }}
-            className="rounded-lg border border-white/70 bg-white/70 p-3 shadow-sm"
+            className="rounded-tile border border-border bg-bg1 p-3 shadow-card"
           >
             {step === 0 && (
               <GuideStep icon={<Droplets className="h-4 w-4" />} title="Nutzung festlegen">
@@ -457,7 +457,7 @@ function SmartEtGuide({
 
             {step === 3 && (
               <GuideStep icon={<Gauge className="h-4 w-4" />} title="Empfehlung pruefen">
-                <div className="rounded-lg border border-primary/15 bg-gradient-to-br from-primary/10 to-ok/10 p-3 text-sm text-slate-700">
+                <div className="rounded-tile border border-primary/15 bg-gradient-to-br from-primary/10 to-ok/10 p-3 text-sm text-tx2">
                   {summary || "Berechne eine Empfehlung aus Nutzung, Standort und Testlauf."}
                 </div>
                 {recommendation && (
@@ -480,7 +480,7 @@ function SmartEtGuide({
           type="button"
           onClick={() => onStep(prevStep)}
           disabled={step === 0}
-          className="inline-flex h-11 items-center gap-2 rounded-lg border border-border bg-white/75 px-3 text-sm font-semibold text-slate-700 shadow-sm disabled:opacity-40"
+          className="inline-flex h-11 items-center gap-2 rounded-tile border border-border bg-bg1 px-3 text-sm font-semibold text-tx2 shadow-card disabled:opacity-40"
         >
           <ChevronLeft className="h-4 w-4" />
           Zurueck
@@ -489,7 +489,7 @@ function SmartEtGuide({
           <button
             type="button"
             onClick={() => onStep(nextStep)}
-            className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-white shadow-[0_10px_24px_rgba(37,136,235,0.25)]"
+            className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-tile bg-primary px-4 text-sm font-bold text-white shadow-card"
           >
             Weiter
             <ChevronRight className="h-4 w-4" />
@@ -500,7 +500,7 @@ function SmartEtGuide({
             type="button"
             onClick={onCalculate}
             disabled={busy}
-            className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-white shadow-[0_10px_24px_rgba(37,136,235,0.25)] disabled:opacity-50"
+            className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-tile bg-primary px-4 text-sm font-bold text-white shadow-card disabled:opacity-50"
           >
             {busy ? "Berechne..." : "Empfehlung berechnen"}
             <Sparkles className="h-4 w-4" />
@@ -511,7 +511,7 @@ function SmartEtGuide({
             type="button"
             onClick={recommendation ? onApply : onCalculate}
             disabled={busy}
-            className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-white shadow-[0_10px_24px_rgba(37,136,235,0.25)] disabled:opacity-50"
+            className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-tile bg-primary px-4 text-sm font-bold text-white shadow-card disabled:opacity-50"
           >
             {recommendation ? "In Programm uebernehmen" : busy ? "Berechne..." : "Empfehlung berechnen"}
             <Check className="h-4 w-4" />
@@ -525,8 +525,8 @@ function SmartEtGuide({
 function GuideStep({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-800">
-        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">{icon}</span>
+      <div className="mb-3 flex items-center gap-2 text-sm font-bold text-tx">
+        <span className="flex h-7 w-7 items-center justify-center rounded-tile bg-[var(--color-blue-dim)] text-primary">{icon}</span>
         {title}
       </div>
       {children}
@@ -536,9 +536,9 @@ function GuideStep({ icon, title, children }: { icon: React.ReactNode; title: st
 
 function GuideMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-white/80 bg-white/80 p-2 shadow-sm">
-      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{label}</div>
-      <div className="num mt-1 text-sm font-semibold text-slate-900">{value}</div>
+    <div className="rounded-tile border border-border bg-bg1 p-2 shadow-card">
+      <div className="text-[10px] font-bold uppercase tracking-wider text-tx3">{label}</div>
+      <div className="num mt-1 text-sm font-semibold text-tx">{value}</div>
     </div>
   );
 }
@@ -550,21 +550,21 @@ function formatMaybe(value: number | undefined) {
 function ZoneRow({ zone, onEdit, onDelete }: { zone: IrrigationZone; onEdit: () => void; onDelete: () => void }) {
   const pct = Math.min(100, Math.round((zone.deficit_mm / Math.max(zone.target_mm, 1)) * 100));
   return (
-    <div className="rounded-lg border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur">
+    <div className="rounded-tile border border-border bg-bg1 p-4 shadow-card ">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="font-semibold text-slate-900">{zone.name || "Zone"}</div>
-          <div className="text-xs text-slate-500">{zone.plant_type || "-"} | {zone.preset || "Normal"} | {zone.duration_min} min</div>
+          <div className="font-semibold text-tx">{zone.name || "Zone"}</div>
+          <div className="text-xs text-tx3">{zone.plant_type || "-"} | {zone.preset || "Normal"} | {zone.duration_min} min</div>
         </div>
         <div className="flex gap-2">
           <button type="button" onClick={onEdit} className="rounded border border-border px-2 py-1 text-xs font-semibold">Bearbeiten</button>
           <button type="button" onClick={onDelete} className="rounded border border-danger/40 px-2 py-1 text-xs font-semibold text-danger">X</button>
         </div>
       </div>
-      <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
+      <div className="mt-3 h-2 overflow-hidden rounded-full bg-bg2">
         <div className="h-full bg-primary" style={{ width: `${pct}%` }} />
       </div>
-      <div className="mt-2 grid grid-cols-3 gap-2 text-xs text-slate-600">
+      <div className="mt-2 grid grid-cols-3 gap-2 text-xs text-tx2">
         <span>Defizit {zone.deficit_mm.toFixed(1)} mm</span>
         <span>Ziel {zone.target_mm.toFixed(1)} mm</span>
         <span>Start ab {zone.min_deficit_mm.toFixed(1)} mm</span>
@@ -582,12 +582,12 @@ function ZoneEditor({ value, presets, onChange, onCancel, onSave }: {
 }) {
   return (
     <motion.div
-      className="rounded-lg border border-primary/20 bg-gradient-to-br from-white/90 to-primary/10 p-4 shadow-[0_14px_34px_rgba(37,136,235,0.12)] backdrop-blur"
+      className="rounded-tile border border-primary/20 bg-gradient-to-br from-bg1 to-bg2 p-4 shadow-card "
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2 }}
     >
-      <div className="mb-3 text-sm font-bold text-slate-800">Zone bearbeiten</div>
+      <div className="mb-3 text-sm font-bold text-tx">Zone bearbeiten</div>
       <div className="grid gap-3 md:grid-cols-3">
         <TextField
           label="Name"
@@ -615,8 +615,8 @@ function ZoneEditor({ value, presets, onChange, onCancel, onSave }: {
         Die Zone ist die logische Ventil-ID fuer Home Assistant/MQTT. Beim Start sendet die Steuerung einen Befehl an <code>pumpensteuerung/irrigation/zone/&lt;zone_id&gt;/command</code>; HA schaltet dazu das passende Ventil.
       </HelpText>
       <div className="mt-4 flex justify-end gap-2">
-        <button type="button" onClick={onCancel} className="rounded-lg border border-border bg-white px-4 py-2 text-sm">Abbrechen</button>
-        <button type="button" onClick={onSave} className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">Zone speichern</button>
+        <button type="button" onClick={onCancel} className="rounded-tile border border-border bg-bg1 px-4 py-2 text-sm">Abbrechen</button>
+        <button type="button" onClick={onSave} className="rounded-tile bg-primary px-4 py-2 text-sm font-bold text-white">Zone speichern</button>
       </div>
     </motion.div>
   );
@@ -665,7 +665,7 @@ function PresetsSection({ active, data, onReload }: { active: string; data: { ac
   const [editing, setEditing] = useState<Preset | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [err, setErr] = useState("");
-  if (!data) return <div className="p-4 text-sm text-slate-400">Lade...</div>;
+  if (!data) return <div className="p-4 text-sm text-tx3">Lade...</div>;
 
   const save = async () => {
     if (!editing) return;
@@ -689,14 +689,14 @@ function PresetsSection({ active, data, onReload }: { active: string; data: { ac
 
   return (
     <>
-      <div className="rounded-lg border border-white/70 bg-white/80 shadow-[0_14px_36px_rgba(15,23,42,0.08)] backdrop-blur">
+      <div className="rounded-tile border border-border bg-bg1 shadow-card ">
         <div className="divide-y divide-border">
           {data.presets.map((p) => (
             <div key={p.name} className="flex flex-wrap items-center gap-3 px-4 py-3">
               <div className="min-w-48 flex-1">
-                <span className="font-semibold text-slate-900">{p.name}</span>
-                <span className="ml-2 text-xs text-slate-500">{MODE_LABEL[p.mode]}</span>
-                {(data.active === p.name || active === p.name) && <span className="ml-2 rounded bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">aktiv</span>}
+                <span className="font-semibold text-tx">{p.name}</span>
+                <span className="ml-2 text-xs text-tx3">{MODE_LABEL[p.mode]}</span>
+                {(data.active === p.name || active === p.name) && <span className="ml-2 rounded bg-[var(--color-blue-dim)] px-2 py-0.5 text-xs font-bold text-primary">aktiv</span>}
               </div>
               <button type="button" onClick={() => api.applyPreset(p.name).then(onReload)} className="rounded border border-border px-3 py-1 text-xs font-semibold">Anwenden</button>
               <button type="button" onClick={() => { setEditing({ ...p }); setIsNew(false); }} className="rounded border border-border px-3 py-1 text-xs font-semibold">Bearbeiten</button>
@@ -746,14 +746,14 @@ function PresetsSection({ active, data, onReload }: { active: string; data: { ac
               </HelpText>
             )}
             <div className="mt-4 flex justify-end gap-2">
-              <button type="button" onClick={() => setEditing(null)} className="rounded-lg border border-border bg-white px-4 py-2 text-sm">Abbrechen</button>
-              <button type="button" onClick={save} className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">Speichern</button>
+              <button type="button" onClick={() => setEditing(null)} className="rounded-tile border border-border bg-bg1 px-4 py-2 text-sm">Abbrechen</button>
+              <button type="button" onClick={save} className="rounded-tile bg-primary px-4 py-2 text-sm font-bold text-white">Speichern</button>
             </div>
           </div>
         )}
         {err && <div className="px-4 pb-3 text-sm text-danger">{err}</div>}
         <div className="border-t border-border px-4 py-3">
-          <button type="button" onClick={() => { setEditing({ ...EMPTY_PRESET }); setIsNew(true); }} className="rounded-lg border border-dashed border-primary px-4 py-2 text-sm font-bold text-primary">+ Neuer Preset</button>
+          <button type="button" onClick={() => { setEditing({ ...EMPTY_PRESET }); setIsNew(true); }} className="rounded-tile border border-dashed border-primary px-4 py-2 text-sm font-bold text-primary">+ Neuer Preset</button>
         </div>
       </div>
     </>
@@ -766,9 +766,9 @@ function PiSection({ setpoint, pOn, pOff, kp, ki, freqMin, freqMax, enabled, spi
   const [draft, setDraft] = useState({ setpoint, p_on: pOn, p_off: pOff, kp, ki, freq_min: freqMin, freq_max: freqMax });
   return (
     <>
-      <div className="rounded-lg border border-white/70 bg-gradient-to-br from-white/90 to-sky-50/70 p-4 shadow-[0_14px_36px_rgba(15,23,42,0.08)] backdrop-blur">
+      <div className="rounded-tile border border-border bg-gradient-to-br from-bg1 to-bg2 p-4 shadow-card ">
         <div className="mb-4 flex items-center justify-between">
-          <span className="text-sm font-semibold text-slate-700">Regler aktiv</span>
+          <span className="text-sm font-semibold text-tx2">Regler aktiv</span>
           <Toggle checked={enabled} onChange={(v) => api.setPressure({ enabled: v })} />
         </div>
         <div className="grid gap-3 md:grid-cols-4">
@@ -781,10 +781,10 @@ function PiSection({ setpoint, pOn, pOff, kp, ki, freqMin, freqMax, enabled, spi
           <NumField label="Ki Nachregelung" value={draft.ki} step={0.1} hint="Korrigiert bleibende Abweichung. Zu hoch kann Schwingen erzeugen." onChange={(v) => setDraft({ ...draft, ki: v })} />
         </div>
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-          <span className="text-xs text-slate-500">Hahn-zu-Erkennung: {spike ? "an" : "aus"}</span>
+          <span className="text-xs text-tx3">Hahn-zu-Erkennung: {spike ? "an" : "aus"}</span>
           <div className="flex gap-2">
-            <button type="button" onClick={() => api.resetDryrun()} className="rounded-lg border border-warn/40 bg-warn/10 px-4 py-2 text-sm font-semibold text-warn">Trockenlauf reset</button>
-            <button type="button" onClick={() => api.setPressure(draft)} className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">Speichern</button>
+            <button type="button" onClick={() => api.resetDryrun()} className="rounded-tile border border-warn/40 bg-[var(--color-amber-dim)] px-4 py-2 text-sm font-semibold text-warn">Trockenlauf reset</button>
+            <button type="button" onClick={() => api.setPressure(draft)} className="rounded-tile bg-primary px-4 py-2 text-sm font-bold text-white">Speichern</button>
           </div>
         </div>
       </div>
@@ -796,9 +796,9 @@ function TimeguardSection({ tg }: { tg: { enabled: boolean; start_hour: number; 
   const [d, setD] = useState({ start_hour: tg.start_hour, start_min: tg.start_min, end_hour: tg.end_hour, end_min: tg.end_min, days: [...tg.days] });
   return (
     <>
-      <div className="rounded-lg border border-white/70 bg-gradient-to-br from-white/90 to-cyan-50/60 p-4 shadow-[0_14px_36px_rgba(15,23,42,0.08)] backdrop-blur">
+      <div className="rounded-tile border border-border bg-gradient-to-br from-bg1 to-bg2 p-4 shadow-card ">
         <div className="mb-4 flex items-center justify-between">
-          <span className="text-sm font-semibold text-slate-700">Aktiv {tg.allowed ? "(im Fenster)" : "(gesperrt)"}</span>
+          <span className="text-sm font-semibold text-tx2">Aktiv {tg.allowed ? "(im Fenster)" : "(gesperrt)"}</span>
           <Toggle checked={tg.enabled} onChange={(v) => api.setTimeguard({ enabled: v })} />
         </div>
         <div className="grid gap-3 md:grid-cols-2">
@@ -811,11 +811,11 @@ function TimeguardSection({ tg }: { tg: { enabled: boolean; start_hour: number; 
               const days = [...d.days];
               days[i] = !days[i];
               setD({ ...d, days });
-            }} className={`h-10 w-10 rounded-lg text-sm font-bold ${d.days[i] ? "bg-primary text-white" : "bg-slate-100 text-slate-500"}`}>{name}</button>
+            }} className={`h-10 w-10 rounded-tile text-sm font-bold ${d.days[i] ? "bg-primary text-white" : "bg-bg2 text-tx3"}`}>{name}</button>
           ))}
         </div>
         <div className="mt-4 flex justify-end">
-          <button type="button" onClick={() => api.setTimeguard(d)} className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">Speichern</button>
+          <button type="button" onClick={() => api.setTimeguard(d)} className="rounded-tile bg-primary px-4 py-2 text-sm font-bold text-white">Speichern</button>
         </div>
       </div>
     </>
@@ -894,20 +894,20 @@ function OtaSection({ fw }: { fw: string }) {
   };
 
   const tokenTone =
-    !ota?.token_configured ? "text-slate-500 bg-slate-100 border-slate-200"
-    : ota.token_ok === true ? "text-ok bg-ok/10 border-ok/20"
-    : ota.token_ok === false ? "text-danger bg-danger/10 border-danger/20"
-    : "text-warn bg-warn/10 border-warn/20";
+    !ota?.token_configured ? "text-tx3 bg-bg2 border-slate-200"
+    : ota.token_ok === true ? "text-ok bg-[var(--color-green-dim)] border-ok/20"
+    : ota.token_ok === false ? "text-danger bg-[var(--color-red-dim)] border-danger/20"
+    : "text-warn bg-[var(--color-amber-dim)] border-warn/20";
   const tokenLabel =
     !ota?.token_configured ? "Kein Token"
     : ota.token_ok === true ? "Token OK"
     : ota.token_ok === false ? "Token fehlerhaft"
     : "Token hinterlegt";
   const statusTone =
-    ota?.running || polling ? "border-primary/20 bg-primary/10 text-primary"
-    : ota?.exit_code && ota.exit_code !== 0 ? "border-danger/20 bg-danger/10 text-danger"
-    : ota?.update_available ? "border-ok/20 bg-ok/10 text-ok"
-    : "border-slate-200 bg-slate-100 text-slate-600";
+    ota?.running || polling ? "border-primary/20 bg-[var(--color-blue-dim)] text-primary"
+    : ota?.exit_code && ota.exit_code !== 0 ? "border-danger/20 bg-[var(--color-red-dim)] text-danger"
+    : ota?.update_available ? "border-ok/20 bg-[var(--color-green-dim)] text-ok"
+    : "border-slate-200 bg-bg2 text-tx2";
   const statusLabel =
     ota?.running || polling ? "Update-Aktion laeuft"
     : ota?.exit_code && ota.exit_code !== 0 ? "Letzte Aktion fehlerhaft"
@@ -935,12 +935,12 @@ function OtaSection({ fw }: { fw: string }) {
 
   return (
     <>
-      <div className="relative overflow-hidden rounded-lg border border-white/70 bg-gradient-to-br from-white/90 via-cyan-50/70 to-emerald-50/60 p-4 shadow-[0_18px_48px_rgba(15,23,42,0.12)] backdrop-blur">
+      <div className="relative overflow-hidden rounded-tile border border-border bg-gradient-to-br from-bg1 via-bg2 to-bg2 p-4 shadow-card ">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary via-cyan-400 to-ok" />
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <div className="text-sm font-bold text-slate-900">Online-Updates</div>
-            <div className="mt-1 max-w-xl text-xs leading-relaxed text-slate-500">
+            <div className="text-sm font-bold text-tx">Online-Updates</div>
+            <div className="mt-1 max-w-xl text-xs leading-relaxed text-tx3">
               Prueft GitHub Releases, installiert freigegebene Pakete und zeigt den Live-Log direkt hier an.
             </div>
           </div>
@@ -957,25 +957,25 @@ function OtaSection({ fw }: { fw: string }) {
 
         {ota?.update_available && (
           <motion.div
-            className="mt-3 rounded-lg border border-ok/20 bg-white/75 p-3 text-sm text-slate-700 shadow-sm backdrop-blur"
+            className="mt-3 rounded-tile border border-ok/20 bg-bg1 p-3 text-sm text-tx2 shadow-card "
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
           >
             <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-              <div className="font-semibold text-slate-900">Update {ota.latest_version} bereit</div>
-              {releaseDate && <div className="text-xs text-slate-500">Release: {releaseDate}</div>}
+              <div className="font-semibold text-tx">Update {ota.latest_version} bereit</div>
+              {releaseDate && <div className="text-xs text-tx3">Release: {releaseDate}</div>}
             </div>
           </motion.div>
         )}
 
-        <div className="mt-4 rounded-lg border border-white/70 bg-white/75 p-3 shadow-[0_12px_30px_rgba(15,23,42,0.08)] backdrop-blur">
+        <div className="mt-4 rounded-tile border border-border bg-bg1 p-3 shadow-card ">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div>
-              <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
+              <div className="flex items-center gap-2 text-sm font-bold text-tx">
                 <KeyRound className="h-4 w-4 text-primary" />
                 GitHub Token
               </div>
-              <div className="mt-1 text-xs leading-relaxed text-slate-500">
+              <div className="mt-1 text-xs leading-relaxed text-tx3">
                 Fuer private Repositories. Der Token wird lokal gespeichert, nicht zurueckgelesen und dauerhaft nie angezeigt.
               </div>
             </div>
@@ -991,12 +991,12 @@ function OtaSection({ fw }: { fw: string }) {
                 autoComplete="off"
                 placeholder={ota?.token_configured ? "Neuen Token eintragen zum Ersetzen" : "GitHub Fine-Grained Token"}
                 onChange={(e) => setTokenDraft(e.target.value)}
-                className="h-11 w-full rounded-lg border border-border bg-white/90 px-3 pr-11 text-sm font-semibold text-slate-900 outline-none ring-primary/20 focus:ring-4"
+                className="h-11 w-full rounded-tile border border-border bg-bg1 px-3 pr-11 text-sm font-semibold text-tx outline-none ring-primary/20 focus:ring-4"
               />
               <button
                 type="button"
                 onClick={() => setShowToken((v) => !v)}
-                className="absolute right-1 top-1 flex h-9 w-9 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100"
+                className="absolute right-1 top-1 flex h-9 w-9 items-center justify-center rounded-tile text-tx3 hover:bg-bg2"
                 aria-label={showToken ? "Token verbergen" : "Token anzeigen"}
               >
                 {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -1006,7 +1006,7 @@ function OtaSection({ fw }: { fw: string }) {
               type="button"
               onClick={saveToken}
               disabled={tokenBusy || tokenDraft.trim().length < 20}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-white shadow-[0_10px_22px_rgba(37,136,235,0.22)] disabled:opacity-40"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-tile bg-primary px-4 text-sm font-bold text-white shadow-card disabled:opacity-40"
             >
               <Check className="h-4 w-4" />
               Speichern & pruefen
@@ -1016,19 +1016,19 @@ function OtaSection({ fw }: { fw: string }) {
                 type="button"
                 onClick={deleteToken}
                 disabled={tokenBusy}
-                className="h-11 rounded-lg border border-danger/30 bg-white/70 px-4 text-sm font-bold text-danger disabled:opacity-40"
+                className="h-11 rounded-tile border border-danger/30 bg-bg1 px-4 text-sm font-bold text-danger disabled:opacity-40"
               >
                 Entfernen
               </button>
             )}
           </div>
           {(tokenMessage || ota?.token_message) && (
-            <div className="mt-2 text-xs text-slate-500">{tokenMessage || ota?.token_message}</div>
+            <div className="mt-2 text-xs text-tx3">{tokenMessage || ota?.token_message}</div>
           )}
         </div>
 
         {ota?.changelog && (
-          <div className="mt-3 rounded-lg border border-white/70 bg-white/75 p-3 text-sm text-slate-700 shadow-sm whitespace-pre-line backdrop-blur">
+          <div className="mt-3 rounded-tile border border-border bg-bg1 p-3 text-sm text-tx2 shadow-card whitespace-pre-line ">
             {ota.changelog}
           </div>
         )}
@@ -1038,7 +1038,7 @@ function OtaSection({ fw }: { fw: string }) {
             type="button"
             onClick={async () => { await api.otaCheck(); poll("check"); }}
             disabled={polling || ota?.running}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-border bg-white/75 px-4 text-sm font-bold text-slate-700 shadow-sm disabled:opacity-40"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-tile border border-border bg-bg1 px-4 text-sm font-bold text-tx2 shadow-card disabled:opacity-40"
           >
             <RefreshCw className={`h-4 w-4 ${updateAction === "check" ? "animate-spin" : ""}`} />
             Online pruefen
@@ -1047,7 +1047,7 @@ function OtaSection({ fw }: { fw: string }) {
             type="button"
             onClick={async () => { setRestartHint(false); await api.otaInstall(ota?.latest_version ?? undefined); poll("install"); }}
             disabled={polling || ota?.running || !ota?.update_available}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-white shadow-[0_12px_26px_rgba(37,136,235,0.25)] disabled:opacity-40"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-tile bg-primary px-4 text-sm font-bold text-white shadow-card disabled:opacity-40"
           >
             <Download className="h-4 w-4" />
             Installieren
@@ -1056,7 +1056,7 @@ function OtaSection({ fw }: { fw: string }) {
             type="button"
             onClick={async () => { await api.otaRollback(); poll("rollback"); }}
             disabled={polling || ota?.running}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-warn/40 bg-white/75 px-4 text-sm font-bold text-warn shadow-sm disabled:opacity-40"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-tile border border-warn/40 bg-bg1 px-4 text-sm font-bold text-warn shadow-card disabled:opacity-40"
           >
             <RotateCcw className="h-4 w-4" />
             Rollback
@@ -1065,15 +1065,15 @@ function OtaSection({ fw }: { fw: string }) {
 
         {(log.length > 0 || polling || ota?.running) && (
           <motion.div
-            className="mt-4 rounded-lg border border-white/70 bg-white/75 p-3 shadow-sm backdrop-blur"
+            className="mt-4 rounded-tile border border-border bg-bg1 p-3 shadow-card "
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
           >
-            <div className="mb-2 flex items-center justify-between gap-3 text-xs font-semibold text-slate-600">
+            <div className="mb-2 flex items-center justify-between gap-3 text-xs font-semibold text-tx2">
               <span>{phaseLabel}</span>
               <span>{progress}%</span>
             </div>
-            <div className="h-3 overflow-hidden rounded-full bg-slate-200">
+            <div className="h-3 overflow-hidden rounded-full bg-bg3">
               <motion.div
                 className={`h-full rounded-full ${ota?.exit_code && ota.exit_code !== 0 ? "bg-danger" : "bg-gradient-to-r from-primary to-ok"}`}
                 animate={{ width: `${progress}%` }}
@@ -1081,7 +1081,7 @@ function OtaSection({ fw }: { fw: string }) {
               />
             </div>
             {log.length > 0 && (
-              <pre ref={logRef} className="mt-3 max-h-56 overflow-y-auto rounded-lg bg-slate-950 p-3 text-xs leading-relaxed text-slate-200 shadow-inner">
+              <pre ref={logRef} className="mt-3 max-h-56 overflow-y-auto rounded-tile bg-slate-950 p-3 text-xs leading-relaxed text-slate-200 ">
                 {log.join("\n")}
               </pre>
             )}
@@ -1090,7 +1090,7 @@ function OtaSection({ fw }: { fw: string }) {
 
         {restartHint && (
           <motion.div
-            className="mt-3 rounded-lg border border-ok/20 bg-ok/10 p-3 text-sm text-slate-700"
+            className="mt-3 rounded-tile border border-ok/20 bg-[var(--color-green-dim)] p-3 text-sm text-tx2"
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
           >
@@ -1105,10 +1105,10 @@ function OtaSection({ fw }: { fw: string }) {
 function VacationSection({ enabled }: { enabled: boolean }) {
   return (
     <>
-      <div className="flex items-center justify-between rounded-lg border border-white/70 bg-gradient-to-br from-white/90 to-sky-50/70 p-4 shadow-[0_14px_36px_rgba(15,23,42,0.08)] backdrop-blur">
+      <div className="flex items-center justify-between rounded-tile border border-border bg-gradient-to-br from-bg1 to-bg2 p-4 shadow-card ">
         <div>
-          <div className="font-semibold text-slate-700">Pumpe gesperrt</div>
-          <div className="text-xs text-slate-500">Alle Bewasserungen pausiert.</div>
+          <div className="font-semibold text-tx2">Pumpe gesperrt</div>
+          <div className="text-xs text-tx3">Alle Bewasserungen pausiert.</div>
         </div>
         <Toggle checked={enabled} onChange={(v) => api.setVacation(v)} />
       </div>
@@ -1135,7 +1135,7 @@ function SystemInfo({ ip, fw, uptime, mqtt, rtu }: { ip: string; fw: string; upt
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <button type="button" onClick={(e) => { e.stopPropagation(); onChange(!checked); }} className={`relative h-7 w-12 rounded-full transition ${checked ? "bg-primary" : "bg-slate-300"}`}>
-      <span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition ${checked ? "left-6" : "left-1"}`} />
+      <span className={`absolute top-1 h-5 w-5 rounded-full bg-bg1 shadow transition ${checked ? "left-6" : "left-1"}`} />
     </button>
   );
 }
@@ -1149,7 +1149,7 @@ function NumField({ label, value, step, hint, onChange }: { label: string; value
 
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</span>
+      <span className="text-xs font-semibold uppercase tracking-wider text-tx3">{label}</span>
       <input
         type="number"
         value={text}
@@ -1171,9 +1171,9 @@ function NumField({ label, value, step, hint, onChange }: { label: string; value
             setText(String(Number.isFinite(value) ? value : 0));
           }
         }}
-        className="h-11 rounded-lg border border-border bg-white px-3 text-base font-semibold tabular-nums focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+        className="h-11 rounded-tile border border-border bg-bg1 px-3 text-base font-semibold tabular-nums focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
       />
-      {hint && <span className="text-[11px] leading-snug text-slate-500">{hint}</span>}
+      {hint && <span className="text-[11px] leading-snug text-tx3">{hint}</span>}
     </label>
   );
 }
@@ -1181,9 +1181,9 @@ function NumField({ label, value, step, hint, onChange }: { label: string; value
 function TextField({ label, value, disabled, hint, onChange }: { label: string; value: string; disabled?: boolean; hint?: string; onChange: (v: string) => void }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</span>
-      <input type="text" value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)} className="h-11 rounded-lg border border-border bg-white px-3 text-sm disabled:bg-slate-100" />
-      {hint && <span className="text-[11px] leading-snug text-slate-500">{hint}</span>}
+      <span className="text-xs font-semibold uppercase tracking-wider text-tx3">{label}</span>
+      <input type="text" value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)} className="h-11 rounded-tile border border-border bg-bg1 px-3 text-sm disabled:bg-bg2" />
+      {hint && <span className="text-[11px] leading-snug text-tx3">{hint}</span>}
     </label>
   );
 }
@@ -1191,18 +1191,18 @@ function TextField({ label, value, disabled, hint, onChange }: { label: string; 
 function Select({ label, value, options, optionLabels, hint, onChange }: { label: string; value: string; options: string[]; optionLabels?: Record<string, string>; hint?: string; onChange: (v: string) => void }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</span>
-      <select value={value} onChange={(e) => onChange(e.target.value)} className="h-11 rounded-lg border border-border bg-white px-3 text-sm font-semibold">
+      <span className="text-xs font-semibold uppercase tracking-wider text-tx3">{label}</span>
+      <select value={value} onChange={(e) => onChange(e.target.value)} className="h-11 rounded-tile border border-border bg-bg1 px-3 text-sm font-semibold">
         {options.map((o) => <option key={o} value={o}>{optionLabels?.[o] ?? o}</option>)}
       </select>
-      {hint && <span className="text-[11px] leading-snug text-slate-500">{hint}</span>}
+      {hint && <span className="text-[11px] leading-snug text-tx3">{hint}</span>}
     </label>
   );
 }
 
 function HelpText({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mt-3 rounded-lg border border-primary/15 bg-primary/5 p-3 text-xs leading-relaxed text-slate-600">
+    <div className="mt-3 rounded-tile border border-primary/15 bg-[var(--color-blue-dim)] p-3 text-xs leading-relaxed text-tx2">
       {children}
     </div>
   );
@@ -1211,20 +1211,20 @@ function HelpText({ children }: { children: React.ReactNode }) {
 function TimeField({ label, h, m, onChange }: { label: string; h: number; m: number; onChange: (h: number, m: number) => void }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</span>
+      <span className="text-xs font-semibold uppercase tracking-wider text-tx3">{label}</span>
       <input type="time" value={`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`} onChange={(e) => {
         const [hh, mm] = e.target.value.split(":").map(Number);
         onChange(hh, mm);
-      }} className="h-11 rounded-lg border border-border bg-white px-3 text-base font-semibold tabular-nums" />
+      }} className="h-11 rounded-tile border border-border bg-bg1 px-3 text-base font-semibold tabular-nums" />
     </label>
   );
 }
 
 function Info({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-white/70 bg-white/80 p-3 shadow-sm backdrop-blur">
-      <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</div>
-      <div className="truncate text-sm font-medium text-slate-700">{value}</div>
+    <div className="rounded-tile border border-border bg-bg1 p-3 shadow-card ">
+      <div className="text-xs font-semibold uppercase tracking-wider text-tx3">{label}</div>
+      <div className="truncate text-sm font-medium text-tx2">{value}</div>
     </div>
   );
 }
@@ -1232,3 +1232,4 @@ function Info({ label, value }: { label: string; value: string }) {
 function timeLabel(p: IrrigationProgram) {
   return `${String(p.start_hour).padStart(2, "0")}:${String(p.start_min).padStart(2, "0")}`;
 }
+

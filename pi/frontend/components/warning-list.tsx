@@ -7,11 +7,11 @@ import type { Warning } from "@/lib/types";
 export function WarningList({ warnings }: { warnings: Warning[] }) {
   if (warnings.length === 0) {
     return (
-      <div className="flex items-center gap-3 rounded-lg border border-border bg-white p-4 shadow-sm">
+      <div className="flex items-center gap-3 rounded-card border border-border bg-bg1 p-4 shadow-card">
         <CheckCircle2 className="h-5 w-5 text-ok" />
         <div>
-          <div className="text-sm font-medium text-slate-900">Keine Warnungen</div>
-          <div className="text-xs text-slate-500">System läuft normal.</div>
+          <div className="text-sm font-medium text-tx">Keine Warnungen</div>
+          <div className="text-xs text-tx3">System läuft normal.</div>
         </div>
       </div>
     );
@@ -23,13 +23,13 @@ export function WarningList({ warnings }: { warnings: Warning[] }) {
         const Icon = w.level === "danger" ? AlertCircle : AlertTriangle;
         const tone =
           w.level === "danger"
-            ? "border-danger/30 bg-danger/5 text-danger"
-            : "border-warn/30 bg-warn/5 text-warn";
+            ? "border-[var(--color-red)]/30 bg-[var(--color-red-dim)] text-danger"
+            : "border-[var(--color-amber)]/30 bg-[var(--color-amber-dim)] text-warn";
         return (
           <li
             key={w.id}
             className={cn(
-              "flex items-center gap-3 rounded-lg border p-3 shadow-sm animate-fade-in",
+              "flex items-center gap-3 rounded-card border p-3 shadow-card animate-fade-in",
               tone
             )}
           >
@@ -41,3 +41,4 @@ export function WarningList({ warnings }: { warnings: Warning[] }) {
     </ul>
   );
 }
+

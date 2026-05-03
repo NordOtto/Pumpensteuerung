@@ -36,6 +36,8 @@ async def get_status() -> dict:
 @router.post("/v20/start")
 async def v20_start():
     start_hz = app_state.v20.freq_setpoint or app_state.pi.freq_min
+    if app_state.ctrl_mode in (2, 3) and app_state.preset_setpoint_hz > 0:
+        start_hz = app_state.preset_setpoint_hz
     await deps.rtu.set_frequency(start_hz)
     await deps.rtu.start()
     return {"ok": True}

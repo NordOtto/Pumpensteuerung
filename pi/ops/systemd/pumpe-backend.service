@@ -17,11 +17,11 @@ RestartSec=3
 AmbientCapabilities=CAP_NET_BIND_SERVICE
 
 # Hardening (zerlegt nichts, falls Backend mal Amok läuft)
-NoNewPrivileges=true
+NoNewPrivileges=false
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
-ReadWritePaths=/var/lib/pumpe /opt/pumpe/ota
+ReadWritePaths=/var/lib/pumpe /opt/pumpe
 
 # RTU braucht Zugriff auf /dev/ttyAMA0 oder /dev/ttyUSB0 (User pumpe muss in dialout sein)
 SupplementaryGroups=dialout

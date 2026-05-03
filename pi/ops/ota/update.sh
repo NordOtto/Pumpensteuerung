@@ -125,8 +125,8 @@ download_release() {
 
     log "Installiere venv-Dependencies"
     python3 -m venv "${target}/backend/.venv"
-    "${target}/backend/.venv/bin/pip" install --upgrade pip --quiet
-    "${target}/backend/.venv/bin/pip" install -r "${target}/backend/requirements.txt" --quiet
+    "${target}/backend/.venv/bin/pip" install --no-cache-dir --upgrade pip --quiet
+    "${target}/backend/.venv/bin/pip" install --no-cache-dir -r "${target}/backend/requirements.txt" --quiet
 
     if [[ -L "$CURRENT_LINK" ]]; then
         cp -n "${CURRENT_LINK}/backend/.env" "${target}/backend/.env" 2>/dev/null || true

@@ -1,17 +1,10 @@
 "use client";
 
-import { Activity, Droplet, Gauge, Radio, Sprout, Wifi, WifiOff } from "lucide-react";
-import type React from "react";
+import { Droplet, Gauge, Activity, Zap, Wifi, WifiOff } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useStatus } from "@/lib/ws";
-import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-
-const MODE_STYLES: Record<string, string> = {
-  AUTO: "ok",
-  MANUELL: "blue",
-  FEHLER: "danger",
-};
+import { cn } from "@/lib/utils";
 
 function useClock() {
   const [time, setTime] = useState("--:--");
@@ -21,7 +14,7 @@ function useClock() {
       setTime(`${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`);
     };
     tick();
-    const id = setInterval(tick, 30_000);
+    const id = setInterval(tick, 10_000);
     return () => clearInterval(id);
   }, []);
   return time;
@@ -32,34 +25,42 @@ export function TopBar() {
   const time = useClock();
 
   return (
-    <header className="fixed inset-x-0 top-0 z-50 border-b border-border bg-bg1 shadow-card">
-      <div className="mx-auto flex min-h-16 max-w-7xl flex-wrap items-center justify-between gap-2 px-3 py-2 md:px-5 lg:pl-28 lg:pr-8">
-        <div className="flex items-center gap-2.5 text-primary">
-          <div className="flex h-10 w-10 items-center justify-center rounded-tile border border-border bg-bg2 text-primary">
-            <Droplet className="h-5 w-5" />
+    <header className="fixed inset-x-0 top-0 z-50 border-b border-border bg-bg1">
+      <div className="mx-auto flex h-14 max-w-7xl items-center gap-3 px-4 md:px-5 lg:pl-28 lg:pr-8">
+
+        {/* Logo */}
+        <div className="flex items-center gap-2 mr-1">
+          <div className="flex h-8 w-8 items-center justify-center rounded-tile border border-[var(--color-green)]/20 bg-[var(--color-green-dim)] text-ok">
+            <Droplet className="h-4 w-4" />
           </div>
           <div>
-            <span className="block text-sm font-bold uppercase tracking-tight text-tx">Pumpensteuerung</span>
-            <span className="hidden text-[11px] font-semibold uppercase tracking-wider text-tx3 sm:block">Brunnenpumpe + Bewaesserung</span>
+            <div className="text-xs font-bold uppercase tracking-[0.08em] text-tx leading-tight">Pumpensteuerung</div>
+            <div className="hidden text-[9px] uppercase tracking-[0.1em] text-tx3 sm:block">Brunnenpumpe + Bewässerung</div>
           </div>
         </div>
+
+        {/* Live metrics strip */}
         {status && (
-          <div className="hidden items-center gap-1.5 md:flex">
-            <Metric icon={<Gauge className="h-3.5 w-3.5" />} label="bar" value={status.pressure_bar.toFixed(2)} />
-            <Metric icon={<Activity className="h-3.5 w-3.5" />} label="L/min" value={status.flow_rate.toFixed(1)} />
-            <Metric icon={<Sprout className="h-3.5 w-3.5" />} label="ET" value={status.irrigation.weather.et0_mm?.toFixed(1) ?? "--"} />
+          <div className="hidden flex-1 items-center gap-1 md:flex overflow-hidden">
+            <LiveMetric icon={<Gauge className="h-4 w-4" />} value={status.pressure_bar.toFixed(2)} unit="bar" colorClass="text-primary" />
+            <div className="h-5 w-px bg-border" />
+            <LiveMetric icon={<Activity className="h-4 w-4" />} value={status.flow_rate.toFixed(1)} unit="L/min" colorClass="text-ok" />
+            <div className="h-5 w-px bg-border" />
+            <LiveMetric icon={<Zap className="h-4 w-4" />} value={status.v20.frequency.toFixed(1)} unit="Hz" colorClass="text-warn" />
           </div>
         )}
-        <div className="flex items-center gap-3">
-          <Badge tone={MODE_STYLES[mode] as "ok" | "blue" | "danger"}>{mode}</Badge>
-          <span className="num text-sm font-medium text-tx2">{time}</span>
+
+        {/* Right side */}
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          <Badge tone={status?.v20.running ? "ok" : "muted"} pulse={status?.v20.running}>
+            {status?.v20.running ? "PUMPE AN" : "PUMPE AUS"}
+          </Badge>
+          <Badge tone="blue">AUTO</Badge>
+          <span className="num text-sm font-semibold text-tx2">{time}</span>
           <div className="flex items-center gap-1.5 text-tx3">
-            {connected ? (
-              <Wifi className="h-4 w-4 text-ok" />
-            ) : (
-              <WifiOff className="h-4 w-4 text-danger" />
-            )}
-            <Radio className={cn("h-4 w-4", status?.sys.mqtt ? "text-ok" : "text-warn")} />
+            {connected
+              ? <Wifi className="h-4 w-4 text-ok" />
+              : <WifiOff className="h-4 w-4 text-danger" />}
           </div>
         </div>
       </div>
@@ -67,14 +68,14 @@ export function TopBar() {
   );
 }
 
-function Metric({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+function LiveMetric({ icon, value, unit, colorClass }: {
+  icon: React.ReactNode; value: string; unit: string; colorClass: string;
+}) {
   return (
-    <div className="flex min-w-[70px] items-center gap-2 rounded-tile border border-border bg-bg2 px-2.5 py-1.5">
-      <span className="text-primary">{icon}</span>
-      <span>
-        <span className="block text-[9px] font-bold uppercase tracking-[0.1em] text-tx3">{label}</span>
-        <span className="num block text-[13px] font-semibold text-tx">{value}</span>
-      </span>
+    <div className="flex items-center gap-1.5 px-2 py-1">
+      <span className={cn("opacity-80", colorClass)}>{icon}</span>
+      <span className={cn("num text-sm font-bold", colorClass)}>{value}</span>
+      <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-tx3">{unit}</span>
     </div>
   );
 }

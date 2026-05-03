@@ -1,1235 +1,369 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { Check, ChevronLeft, ChevronRight, Download, Droplets, Eye, EyeOff, Gauge, KeyRound, RefreshCw, RotateCcw, Ruler, Sparkles, SunMedium } from "lucide-react";
-import type React from "react";
-import { SortablePanels } from "@/components/sortable-panels";
+import { useCallback, useEffect, useState } from "react";
+import { RefreshCw, RotateCcw } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { useStatus } from "@/lib/ws";
 import { api } from "@/lib/api";
-import type { IrrigationProgram, IrrigationZone, OtaStatus, Preset } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import type { IrrigationProgram, OtaStatus, Preset } from "@/lib/types";
 
 const DAY_NAMES = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
-const PLANTS = ["Rasen", "Hecke", "Beet", "Tropfschlauch"];
-const SOILS = ["sandig", "lehmig", "schwer"];
-const SUN = ["schattig", "halbsonnig", "vollsonnig"];
-const GUIDE_STEPS = ["Nutzung", "Standort", "Messung", "Empfehlung"];
-
-type SmartEtWizard = {
-  plant_type: string;
-  soil_type: string;
-  sun_exposure: string;
-  measured_mm: number;
-  test_minutes: number;
-  max_runs_per_week: number;
-  preset: string;
-};
-
-type SmartEtRecommendation = Awaited<ReturnType<typeof api.recommendSmartEt>>;
+const SECTIONS = [
+  { id: "programs",  label: "Programme" },
+  { id: "presets",   label: "Presets" },
+  { id: "pi",        label: "PI-Regler" },
+  { id: "timeguard", label: "Zeitfenster" },
+  { id: "system",    label: "System" },
+] as const;
+type SectionId = typeof SECTIONS[number]["id"];
 
 export default function SettingsPage() {
   const { status } = useStatus();
+  const [active, setActive] = useState<SectionId>("programs");
   const [presetData, setPresetData] = useState<{ active: string; presets: Preset[] } | null>(null);
-  const loadPresets = useCallback(() => {
-    api.fetchPresets().then(setPresetData).catch(() => {});
-  }, []);
-
+  const loadPresets = useCallback(() => { api.fetchPresets().then(setPresetData).catch(() => {}); }, []);
   useEffect(() => { loadPresets(); }, [loadPresets]);
 
   if (!status) return <div className="flex h-64 items-center justify-center text-tx3">Lade...</div>;
 
   return (
-    <div className="flex flex-col gap-6 animate-fade-in">
-      <SortablePanels
-        storageKey="pumpe.settings.sections"
-        defaultOrder={["programs", "presets", "pi", "timeguard", "ota", "vacation", "system"]}
-        titles={{
-          programs: "Bewasserungs-Programme",
-          presets: "Pumpen-Presets",
-          pi: "PI-Druckregelung",
-          timeguard: "Zeitfenster",
-          ota: "System-Update",
-          vacation: "Urlaubsmodus",
-          system: "System",
-        }}
-      >
-        {{
-          programs: <ProgramsSection programs={status.irrigation.programs as IrrigationProgram[]} presets={presetData?.presets ?? []} />,
-          presets: <PresetsSection active={status.active_preset} data={presetData} onReload={loadPresets} />,
-          pi: (
-            <PiSection
-              setpoint={status.pi.setpoint}
-              pOn={status.pi.p_on}
-              pOff={status.pi.p_off}
-              kp={status.pi.kp}
-              ki={status.pi.ki}
-              freqMin={status.pi.freq_min}
-              freqMax={status.pi.freq_max}
-              enabled={status.pi.enabled}
-              spike={status.pi.spike_enabled}
-            />
-          ),
-          timeguard: <TimeguardSection tg={status.timeguard} />,
-          ota: <OtaSection fw={status.sys.fw} />,
-          vacation: <VacationSection enabled={status.vacation.enabled} />,
-          system: (
-            <SystemInfo
-              ip={status.sys.ip}
-              fw={status.sys.fw}
-              uptime={status.sys.uptime}
-              mqtt={status.sys.mqtt}
-              rtu={status.sys.rtu_connected}
-            />
-          ),
-        }}
-      </SortablePanels>
-    </div>
-  );
-}
-
-const EMPTY_ZONE: IrrigationZone = {
-  id: "",
-  name: "",
-  enabled: true,
-  duration_min: 20,
-  water_mm: 10,
-  min_deficit_mm: 8,
-  deficit_mm: 0,
-  target_mm: 15,
-  cycle_min: 0,
-  soak_min: 0,
-  preset: "Normal",
-  plant_type: "Rasen",
-};
-
-const EMPTY_PROGRAM: IrrigationProgram = {
-  id: "",
-  name: "",
-  enabled: true,
-  mode: "smart_et",
-  days: [true, true, true, true, true, false, false],
-  start_hour: 7,
-  start_min: 0,
-  seasonal_factor: 1,
-  weather_enabled: true,
-  max_runs_per_week: 3,
-  min_runtime_factor: 0.25,
-  max_runtime_factor: 1.5,
-  thresholds: {
-    skip_rain_mm: 6,
-    reduce_rain_mm: 2,
-    wind_max_kmh: 35,
-    soil_moisture_skip_pct: 70,
-    et0_default_mm: 3,
-  },
-  zones: [],
-  last_run_at: null,
-  last_skip_reason: "",
-};
-
-function clonePrograms(programs: IrrigationProgram[]) {
-  return programs.map((p) => ({
-    ...EMPTY_PROGRAM,
-    ...p,
-    days: [...(p.days ?? EMPTY_PROGRAM.days)],
-    thresholds: {
-      skip_rain_mm: p.thresholds?.skip_rain_mm ?? EMPTY_PROGRAM.thresholds!.skip_rain_mm,
-      reduce_rain_mm: p.thresholds?.reduce_rain_mm ?? EMPTY_PROGRAM.thresholds!.reduce_rain_mm,
-      wind_max_kmh: p.thresholds?.wind_max_kmh ?? EMPTY_PROGRAM.thresholds!.wind_max_kmh,
-      soil_moisture_skip_pct: p.thresholds?.soil_moisture_skip_pct ?? EMPTY_PROGRAM.thresholds!.soil_moisture_skip_pct,
-      et0_default_mm: p.thresholds?.et0_default_mm ?? EMPTY_PROGRAM.thresholds!.et0_default_mm,
-    },
-    zones: p.zones.map((z) => ({ ...EMPTY_ZONE, ...z })),
-  })) as IrrigationProgram[];
-}
-
-function ProgramsSection({ programs, presets }: { programs: IrrigationProgram[]; presets: Preset[] }) {
-  const [draft, setDraft] = useState<IrrigationProgram[]>(() => clonePrograms(programs));
-  const [dirty, setDirty] = useState(false);
-  const [openIdx, setOpenIdx] = useState(0);
-  const [editingZone, setEditingZone] = useState<{ pIdx: number; zIdx: number | null; z: IrrigationZone } | null>(null);
-  const [wizard, setWizard] = useState<SmartEtWizard>({
-    plant_type: "Rasen",
-    soil_type: "lehmig",
-    sun_exposure: "vollsonnig",
-    measured_mm: 5,
-    test_minutes: 10,
-    max_runs_per_week: 3,
-    preset: "Rasen",
-  });
-  const [wizardStep, setWizardStep] = useState(0);
-  const [wizardRec, setWizardRec] = useState<SmartEtRecommendation | null>(null);
-  const [wizardSummary, setWizardSummary] = useState("");
-  const [wizardBusy, setWizardBusy] = useState(false);
-  const [err, setErr] = useState("");
-
-  useEffect(() => {
-    if (!dirty) setDraft(clonePrograms(programs));
-  }, [programs, dirty]);
-
-  const updateProg = (i: number, patch: Partial<IrrigationProgram>) => {
-    setDirty(true);
-    setDraft((d) => d.map((p, idx) => (idx === i ? { ...p, ...patch } : p)));
-  };
-
-  const savePrograms = async () => {
-    setErr("");
-    try {
-      await api.savePrograms(draft);
-      setDirty(false);
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : "Speichern fehlgeschlagen");
-    }
-  };
-
-  const calculateWizard = async () => {
-    setErr("");
-    setWizardBusy(true);
-    try {
-      const rec = await api.recommendSmartEt(wizard);
-      setWizardRec(rec);
-      setWizardSummary(rec.summary);
-      setWizardStep(3);
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : "Empfehlung fehlgeschlagen");
-    } finally {
-      setWizardBusy(false);
-    }
-  };
-
-  const applyWizard = async () => {
-    const pIdx = openIdx;
-    const program = draft[pIdx];
-    if (!program) return;
-    const zone = program.zones[0] ?? { ...EMPTY_ZONE, id: `zone_${Date.now()}`, name: "Zone 1" };
-    const rec = wizardRec ?? await api.recommendSmartEt(wizard);
-    setWizardRec(rec);
-    setWizardSummary(rec.summary);
-    setDirty(true);
-    setDraft((d) => d.map((p, idx) => {
-      if (idx !== pIdx) return p;
-      const nextZone = { ...zone, ...rec.zone_patch, enabled: true };
-      return {
-        ...p,
-        ...rec.program_patch,
-        zones: p.zones.length ? [nextZone, ...p.zones.slice(1)] : [nextZone],
-      } as IrrigationProgram;
-    }));
-  };
-
-  const saveZone = () => {
-    if (!editingZone) return;
-    const { pIdx, zIdx, z } = editingZone;
-    const id = z.id || `zone_${Date.now()}`;
-    setDirty(true);
-    setDraft((d) => d.map((p, i) => {
-      if (i !== pIdx) return p;
-      const zones = zIdx === null
-        ? [...p.zones, { ...z, id }]
-        : p.zones.map((item, j) => (j === zIdx ? { ...z, id: item.id || id } : item));
-      return { ...p, zones };
-    }));
-    setEditingZone(null);
-  };
-
-  const addProgram = () => {
-    setDirty(true);
-    setDraft((d) => {
-      const next = { ...EMPTY_PROGRAM, id: `prog_${Date.now()}`, name: `Programm ${d.length + 1}` };
-      setOpenIdx(d.length);
-      return [...d, next];
-    });
-  };
-
-  const presetNames = presets.map((p) => p.name);
-  const activeProgram = draft[openIdx];
-
-  return (
-    <>
-      <div className="grid gap-4 lg:grid-cols-[360px_1fr]">
-        <SmartEtGuide
-          programName={activeProgram?.name || "offenes Programm"}
-          step={wizardStep}
-          value={wizard}
-          presets={presetNames}
-          recommendation={wizardRec}
-          summary={wizardSummary}
-          busy={wizardBusy}
-          onStep={setWizardStep}
-          onChange={(next) => {
-            setWizard(next);
-            setWizardRec(null);
-            setWizardSummary("");
-          }}
-          onCalculate={calculateWizard}
-          onApply={applyWizard}
-        />
-
-        <div className="flex flex-col gap-3">
-          {draft.map((p, i) => {
-            const isOpen = openIdx === i;
-            const maxDeficit = Math.max(0, ...p.zones.map((z) => z.deficit_mm ?? 0));
-            return (
-              <motion.div
-                key={p.id || i}
-                className="overflow-hidden rounded-tile border border-border bg-bg1 shadow-card "
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.03, duration: 0.22 }}
-              >
-                <button type="button" onClick={() => setOpenIdx(isOpen ? -1 : i)} className="flex w-full items-center gap-3 px-4 py-3 text-left">
-                  <Toggle checked={p.enabled} onChange={(v) => updateProg(i, { enabled: v })} />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate font-semibold text-tx">{p.name || "Unbenannt"}</div>
-                    <div className="text-xs text-tx3">
-                      {p.mode === "smart_et" ? "Smart ET" : "Fest"} | {timeLabel(p)} | {p.zones.length} Zone(n) | Defizit {maxDeficit.toFixed(1)} mm
-                    </div>
-                  </div>
-                  <span className="rounded bg-bg2 px-2 py-1 text-xs font-semibold text-tx2">
-                    {p.last_skip_reason || "bereit"}
-                  </span>
-                </button>
-
-                {isOpen && (
-                  <motion.div
-                    className="border-t border-border bg-gradient-to-br from-bg2 to-bg2 p-4"
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <div className="grid gap-3 md:grid-cols-3">
-                      <TextField label="Name" value={p.name} onChange={(v) => updateProg(i, { name: v })} />
-                      <Select label="Modus" value={p.mode} options={["smart_et", "fixed"]} onChange={(v) => updateProg(i, { mode: v as "smart_et" | "fixed" })} />
-                      <TimeField label="Startfenster" h={p.start_hour} m={p.start_min} onChange={(h, m) => updateProg(i, { start_hour: h, start_min: m })} />
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {DAY_NAMES.map((name, d) => (
-                        <button
-                          key={name}
-                          type="button"
-                          onClick={() => {
-                            const days = [...p.days];
-                            days[d] = !days[d];
-                            updateProg(i, { days });
-                          }}
-                          className={`h-10 w-10 rounded-tile text-sm font-bold ${p.days[d] ? "bg-primary text-white" : "bg-bg2 text-tx3"}`}
-                        >
-                          {name}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="mt-4 grid gap-3 md:grid-cols-4">
-                      <NumField label="Saisonfaktor" value={p.seasonal_factor} step={0.05} hint="Multipliziert ET0: 1.0 normal, >1 mehr Wasser, <1 weniger. Der Guide berechnet ihn aus Pflanze und Sonne." onChange={(v) => updateProg(i, { seasonal_factor: v })} />
-                      <NumField label="Max/Woche" value={p.max_runs_per_week} step={1} onChange={(v) => updateProg(i, { max_runs_per_week: v })} />
-                      <NumField label="Wind max km/h" value={p.thresholds?.wind_max_kmh ?? 35} step={1} onChange={(v) => updateProg(i, { thresholds: { ...p.thresholds!, wind_max_kmh: v } })} />
-                      <NumField label="Regen Skip mm" value={p.thresholds?.skip_rain_mm ?? 6} step={0.5} onChange={(v) => updateProg(i, { thresholds: { ...p.thresholds!, skip_rain_mm: v } })} />
-                    </div>
-
-                    <div className="mt-4 grid gap-3 md:grid-cols-2">
-                      {p.zones.map((z, j) => <ZoneRow key={z.id || j} zone={z} onEdit={() => setEditingZone({ pIdx: i, zIdx: j, z: { ...z } })} onDelete={() => updateProg(i, { zones: p.zones.filter((_, idx) => idx !== j) })} />)}
-                      <button type="button" onClick={() => setEditingZone({ pIdx: i, zIdx: null, z: { ...EMPTY_ZONE } })} className="rounded-tile border border-dashed border-primary p-4 text-sm font-bold text-primary">
-                        + Zone hinzufugen
-                      </button>
-                    </div>
-                  </motion.div>
-                )}
-              </motion.div>
-            );
-          })}
-
-          {editingZone && (
-            <ZoneEditor
-              value={editingZone.z}
-              presets={presetNames}
-              onChange={(z) => setEditingZone({ ...editingZone, z })}
-              onCancel={() => setEditingZone(null)}
-              onSave={saveZone}
-            />
-          )}
-
-          {err && <div className="rounded-tile border border-danger/30 bg-[var(--color-red-dim)] p-3 text-sm text-danger">{err}</div>}
-          <div className="flex flex-wrap gap-3">
-            <button type="button" onClick={addProgram} className="rounded-tile border border-dashed border-primary px-4 py-2 text-sm font-bold text-primary">+ Neues Programm</button>
-            <button type="button" onClick={savePrograms} className="rounded-tile bg-primary px-5 py-2 text-sm font-bold text-white">Alle Programme speichern</button>
-          </div>
-        </div>
-      </div>
-    </>
-  );
-}
-
-function SmartEtGuide({
-  programName,
-  step,
-  value,
-  presets,
-  recommendation,
-  summary,
-  busy,
-  onStep,
-  onChange,
-  onCalculate,
-  onApply,
-}: {
-  programName: string;
-  step: number;
-  value: SmartEtWizard;
-  presets: string[];
-  recommendation: SmartEtRecommendation | null;
-  summary: string;
-  busy: boolean;
-  onStep: (step: number) => void;
-  onChange: (value: SmartEtWizard) => void;
-  onCalculate: () => void;
-  onApply: () => void;
-}) {
-  const nextStep = Math.min(step + 1, GUIDE_STEPS.length - 1);
-  const prevStep = Math.max(step - 1, 0);
-
-  return (
-    <motion.aside
-      className="overflow-hidden rounded-tile border border-border bg-gradient-to-br from-bg1 via-bg1 to-bg2 p-4 shadow-card "
-      initial={{ opacity: 0, x: -14 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.28, ease: "easeOut" }}
-    >
-      <div className="mb-4 flex items-start gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-tile bg-[var(--color-blue-dim)] text-primary ">
-          <Sparkles className="h-5 w-5" />
-        </div>
-        <div className="min-w-0">
-          <div className="text-xs font-bold uppercase tracking-widest text-primary">Smart-ET Guide</div>
-          <div className="mt-1 text-sm text-tx2">
-            Fuehrt die Empfehlung fuer <span className="font-semibold text-tx">{programName}</span>.
-          </div>
-        </div>
-      </div>
-
-      <div className="mb-4 grid grid-cols-4 gap-2">
-        {GUIDE_STEPS.map((label, index) => (
-          <button
-            key={label}
-            type="button"
-            onClick={() => onStep(index)}
-            className={`h-2 rounded-full transition ${index <= step ? "bg-primary shadow-card" : "bg-bg3"}`}
-            aria-label={label}
-          />
+    <div className="flex flex-col gap-2.5">
+      {/* Section tabs */}
+      <div className="flex gap-1 overflow-x-auto pb-0.5">
+        {SECTIONS.map((s) => (
+          <button key={s.id} type="button" onClick={() => setActive(s.id)}
+            className={cn(
+              "shrink-0 rounded-tile border px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.06em] transition",
+              active === s.id
+                ? "border-[var(--color-blue)]/35 bg-[var(--color-blue-dim)] text-primary"
+                : "border-border bg-bg2 text-tx2 hover:text-tx"
+            )}>
+            {s.label}
+          </button>
         ))}
       </div>
 
-      <div className="min-h-[250px]">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={step}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2 }}
-            className="rounded-tile border border-border bg-bg1 p-3 shadow-card"
-          >
-            {step === 0 && (
-              <GuideStep icon={<Droplets className="h-4 w-4" />} title="Nutzung festlegen">
-                <div className="grid gap-3">
-                  <Select label="Nutzung" value={value.plant_type} options={PLANTS} onChange={(v) => onChange({ ...value, plant_type: v })} />
-                  <Select label="Preset" value={value.preset} options={[...presets, "Benutzerdefiniert"]} onChange={(v) => onChange({ ...value, preset: v })} />
-                </div>
-              </GuideStep>
-            )}
+      {active === "programs"  && <ProgramsSettings programs={status.irrigation.programs} presets={presetData?.presets ?? []} />}
+      {active === "presets"   && <PresetsSettings active={status.active_preset} data={presetData} onReload={loadPresets} />}
+      {active === "pi"        && <PiSettings pi={status.pi} />}
+      {active === "timeguard" && <TimeguardSettings tg={status.timeguard} />}
+      {active === "system"    && <SystemSettings sys={status.sys} />}
+    </div>
+  );
+}
 
-            {step === 1 && (
-              <GuideStep icon={<SunMedium className="h-4 w-4" />} title="Standort einordnen">
-                <div className="grid gap-3">
-                  <Select label="Boden" value={value.soil_type} options={SOILS} onChange={(v) => onChange({ ...value, soil_type: v })} />
-                  <Select label="Sonne" value={value.sun_exposure} options={SUN} onChange={(v) => onChange({ ...value, sun_exposure: v })} />
-                </div>
-              </GuideStep>
-            )}
+// ── Programme ────────────────────────────────────────────────────────────────
+function ProgramsSettings({ programs, presets }: { programs: IrrigationProgram[]; presets: Preset[] }) {
+  const [openIdx, setOpenIdx] = useState(0);
+  const presetNames = presets.map((p) => p.name);
 
-            {step === 2 && (
-              <GuideStep icon={<Ruler className="h-4 w-4" />} title="Testlauf messen">
-                <div className="grid gap-3">
-                  <NumField label="Gemessene Regenhoehe mm" value={value.measured_mm} step={0.5} hint="Wasserhoehe im Regenmesser nach dem Testlauf. 1 mm entspricht 1 Liter pro m²." onChange={(v) => onChange({ ...value, measured_mm: v })} />
-                  <NumField label="Testdauer min" value={value.test_minutes} step={1} hint="So lange laeuft die Zone fuer die Messung, z. B. 10 Minuten." onChange={(v) => onChange({ ...value, test_minutes: v })} />
-                  <NumField label="Max/Woche" value={value.max_runs_per_week} step={1} onChange={(v) => onChange({ ...value, max_runs_per_week: v })} />
-                </div>
-              </GuideStep>
-            )}
+  return (
+    <div className="flex flex-col gap-2">
+      {programs.map((p, i) => (
+        <div key={p.id} className="overflow-hidden rounded-card border border-border bg-bg1">
+          <button type="button" onClick={() => setOpenIdx(openIdx === i ? -1 : i)}
+            className="flex w-full items-center gap-3 px-4 py-3 text-left">
+            <Toggle checked={p.enabled} onChange={() => {}} />
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-semibold text-tx">{p.name}</div>
+              <div className="mt-0.5 text-[10px] text-tx3">
+                {p.mode === "smart_et" ? "Smart ET" : "Fest"} · Start {String(p.start_hour).padStart(2, "0")}:{String(p.start_min).padStart(2, "0")} · {p.zones.length} Zone(n)
+              </div>
+            </div>
+            <Badge tone={p.last_skip_reason ? "warn" : "ok"}>{p.last_skip_reason || "bereit"}</Badge>
+          </button>
 
-            {step === 3 && (
-              <GuideStep icon={<Gauge className="h-4 w-4" />} title="Empfehlung pruefen">
-                <div className="rounded-tile border border-primary/15 bg-gradient-to-br from-primary/10 to-ok/10 p-3 text-sm text-tx2">
-                  {summary || "Berechne eine Empfehlung aus Nutzung, Standort und Testlauf."}
-                </div>
-                {recommendation && (
-                  <div className="mt-3 grid grid-cols-2 gap-2">
-                    <GuideMetric label="Wasser" value={`${formatMaybe(recommendation.zone_patch.water_mm)} mm`} />
-                    <GuideMetric label="Laufzeit" value={`${recommendation.zone_patch.duration_min ?? "--"} min`} />
-                    <GuideMetric label="Start ab" value={`${formatMaybe(recommendation.zone_patch.min_deficit_mm)} mm`} />
-                    <GuideMetric label="Rate" value={`${recommendation.precip_mm_h.toFixed(1)} mm/h`} />
-                    <GuideMetric label="Sickerphase" value={recommendation.zone_patch.cycle_min ? `${recommendation.zone_patch.cycle_min} / ${recommendation.zone_patch.soak_min} min` : "aus"} />
+          {openIdx === i && (
+            <div className="border-t border-border p-4">
+              <div className="mb-3 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                <SettingField label="Name" value={p.name} />
+                <SettingField label="Modus" value={p.mode === "smart_et" ? "Smart ET" : "Fest"} />
+                <SettingField label="Start" value={`${String(p.start_hour).padStart(2, "0")}:${String(p.start_min).padStart(2, "0")}`} />
+                <SettingField label="Max/Woche" value={String(p.max_runs_per_week)} />
+              </div>
+
+              <div className="mb-3 text-[10px] font-bold uppercase tracking-[0.08em] text-tx3">Wochentage</div>
+              <div className="mb-3 flex gap-1.5">
+                {DAY_NAMES.map((d, idx) => (
+                  <div key={d} className={cn(
+                    "flex h-8 w-8 items-center justify-center rounded-tile border text-[10px] font-bold",
+                    p.days[idx]
+                      ? "border-[var(--color-blue)]/35 bg-[var(--color-blue-dim)] text-primary"
+                      : "border-border bg-bg3 text-tx3"
+                  )}>{d}</div>
+                ))}
+              </div>
+
+              <div className="mb-3 text-[10px] font-bold uppercase tracking-[0.08em] text-tx3">Zonen</div>
+              {p.zones.map((z) => (
+                <div key={z.id} className="mb-1.5 flex items-center gap-3 rounded-tile border border-border bg-bg2 px-3 py-2">
+                  <div className="flex-1">
+                    <div className="text-xs font-semibold text-tx">{z.name}</div>
+                    <div className="text-[10px] text-tx3">{z.plant_type} · {z.duration_min} min · {z.preset || "Normal"}</div>
                   </div>
-                )}
-              </GuideStep>
-            )}
-          </motion.div>
-        </AnimatePresence>
-      </div>
+                  <button type="button" className="rounded-tile border border-border bg-bg1 px-2.5 py-1 text-[11px] font-semibold text-tx2">
+                    Bearbeiten
+                  </button>
+                </div>
+              ))}
 
-      <div className="mt-4 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => onStep(prevStep)}
-          disabled={step === 0}
-          className="inline-flex h-11 items-center gap-2 rounded-tile border border-border bg-bg1 px-3 text-sm font-semibold text-tx2 shadow-card disabled:opacity-40"
-        >
-          <ChevronLeft className="h-4 w-4" />
-          Zurueck
-        </button>
-        {step < 2 && (
-          <button
-            type="button"
-            onClick={() => onStep(nextStep)}
-            className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-tile bg-primary px-4 text-sm font-bold text-white shadow-card"
-          >
-            Weiter
-            <ChevronRight className="h-4 w-4" />
-          </button>
-        )}
-        {step === 2 && (
-          <button
-            type="button"
-            onClick={onCalculate}
-            disabled={busy}
-            className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-tile bg-primary px-4 text-sm font-bold text-white shadow-card disabled:opacity-50"
-          >
-            {busy ? "Berechne..." : "Empfehlung berechnen"}
-            <Sparkles className="h-4 w-4" />
-          </button>
-        )}
-        {step === 3 && (
-          <button
-            type="button"
-            onClick={recommendation ? onApply : onCalculate}
-            disabled={busy}
-            className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-tile bg-primary px-4 text-sm font-bold text-white shadow-card disabled:opacity-50"
-          >
-            {recommendation ? "In Programm uebernehmen" : busy ? "Berechne..." : "Empfehlung berechnen"}
-            <Check className="h-4 w-4" />
-          </button>
-        )}
-      </div>
-    </motion.aside>
-  );
-}
-
-function GuideStep({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <div className="mb-3 flex items-center gap-2 text-sm font-bold text-tx">
-        <span className="flex h-7 w-7 items-center justify-center rounded-tile bg-[var(--color-blue-dim)] text-primary">{icon}</span>
-        {title}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function GuideMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-tile border border-border bg-bg1 p-2 shadow-card">
-      <div className="text-[10px] font-bold uppercase tracking-wider text-tx3">{label}</div>
-      <div className="num mt-1 text-sm font-semibold text-tx">{value}</div>
-    </div>
-  );
-}
-
-function formatMaybe(value: number | undefined) {
-  return typeof value === "number" && Number.isFinite(value) ? value.toFixed(1) : "--";
-}
-
-function ZoneRow({ zone, onEdit, onDelete }: { zone: IrrigationZone; onEdit: () => void; onDelete: () => void }) {
-  const pct = Math.min(100, Math.round((zone.deficit_mm / Math.max(zone.target_mm, 1)) * 100));
-  return (
-    <div className="rounded-tile border border-border bg-bg1 p-4 shadow-card ">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="font-semibold text-tx">{zone.name || "Zone"}</div>
-          <div className="text-xs text-tx3">{zone.plant_type || "-"} | {zone.preset || "Normal"} | {zone.duration_min} min</div>
-        </div>
-        <div className="flex gap-2">
-          <button type="button" onClick={onEdit} className="rounded border border-border px-2 py-1 text-xs font-semibold">Bearbeiten</button>
-          <button type="button" onClick={onDelete} className="rounded border border-danger/40 px-2 py-1 text-xs font-semibold text-danger">X</button>
-        </div>
-      </div>
-      <div className="mt-3 h-2 overflow-hidden rounded-full bg-bg2">
-        <div className="h-full bg-primary" style={{ width: `${pct}%` }} />
-      </div>
-      <div className="mt-2 grid grid-cols-3 gap-2 text-xs text-tx2">
-        <span>Defizit {zone.deficit_mm.toFixed(1)} mm</span>
-        <span>Ziel {zone.target_mm.toFixed(1)} mm</span>
-        <span>Start ab {zone.min_deficit_mm.toFixed(1)} mm</span>
-      </div>
-    </div>
-  );
-}
-
-function ZoneEditor({ value, presets, onChange, onCancel, onSave }: {
-  value: IrrigationZone;
-  presets: string[];
-  onChange: (z: IrrigationZone) => void;
-  onCancel: () => void;
-  onSave: () => void;
-}) {
-  return (
-    <motion.div
-      className="rounded-tile border border-primary/20 bg-gradient-to-br from-bg1 to-bg2 p-4 shadow-card "
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2 }}
-    >
-      <div className="mb-3 text-sm font-bold text-tx">Zone bearbeiten</div>
-      <div className="grid gap-3 md:grid-cols-3">
-        <TextField
-          label="Name"
-          value={value.name}
-          hint="Anzeigename, z. B. Garten, Hecke oder Schlauchtrommel."
-          onChange={(v) => onChange({ ...value, name: v, id: value.id ? value.id : slugId(v) })}
-        />
-        <TextField
-          label="MQTT-ID"
-          value={value.id}
-          hint="Muss zum HA-Topic passen, z. B. garten fuer .../zone/garten/command."
-          onChange={(v) => onChange({ ...value, id: slugId(v) })}
-        />
-        <Select label="Preset" value={value.preset} options={[...presets, "Benutzerdefiniert"]} hint="Wird vor dem Zonenstart aktiviert, z. B. Beregnung mit Druckregelung." onChange={(v) => onChange({ ...value, preset: v })} />
-        <Select label="Pflanzentyp" value={value.plant_type || "Rasen"} options={PLANTS} onChange={(v) => onChange({ ...value, plant_type: v })} />
-        <NumField label="Laufzeit min" value={value.duration_min} step={1} hint="Basislaufzeit fuer diese Zone." onChange={(v) => onChange({ ...value, duration_min: v })} />
-        <NumField label="Wasser mm" value={value.water_mm} step={0.5} hint="Wassermenge, die diese Basislaufzeit ungefaehr ausbringt." onChange={(v) => onChange({ ...value, water_mm: v })} />
-        <NumField label="Ziel mm" value={value.target_mm} step={0.5} hint="Maximale Wassermenge, die Smart-ET je Lauf auffuellen will." onChange={(v) => onChange({ ...value, target_mm: v })} />
-        <NumField label="Start ab mm" value={value.min_deficit_mm} step={0.5} hint="Smart-ET startet diese Zone erst ab diesem Wasserdefizit." onChange={(v) => onChange({ ...value, min_deficit_mm: v })} />
-        <NumField label="Akt. Defizit mm" value={value.deficit_mm} step={0.5} hint="Aktueller Wasserbedarf. Wird taeglich aus ET0, Saisonfaktor und Regen fortgeschrieben." onChange={(v) => onChange({ ...value, deficit_mm: v })} />
-        <NumField label="Beregnungsblock min" value={value.cycle_min} step={1} hint="0 = ohne Pause. Fuer Rasen z. B. 10-15 min laufen lassen." onChange={(v) => onChange({ ...value, cycle_min: v })} />
-        <NumField label="Sickerpause min" value={value.soak_min} step={1} hint="Pause zwischen Bloecken, damit Wasser tiefer einsickert." onChange={(v) => onChange({ ...value, soak_min: v })} />
-      </div>
-      <HelpText>
-        Die Zone ist die logische Ventil-ID fuer Home Assistant/MQTT. Beim Start sendet die Steuerung einen Befehl an <code>pumpensteuerung/irrigation/zone/&lt;zone_id&gt;/command</code>; HA schaltet dazu das passende Ventil.
-      </HelpText>
-      <div className="mt-4 flex justify-end gap-2">
-        <button type="button" onClick={onCancel} className="rounded-tile border border-border bg-bg1 px-4 py-2 text-sm">Abbrechen</button>
-        <button type="button" onClick={onSave} className="rounded-tile bg-primary px-4 py-2 text-sm font-bold text-white">Zone speichern</button>
-      </div>
-    </motion.div>
-  );
-}
-
-function slugId(value: string) {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/ä/g, "ae")
-    .replace(/ö/g, "oe")
-    .replace(/ü/g, "ue")
-    .replace(/ß/g, "ss")
-    .replace(/[^a-z0-9_-]+/g, "_")
-    .replace(/^_+|_+$/g, "");
-}
-
-const EMPTY_PRESET: Preset = {
-  name: "",
-  mode: 3,
-  setpoint: 3,
-  kp: 8,
-  ki: 1,
-  p_on: 2.2,
-  p_off: 3.7,
-  freq_min: 35,
-  freq_max: 52,
-  setpoint_hz: 45,
-  expected_pressure: 3,
-};
-
-const MODE_LABEL: Record<number, string> = {
-  0: "Druckregelung",
-  1: "Durchflussregelung",
-  2: "Fixe Frequenz",
-  3: "Hahnmodus",
-};
-const MODE_OPTIONS = [
-  { value: "0", label: "Druckregelung" },
-  { value: "1", label: "Durchflussregelung" },
-  { value: "2", label: "Fixe Frequenz" },
-  { value: "3", label: "Hahnmodus" },
-];
-
-function PresetsSection({ active, data, onReload }: { active: string; data: { active: string; presets: Preset[] } | null; onReload: () => void }) {
-  const [editing, setEditing] = useState<Preset | null>(null);
-  const [isNew, setIsNew] = useState(false);
-  const [err, setErr] = useState("");
-  if (!data) return <div className="p-4 text-sm text-tx3">Lade...</div>;
-
-  const save = async () => {
-    if (!editing) return;
-    setErr("");
-    try {
-      await api.savePreset(editing);
-      onReload();
-      setEditing(null);
-      setIsNew(false);
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : "Speichern fehlgeschlagen");
-    }
-  };
-  const mode = editing?.mode ?? 0;
-  const setpointLabel = mode === 1 ? "Soll-Durchfluss L/min" : "Solldruck bar";
-  const setpointHint = mode === 1
-    ? "Ziel-Durchfluss fuer die PI-Regelung."
-    : mode === 0
-      ? "Zieldruck, den der PI-Regler waehrend des Laufens halten soll."
-      : "Nur fuer Druck-/Durchflussregelung relevant.";
-
-  return (
-    <>
-      <div className="rounded-tile border border-border bg-bg1 shadow-card ">
-        <div className="divide-y divide-border">
-          {data.presets.map((p) => (
-            <div key={p.name} className="flex flex-wrap items-center gap-3 px-4 py-3">
-              <div className="min-w-48 flex-1">
-                <span className="font-semibold text-tx">{p.name}</span>
-                <span className="ml-2 text-xs text-tx3">{MODE_LABEL[p.mode]}</span>
-                {(data.active === p.name || active === p.name) && <span className="ml-2 rounded bg-[var(--color-blue-dim)] px-2 py-0.5 text-xs font-bold text-primary">aktiv</span>}
-              </div>
-              <button type="button" onClick={() => api.applyPreset(p.name).then(onReload)} className="rounded border border-border px-3 py-1 text-xs font-semibold">Anwenden</button>
-              <button type="button" onClick={() => { setEditing({ ...p }); setIsNew(false); }} className="rounded border border-border px-3 py-1 text-xs font-semibold">Bearbeiten</button>
-              <button type="button" onClick={() => api.deletePreset(p.name).then(onReload).catch((e) => setErr(e.message))} className="rounded border border-danger/40 px-3 py-1 text-xs font-semibold text-danger">Loschen</button>
-            </div>
-          ))}
-        </div>
-        {editing && (
-          <div className="border-t border-border bg-slate-50 p-4">
-            <div className="grid gap-3 md:grid-cols-4">
-              <TextField label="Name" value={editing.name} disabled={!isNew} onChange={(v) => setEditing({ ...editing, name: v })} />
-              <Select
-                label="Modus"
-                value={String(editing.mode)}
-                options={MODE_OPTIONS.map((o) => o.value)}
-                optionLabels={Object.fromEntries(MODE_OPTIONS.map((o) => [o.value, o.label]))}
-                hint="Druck: PI auf bar. Durchfluss: PI auf L/min. FixHz: sofort feste Drehzahl. Hahn: Ein/Aus ueber Druck, feste Drehzahl."
-                onChange={(v) => setEditing({ ...editing, mode: Number(v) as 0 | 1 | 2 | 3 })}
-              />
-              {mode !== 2 && mode !== 3 && (
-                <NumField label={setpointLabel} value={editing.setpoint} step={0.1} hint={setpointHint} onChange={(v) => setEditing({ ...editing, setpoint: v })} />
-              )}
-              {(mode === 2 || mode === 3) && (
-                <NumField label="Feste Drehzahl Hz" value={editing.setpoint_hz} step={1} hint={mode === 3 ? "Hahnmodus: diese Hz laufen zwischen Ein- und Ausschaltdruck." : "FixHz: Pumpe laeuft direkt mit dieser Frequenz."} onChange={(v) => setEditing({ ...editing, setpoint_hz: v })} />
-              )}
-              {mode === 3 && (
-                <>
-                  <NumField label="Einschaltdruck bar" value={editing.p_on} step={0.1} hint="Unter diesem Druck startet die Pumpe im Hahnmodus." onChange={(v) => setEditing({ ...editing, p_on: v })} />
-                  <NumField label="Ausschaltdruck bar" value={editing.p_off} step={0.1} hint="Ab diesem Druck stoppt die Pumpe im Hahnmodus." onChange={(v) => setEditing({ ...editing, p_off: v })} />
-                </>
-              )}
-              {mode === 2 && (
-                <NumField label="Schutzdruck bar" value={editing.expected_pressure} step={0.1} hint="FixHz-Schutz: oberhalb dieses Drucks plus Hysterese wird gestoppt." onChange={(v) => setEditing({ ...editing, expected_pressure: v })} />
-              )}
-              {(mode === 0 || mode === 1) && (
-                <>
-                  <NumField label="Kp Reaktion" value={editing.kp} step={0.5} hint="Direkte Reaktion auf Abweichung. Hoeher = schneller, kann unruhiger werden." onChange={(v) => setEditing({ ...editing, kp: v })} />
-                  <NumField label="Ki Nachregelung" value={editing.ki} step={0.1} hint="Korrigiert bleibende Abweichung ueber Zeit. Zu hoch kann Schwingen erzeugen." onChange={(v) => setEditing({ ...editing, ki: v })} />
-                  <NumField label="Hz min" value={editing.freq_min} step={1} hint="Untergrenze der automatischen Frequenzregelung." onChange={(v) => setEditing({ ...editing, freq_min: v })} />
-                  <NumField label="Hz max" value={editing.freq_max} step={1} hint="Obergrenze der automatischen Frequenzregelung." onChange={(v) => setEditing({ ...editing, freq_max: v })} />
-                </>
-              )}
-            </div>
-            {mode === 3 && (
-              <HelpText>
-                Hahnmodus ist fuer Hahn, Schlauchtrommel und Giesskanne gedacht: unter Einschaltdruck startet die Pumpe mit fester Hz, ab Ausschaltdruck stoppt sie wieder. PI-Regelung bleibt dabei aus.
-              </HelpText>
-            )}
-            <div className="mt-4 flex justify-end gap-2">
-              <button type="button" onClick={() => setEditing(null)} className="rounded-tile border border-border bg-bg1 px-4 py-2 text-sm">Abbrechen</button>
-              <button type="button" onClick={save} className="rounded-tile bg-primary px-4 py-2 text-sm font-bold text-white">Speichern</button>
-            </div>
-          </div>
-        )}
-        {err && <div className="px-4 pb-3 text-sm text-danger">{err}</div>}
-        <div className="border-t border-border px-4 py-3">
-          <button type="button" onClick={() => { setEditing({ ...EMPTY_PRESET }); setIsNew(true); }} className="rounded-tile border border-dashed border-primary px-4 py-2 text-sm font-bold text-primary">+ Neuer Preset</button>
-        </div>
-      </div>
-    </>
-  );
-}
-
-function PiSection({ setpoint, pOn, pOff, kp, ki, freqMin, freqMax, enabled, spike }: {
-  setpoint: number; pOn: number; pOff: number; kp: number; ki: number; freqMin: number; freqMax: number; enabled: boolean; spike: boolean;
-}) {
-  const [draft, setDraft] = useState({ setpoint, p_on: pOn, p_off: pOff, kp, ki, freq_min: freqMin, freq_max: freqMax });
-  return (
-    <>
-      <div className="rounded-tile border border-border bg-gradient-to-br from-bg1 to-bg2 p-4 shadow-card ">
-        <div className="mb-4 flex items-center justify-between">
-          <span className="text-sm font-semibold text-tx2">Regler aktiv</span>
-          <Toggle checked={enabled} onChange={(v) => api.setPressure({ enabled: v })} />
-        </div>
-        <div className="grid gap-3 md:grid-cols-4">
-          <NumField label="Solldruck bar" value={draft.setpoint} step={0.1} hint="Zieldruck fuer Druckregelung. Dient auch als Mitte fuer Ein-/Ausschaltdruck." onChange={(v) => setDraft({ ...draft, setpoint: v })} />
-          <NumField label="Einschaltdruck bar" value={draft.p_on} step={0.1} hint="Hahn-/Druckbetrieb: darunter startet die Pumpe." onChange={(v) => setDraft({ ...draft, p_on: v })} />
-          <NumField label="Ausschaltdruck bar" value={draft.p_off} step={0.1} hint="Hahn-/Druckbetrieb: ab hier stoppt die Pumpe." onChange={(v) => setDraft({ ...draft, p_off: v })} />
-          <NumField label="Hz min" value={draft.freq_min} step={1} hint="Untergrenze fuer automatische PI-Regelung." onChange={(v) => setDraft({ ...draft, freq_min: v })} />
-          <NumField label="Hz max" value={draft.freq_max} step={1} hint="Obergrenze fuer automatische PI-Regelung und Fallback fuer Hahnmodus." onChange={(v) => setDraft({ ...draft, freq_max: v })} />
-          <NumField label="Kp Reaktion" value={draft.kp} step={0.5} hint="Direkter Regelanteil. Hoeher = schneller, aber unruhiger." onChange={(v) => setDraft({ ...draft, kp: v })} />
-          <NumField label="Ki Nachregelung" value={draft.ki} step={0.1} hint="Korrigiert bleibende Abweichung. Zu hoch kann Schwingen erzeugen." onChange={(v) => setDraft({ ...draft, ki: v })} />
-        </div>
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-          <span className="text-xs text-tx3">Hahn-zu-Erkennung: {spike ? "an" : "aus"}</span>
-          <div className="flex gap-2">
-            <button type="button" onClick={() => api.resetDryrun()} className="rounded-tile border border-warn/40 bg-[var(--color-amber-dim)] px-4 py-2 text-sm font-semibold text-warn">Trockenlauf reset</button>
-            <button type="button" onClick={() => api.setPressure(draft)} className="rounded-tile bg-primary px-4 py-2 text-sm font-bold text-white">Speichern</button>
-          </div>
-        </div>
-      </div>
-    </>
-  );
-}
-
-function TimeguardSection({ tg }: { tg: { enabled: boolean; start_hour: number; start_min: number; end_hour: number; end_min: number; days: boolean[]; allowed: boolean } }) {
-  const [d, setD] = useState({ start_hour: tg.start_hour, start_min: tg.start_min, end_hour: tg.end_hour, end_min: tg.end_min, days: [...tg.days] });
-  return (
-    <>
-      <div className="rounded-tile border border-border bg-gradient-to-br from-bg1 to-bg2 p-4 shadow-card ">
-        <div className="mb-4 flex items-center justify-between">
-          <span className="text-sm font-semibold text-tx2">Aktiv {tg.allowed ? "(im Fenster)" : "(gesperrt)"}</span>
-          <Toggle checked={tg.enabled} onChange={(v) => api.setTimeguard({ enabled: v })} />
-        </div>
-        <div className="grid gap-3 md:grid-cols-2">
-          <TimeField label="Start" h={d.start_hour} m={d.start_min} onChange={(h, m) => setD({ ...d, start_hour: h, start_min: m })} />
-          <TimeField label="Ende" h={d.end_hour} m={d.end_min} onChange={(h, m) => setD({ ...d, end_hour: h, end_min: m })} />
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {DAY_NAMES.map((name, i) => (
-            <button key={name} type="button" onClick={() => {
-              const days = [...d.days];
-              days[i] = !days[i];
-              setD({ ...d, days });
-            }} className={`h-10 w-10 rounded-tile text-sm font-bold ${d.days[i] ? "bg-primary text-white" : "bg-bg2 text-tx3"}`}>{name}</button>
-          ))}
-        </div>
-        <div className="mt-4 flex justify-end">
-          <button type="button" onClick={() => api.setTimeguard(d)} className="rounded-tile bg-primary px-4 py-2 text-sm font-bold text-white">Speichern</button>
-        </div>
-      </div>
-    </>
-  );
-}
-
-function OtaSection({ fw }: { fw: string }) {
-  const [ota, setOta] = useState<OtaStatus | null>(null);
-  const [log, setLog] = useState<string[]>([]);
-  const [polling, setPolling] = useState(false);
-  const [updateAction, setUpdateAction] = useState<"idle" | "check" | "install" | "rollback">("idle");
-  const [tokenDraft, setTokenDraft] = useState("");
-  const [showToken, setShowToken] = useState(false);
-  const [tokenBusy, setTokenBusy] = useState(false);
-  const [tokenMessage, setTokenMessage] = useState("");
-  const [restartHint, setRestartHint] = useState(false);
-  const logRef = useRef<HTMLPreElement>(null);
-  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
-  useEffect(() => {
-    api.otaStatus().then(setOta).catch(() => {});
-    return () => { if (timer.current) clearInterval(timer.current); };
-  }, []);
-  useEffect(() => { if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight; }, [log]);
-
-  const poll = (action: "check" | "install" | "rollback") => {
-    setPolling(true);
-    setUpdateAction(action);
-    if (timer.current) clearInterval(timer.current);
-    const tick = async () => {
-      const r = await api.otaLog().catch(() => null);
-      if (!r) return;
-      setLog(r.lines);
-      if (!r.running) {
-        if (timer.current) clearInterval(timer.current);
-        setPolling(false);
-        setUpdateAction("idle");
-        if (action === "install" && r.exit_code === 0) setRestartHint(true);
-        api.otaStatus().then(setOta).catch(() => {});
-      }
-    };
-    void tick();
-    timer.current = setInterval(tick, 1000);
-  };
-
-  const saveToken = async () => {
-    setTokenBusy(true);
-    setTokenMessage("");
-    try {
-      const res = await api.otaTokenSet(tokenDraft);
-      setTokenDraft("");
-      setTokenMessage(res.message || "Token gespeichert");
-      const next = await api.otaStatus();
-      setOta(next);
-    } catch (e) {
-      setTokenMessage(e instanceof Error ? e.message : "Token konnte nicht gespeichert werden");
-      api.otaStatus().then(setOta).catch(() => {});
-    } finally {
-      setTokenBusy(false);
-    }
-  };
-
-  const deleteToken = async () => {
-    setTokenBusy(true);
-    setTokenMessage("");
-    try {
-      await api.otaTokenDelete();
-      setTokenDraft("");
-      setTokenMessage("Token entfernt");
-      const next = await api.otaStatus();
-      setOta(next);
-    } catch (e) {
-      setTokenMessage(e instanceof Error ? e.message : "Token konnte nicht entfernt werden");
-    } finally {
-      setTokenBusy(false);
-    }
-  };
-
-  const tokenTone =
-    !ota?.token_configured ? "text-tx3 bg-bg2 border-slate-200"
-    : ota.token_ok === true ? "text-ok bg-[var(--color-green-dim)] border-ok/20"
-    : ota.token_ok === false ? "text-danger bg-[var(--color-red-dim)] border-danger/20"
-    : "text-warn bg-[var(--color-amber-dim)] border-warn/20";
-  const tokenLabel =
-    !ota?.token_configured ? "Kein Token"
-    : ota.token_ok === true ? "Token OK"
-    : ota.token_ok === false ? "Token fehlerhaft"
-    : "Token hinterlegt";
-  const statusTone =
-    ota?.running || polling ? "border-primary/20 bg-[var(--color-blue-dim)] text-primary"
-    : ota?.exit_code && ota.exit_code !== 0 ? "border-danger/20 bg-[var(--color-red-dim)] text-danger"
-    : ota?.update_available ? "border-ok/20 bg-[var(--color-green-dim)] text-ok"
-    : "border-slate-200 bg-bg2 text-tx2";
-  const statusLabel =
-    ota?.running || polling ? "Update-Aktion laeuft"
-    : ota?.exit_code && ota.exit_code !== 0 ? "Letzte Aktion fehlerhaft"
-    : ota?.update_available ? "Update verfuegbar"
-    : "System aktuell oder nicht geprueft";
-  const progress =
-    ota?.running || polling ? (updateAction === "install" ? 68 : updateAction === "rollback" ? 48 : 34)
-    : log.length > 0 && ota?.exit_code === 0 ? 100
-    : log.length > 0 && ota?.exit_code !== null ? 100
-    : 0;
-  const phaseLabel =
-    ota?.running || polling ? (updateAction === "install" ? "Installation" : updateAction === "rollback" ? "Rollback" : "Online-Pruefung")
-    : ota?.exit_code === 0 ? "Fertig"
-    : ota?.exit_code && ota.exit_code !== 0 ? "Fehler"
-    : "Bereit";
-  const releaseDate = ota?.latest_date
-    ? new Date(ota.latest_date).toLocaleString("de-DE", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "";
-
-  return (
-    <>
-      <div className="relative overflow-hidden rounded-tile border border-border bg-gradient-to-br from-bg1 via-bg2 to-bg2 p-4 shadow-card ">
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary via-cyan-400 to-ok" />
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <div className="text-sm font-bold text-tx">Online-Updates</div>
-            <div className="mt-1 max-w-xl text-xs leading-relaxed text-tx3">
-              Prueft GitHub Releases, installiert freigegebene Pakete und zeigt den Live-Log direkt hier an.
-            </div>
-          </div>
-          <span className={`inline-flex w-fit rounded-full border px-3 py-1 text-xs font-bold ${statusTone}`}>
-            {statusLabel}
-          </span>
-        </div>
-
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          <Info label="Installiert" value={ota?.current_version ?? fw} />
-          <Info label="Neueste Version" value={ota?.latest_version ?? "-"} />
-          <Info label="Commit" value={ota?.latest_commit?.slice(0, 12) ?? "-"} />
-        </div>
-
-        {ota?.update_available && (
-          <motion.div
-            className="mt-3 rounded-tile border border-ok/20 bg-bg1 p-3 text-sm text-tx2 shadow-card "
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-              <div className="font-semibold text-tx">Update {ota.latest_version} bereit</div>
-              {releaseDate && <div className="text-xs text-tx3">Release: {releaseDate}</div>}
-            </div>
-          </motion.div>
-        )}
-
-        <div className="mt-4 rounded-tile border border-border bg-bg1 p-3 shadow-card ">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <div className="flex items-center gap-2 text-sm font-bold text-tx">
-                <KeyRound className="h-4 w-4 text-primary" />
-                GitHub Token
-              </div>
-              <div className="mt-1 text-xs leading-relaxed text-tx3">
-                Fuer private Repositories. Der Token wird lokal gespeichert, nicht zurueckgelesen und dauerhaft nie angezeigt.
+              <div className="mt-3 flex gap-2">
+                <button type="button" className="rounded-tile bg-primary px-4 py-2 text-xs font-bold text-white">
+                  Speichern
+                </button>
               </div>
             </div>
-            <span className={`rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wider ${tokenTone}`}>
-              {tokenLabel}
-            </span>
-          </div>
-          <div className="grid gap-2 md:grid-cols-[1fr_auto_auto]">
-            <div className="relative">
-              <input
-                type={showToken ? "text" : "password"}
-                value={tokenDraft}
-                autoComplete="off"
-                placeholder={ota?.token_configured ? "Neuen Token eintragen zum Ersetzen" : "GitHub Fine-Grained Token"}
-                onChange={(e) => setTokenDraft(e.target.value)}
-                className="h-11 w-full rounded-tile border border-border bg-bg1 px-3 pr-11 text-sm font-semibold text-tx outline-none ring-primary/20 focus:ring-4"
-              />
-              <button
-                type="button"
-                onClick={() => setShowToken((v) => !v)}
-                className="absolute right-1 top-1 flex h-9 w-9 items-center justify-center rounded-tile text-tx3 hover:bg-bg2"
-                aria-label={showToken ? "Token verbergen" : "Token anzeigen"}
-              >
-                {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            </div>
-            <button
-              type="button"
-              onClick={saveToken}
-              disabled={tokenBusy || tokenDraft.trim().length < 20}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-tile bg-primary px-4 text-sm font-bold text-white shadow-card disabled:opacity-40"
-            >
-              <Check className="h-4 w-4" />
-              Speichern & pruefen
-            </button>
-            {ota?.token_configured && (
-              <button
-                type="button"
-                onClick={deleteToken}
-                disabled={tokenBusy}
-                className="h-11 rounded-tile border border-danger/30 bg-bg1 px-4 text-sm font-bold text-danger disabled:opacity-40"
-              >
-                Entfernen
-              </button>
-            )}
-          </div>
-          {(tokenMessage || ota?.token_message) && (
-            <div className="mt-2 text-xs text-tx3">{tokenMessage || ota?.token_message}</div>
           )}
         </div>
+      ))}
+    </div>
+  );
+}
 
-        {ota?.changelog && (
-          <div className="mt-3 rounded-tile border border-border bg-bg1 p-3 text-sm text-tx2 shadow-card whitespace-pre-line ">
-            {ota.changelog}
+// ── Presets ──────────────────────────────────────────────────────────────────
+const MODE_LABEL: Record<number, string> = { 0: "Druckregelung", 1: "Durchflussregelung", 2: "Fixe Frequenz", 3: "Hahnmodus" };
+
+function PresetsSettings({ active, data, onReload }: {
+  active: string;
+  data: { active: string; presets: Preset[] } | null;
+  onReload: () => void;
+}) {
+  const [editing, setEditing] = useState<Preset | null>(null);
+  if (!data) return <div className="rounded-card border border-border bg-bg1 p-4 text-sm text-tx3">Lade...</div>;
+
+  return (
+    <div className="rounded-card border border-border bg-bg1">
+      <div className="divide-y divide-border">
+        {data.presets.map((p) => (
+          <div key={p.name} className="flex flex-wrap items-center gap-3 px-4 py-3">
+            <div className="min-w-0 flex-1">
+              <span className="text-sm font-semibold text-tx">{p.name}</span>
+              <span className="ml-2 text-xs text-tx3">{MODE_LABEL[p.mode]}</span>
+              {(data.active === p.name || active === p.name) && (
+                <Badge tone="blue" className="ml-2">Aktiv</Badge>
+              )}
+            </div>
+            <div className="flex gap-1.5">
+              <button type="button" onClick={() => api.applyPreset(p.name).then(onReload)}
+                className="rounded-tile border border-border bg-bg2 px-3 py-1.5 text-xs font-semibold text-tx2">
+                Anwenden
+              </button>
+              <button type="button" onClick={() => setEditing({ ...p })}
+                className="rounded-tile border border-border bg-bg2 px-3 py-1.5 text-xs font-semibold text-tx2">
+                Bearbeiten
+              </button>
+            </div>
           </div>
-        )}
-
-        <div className="mt-4 grid gap-2 sm:grid-cols-3">
-          <button
-            type="button"
-            onClick={async () => { await api.otaCheck(); poll("check"); }}
-            disabled={polling || ota?.running}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-tile border border-border bg-bg1 px-4 text-sm font-bold text-tx2 shadow-card disabled:opacity-40"
-          >
-            <RefreshCw className={`h-4 w-4 ${updateAction === "check" ? "animate-spin" : ""}`} />
-            Online pruefen
-          </button>
-          <button
-            type="button"
-            onClick={async () => { setRestartHint(false); await api.otaInstall(ota?.latest_version ?? undefined); poll("install"); }}
-            disabled={polling || ota?.running || !ota?.update_available}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-tile bg-primary px-4 text-sm font-bold text-white shadow-card disabled:opacity-40"
-          >
-            <Download className="h-4 w-4" />
-            Installieren
-          </button>
-          <button
-            type="button"
-            onClick={async () => { await api.otaRollback(); poll("rollback"); }}
-            disabled={polling || ota?.running}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-tile border border-warn/40 bg-bg1 px-4 text-sm font-bold text-warn shadow-card disabled:opacity-40"
-          >
-            <RotateCcw className="h-4 w-4" />
-            Rollback
-          </button>
-        </div>
-
-        {(log.length > 0 || polling || ota?.running) && (
-          <motion.div
-            className="mt-4 rounded-tile border border-border bg-bg1 p-3 shadow-card "
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            <div className="mb-2 flex items-center justify-between gap-3 text-xs font-semibold text-tx2">
-              <span>{phaseLabel}</span>
-              <span>{progress}%</span>
-            </div>
-            <div className="h-3 overflow-hidden rounded-full bg-bg3">
-              <motion.div
-                className={`h-full rounded-full ${ota?.exit_code && ota.exit_code !== 0 ? "bg-danger" : "bg-gradient-to-r from-primary to-ok"}`}
-                animate={{ width: `${progress}%` }}
-                transition={{ duration: 0.25 }}
-              />
-            </div>
-            {log.length > 0 && (
-              <pre ref={logRef} className="mt-3 max-h-56 overflow-y-auto rounded-tile bg-slate-950 p-3 text-xs leading-relaxed text-slate-200 ">
-                {log.join("\n")}
-              </pre>
-            )}
-          </motion.div>
-        )}
-
-        {restartHint && (
-          <motion.div
-            className="mt-3 rounded-tile border border-ok/20 bg-[var(--color-green-dim)] p-3 text-sm text-tx2"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            Update installiert. Falls die UI nicht automatisch neu verbunden ist, Seite einmal neu laden.
-          </motion.div>
-        )}
+        ))}
       </div>
-    </>
+
+      {editing && (
+        <div className="border-t border-border p-4">
+          <div className="mb-3 text-xs font-bold text-tx">Preset: {editing.name}</div>
+          <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+            {[
+              ["Solldruck bar", editing.setpoint.toFixed(1)],
+              ["Kp Reaktion", editing.kp.toFixed(1)],
+              ["Ki Nachregelung", editing.ki.toFixed(2)],
+              ["Hz min", String(editing.freq_min)],
+              ["Hz max", String(editing.freq_max)],
+            ].map(([l, v]) => <SettingField key={l} label={l} value={v} />)}
+          </div>
+          <div className="mt-3 flex justify-end gap-2">
+            <button type="button" onClick={() => setEditing(null)}
+              className="rounded-tile border border-border bg-bg1 px-4 py-2 text-xs font-semibold">
+              Abbrechen
+            </button>
+            <button type="button" onClick={() => { api.savePreset(editing).then(onReload); setEditing(null); }}
+              className="rounded-tile bg-primary px-4 py-2 text-xs font-bold text-white">
+              Speichern
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="border-t border-border px-4 py-3">
+        <button type="button"
+          className="rounded-tile border border-dashed border-[var(--color-blue)] px-4 py-2 text-xs font-bold text-primary">
+          + Neuer Preset
+        </button>
+      </div>
+    </div>
   );
 }
 
-function VacationSection({ enabled }: { enabled: boolean }) {
+// ── PI-Regler ─────────────────────────────────────────────────────────────────
+function PiSettings({ pi }: { pi: { enabled: boolean; setpoint: number; p_on: number; p_off: number; kp: number; ki: number; freq_min: number; freq_max: number } }) {
+  const [draft, setDraft] = useState({ setpoint: pi.setpoint, p_on: pi.p_on, p_off: pi.p_off, kp: pi.kp, ki: pi.ki, freq_min: pi.freq_min, freq_max: pi.freq_max });
+
   return (
-    <>
-      <div className="flex items-center justify-between rounded-tile border border-border bg-gradient-to-br from-bg1 to-bg2 p-4 shadow-card ">
-        <div>
-          <div className="font-semibold text-tx2">Pumpe gesperrt</div>
-          <div className="text-xs text-tx3">Alle Bewasserungen pausiert.</div>
-        </div>
-        <Toggle checked={enabled} onChange={(v) => api.setVacation(v)} />
+    <div className="rounded-card border border-border bg-bg1 p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-tx3">PI-Druckregelung</div>
+        <Toggle checked={pi.enabled} onChange={(v) => api.setPressure({ enabled: v })} />
       </div>
-    </>
+      <div className="mb-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4">
+        {([
+          ["Solldruck", "setpoint", "bar"],
+          ["Einschaltdruck", "p_on", "bar"],
+          ["Ausschaltdruck", "p_off", "bar"],
+          ["Kp Reaktion", "kp", ""],
+          ["Ki Nachregelung", "ki", ""],
+          ["Hz min", "freq_min", "Hz"],
+          ["Hz max", "freq_max", "Hz"],
+        ] as const).map(([label, key, unit]) => (
+          <SettingField key={label} label={label} value={`${(draft[key as keyof typeof draft] as number).toFixed(key === "ki" ? 2 : 1)} ${unit}`} />
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={() => api.resetDryrun()}
+          className="rounded-tile border border-warn/35 bg-[var(--color-amber-dim)] px-4 py-2 text-xs font-bold text-warn">
+          Trockenlauf Reset
+        </button>
+        <button type="button" onClick={() => api.setPressure(draft)}
+          className="rounded-tile bg-primary px-4 py-2 text-xs font-bold text-white">
+          Speichern
+        </button>
+      </div>
+    </div>
   );
 }
 
-function SystemInfo({ ip, fw, uptime, mqtt, rtu }: { ip: string; fw: string; uptime: number; mqtt: boolean; rtu: boolean }) {
-  const days = Math.floor(uptime / 86400);
-  const hrs = Math.floor((uptime % 86400) / 3600);
-  const min = Math.floor((uptime % 3600) / 60);
+// ── Zeitfenster ───────────────────────────────────────────────────────────────
+function TimeguardSettings({ tg }: { tg: { enabled: boolean; start_hour: number; start_min: number; end_hour: number; end_min: number; days: boolean[]; allowed: boolean } }) {
+  const [d, setD] = useState({ start_hour: tg.start_hour, start_min: tg.start_min, end_hour: tg.end_hour, end_min: tg.end_min, days: [...tg.days] });
+  const fmt = (h: number, m: number) => `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+
   return (
-    <>
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Info label="Firmware" value={fw} />
-        <Info label="IP" value={ip || "-"} />
-        <Info label="Uptime" value={`${days}d ${hrs}h ${min}m`} />
-        <Info label="Verbindungen" value={`${mqtt ? "MQTT ok" : "MQTT aus"} | ${rtu ? "RTU ok" : "RTU aus"}`} />
+    <div className="rounded-card border border-border bg-bg1 p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-tx3">Zeitfenster-Sperre</div>
+        <Toggle checked={tg.enabled} onChange={(v) => api.setTimeguard({ enabled: v })} />
       </div>
-    </>
+      <div className="mb-3 grid grid-cols-2 gap-2.5">
+        <label className="flex flex-col gap-1">
+          <span className="text-[10px] font-bold uppercase tracking-[0.06em] text-tx3">Start</span>
+          <input type="time" value={fmt(d.start_hour, d.start_min)}
+            onChange={(e) => { const [h, m] = e.target.value.split(":").map(Number); setD({ ...d, start_hour: h, start_min: m }); }}
+            className="h-11 rounded-tile border border-border bg-bg2 px-3 text-sm font-semibold text-tx outline-none" />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-[10px] font-bold uppercase tracking-[0.06em] text-tx3">Ende</span>
+          <input type="time" value={fmt(d.end_hour, d.end_min)}
+            onChange={(e) => { const [h, m] = e.target.value.split(":").map(Number); setD({ ...d, end_hour: h, end_min: m }); }}
+            className="h-11 rounded-tile border border-border bg-bg2 px-3 text-sm font-semibold text-tx outline-none" />
+        </label>
+      </div>
+      <div className="mb-3 flex flex-wrap gap-1.5">
+        {DAY_NAMES.map((name, i) => (
+          <button key={name} type="button"
+            onClick={() => { const days = [...d.days]; days[i] = !days[i]; setD({ ...d, days }); }}
+            className={cn(
+              "flex h-9 w-9 items-center justify-center rounded-tile border text-[11px] font-bold transition",
+              d.days[i] ? "border-[var(--color-green)]/35 bg-[var(--color-green-dim)] text-ok" : "border-border bg-bg3 text-tx3"
+            )}>
+            {name}
+          </button>
+        ))}
+      </div>
+      <div className="mb-3">
+        <Badge tone={tg.allowed ? "ok" : "warn"}>{tg.allowed ? "Im Zeitfenster" : "Außerhalb des Zeitfensters"}</Badge>
+      </div>
+      <button type="button" onClick={() => api.setTimeguard(d)}
+        className="rounded-tile bg-primary px-4 py-2 text-xs font-bold text-white">
+        Speichern
+      </button>
+    </div>
+  );
+}
+
+// ── System ────────────────────────────────────────────────────────────────────
+function SystemSettings({ sys }: { sys: { ip: string; fw: string; uptime: number; mqtt: boolean; rtu_connected: boolean } }) {
+  const [ota, setOta] = useState<OtaStatus | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [checked, setChecked] = useState(false);
+
+  useEffect(() => { api.otaStatus().then(setOta).catch(() => {}); }, []);
+
+  const upH = Math.floor(sys.uptime / 3600);
+  const upD = Math.floor(upH / 24);
+
+  return (
+    <div className="flex flex-col gap-2">
+      {/* OTA */}
+      <div className="relative overflow-hidden rounded-card border border-border bg-bg1 p-4">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-primary via-cyan-400 to-ok" />
+        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="text-sm font-bold text-tx">Online-Updates</div>
+            <div className="mt-0.5 text-[11px] text-tx3">Prüft GitHub Releases und installiert freigegebene Pakete.</div>
+          </div>
+          <span className={cn(
+            "rounded-full border px-3 py-1 text-[10px] font-bold",
+            checking ? "border-primary/20 bg-[var(--color-blue-dim)] text-primary"
+            : checked ? "border-ok/20 bg-[var(--color-green-dim)] text-ok"
+            : "border-border bg-bg2 text-tx3"
+          )}>
+            {checking ? "Prüfe…" : checked ? "Aktuell" : "Nicht geprüft"}
+          </span>
+        </div>
+        <div className="mb-3 grid grid-cols-3 gap-2">
+          {[["Installiert", sys.fw], ["Neueste Version", ota?.latest_version ?? "—"], ["Letzter Check", checked ? new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) : "—"]].map(([l, v]) => (
+            <SettingField key={l} label={l} value={v} />
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <button type="button" disabled={checking}
+            onClick={() => { setChecking(true); api.otaCheck().finally(() => { setChecking(false); setChecked(true); api.otaStatus().then(setOta).catch(() => {}); }); }}
+            className="inline-flex items-center gap-2 rounded-tile border border-border bg-bg2 px-4 py-2 text-xs font-bold text-tx2 disabled:opacity-50">
+            <RefreshCw className={cn("h-3.5 w-3.5", checking && "animate-spin")} />
+            {checking ? "Prüfe…" : "Auf Updates prüfen"}
+          </button>
+          <button type="button" disabled
+            className="inline-flex items-center gap-2 rounded-tile bg-primary px-4 py-2 text-xs font-bold text-white opacity-40">
+            Update installieren
+          </button>
+        </div>
+      </div>
+
+      {/* System info */}
+      <div className="rounded-card border border-border bg-bg1 p-4">
+        <div className="mb-3 text-[10px] font-bold uppercase tracking-[0.12em] text-tx3">Systeminformationen</div>
+        <div className="divide-y divide-border2">
+          {[
+            ["IP-Adresse", sys.ip],
+            ["Firmware", sys.fw],
+            ["Laufzeit", `${upD}d ${upH % 24}h`],
+            ["MQTT", sys.mqtt ? "Verbunden" : "Getrennt"],
+            ["RTU", sys.rtu_connected ? "Verbunden" : "Getrennt"],
+          ].map(([l, v]) => (
+            <div key={l} className="flex items-center justify-between py-2">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-tx3">{l}</span>
+              <span className="num text-xs font-semibold text-tx">{v}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Shared helpers ────────────────────────────────────────────────────────────
+function SettingField({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-tile border border-border bg-bg2 px-3 py-2">
+      <div className="mb-1 text-[9px] font-bold uppercase tracking-[0.1em] text-tx3">{label}</div>
+      <div className="num text-sm font-semibold text-tx">{value}</div>
+    </div>
   );
 }
 
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
-    <button type="button" onClick={(e) => { e.stopPropagation(); onChange(!checked); }} className={`relative h-7 w-12 rounded-full transition ${checked ? "bg-primary" : "bg-slate-300"}`}>
-      <span className={`absolute top-1 h-5 w-5 rounded-full bg-bg1 shadow transition ${checked ? "left-6" : "left-1"}`} />
+    <button type="button" onClick={(e) => { e.stopPropagation(); onChange(!checked); }}
+      className={cn("relative h-5 w-9 rounded-full transition", checked ? "bg-ok" : "bg-bg3 border border-border")}>
+      <span className={cn("absolute top-0.5 h-4 w-4 rounded-full bg-bg1 shadow transition-all", checked ? "left-[18px]" : "left-0.5")} />
     </button>
   );
 }
-
-function NumField({ label, value, step, hint, onChange }: { label: string; value: number; step: number; hint?: string; onChange: (v: number) => void }) {
-  const [text, setText] = useState(() => String(Number.isFinite(value) ? value : 0));
-
-  useEffect(() => {
-    setText(String(Number.isFinite(value) ? value : 0));
-  }, [value]);
-
-  return (
-    <label className="flex flex-col gap-1">
-      <span className="text-xs font-semibold uppercase tracking-wider text-tx3">{label}</span>
-      <input
-        type="number"
-        value={text}
-        step={step}
-        onChange={(e) => {
-          const next = e.target.value;
-          setText(next);
-          if (next === "" || next === "-" || next === "." || next === ",") return;
-          const parsed = Number.parseFloat(next.replace(",", "."));
-          if (Number.isFinite(parsed)) onChange(parsed);
-        }}
-        onBlur={() => {
-          const parsed = Number.parseFloat(text.replace(",", "."));
-          if (Number.isFinite(parsed)) {
-            const normalized = String(parsed);
-            setText(normalized);
-            onChange(parsed);
-          } else {
-            setText(String(Number.isFinite(value) ? value : 0));
-          }
-        }}
-        className="h-11 rounded-tile border border-border bg-bg1 px-3 text-base font-semibold tabular-nums focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-      />
-      {hint && <span className="text-[11px] leading-snug text-tx3">{hint}</span>}
-    </label>
-  );
-}
-
-function TextField({ label, value, disabled, hint, onChange }: { label: string; value: string; disabled?: boolean; hint?: string; onChange: (v: string) => void }) {
-  return (
-    <label className="flex flex-col gap-1">
-      <span className="text-xs font-semibold uppercase tracking-wider text-tx3">{label}</span>
-      <input type="text" value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)} className="h-11 rounded-tile border border-border bg-bg1 px-3 text-sm disabled:bg-bg2" />
-      {hint && <span className="text-[11px] leading-snug text-tx3">{hint}</span>}
-    </label>
-  );
-}
-
-function Select({ label, value, options, optionLabels, hint, onChange }: { label: string; value: string; options: string[]; optionLabels?: Record<string, string>; hint?: string; onChange: (v: string) => void }) {
-  return (
-    <label className="flex flex-col gap-1">
-      <span className="text-xs font-semibold uppercase tracking-wider text-tx3">{label}</span>
-      <select value={value} onChange={(e) => onChange(e.target.value)} className="h-11 rounded-tile border border-border bg-bg1 px-3 text-sm font-semibold">
-        {options.map((o) => <option key={o} value={o}>{optionLabels?.[o] ?? o}</option>)}
-      </select>
-      {hint && <span className="text-[11px] leading-snug text-tx3">{hint}</span>}
-    </label>
-  );
-}
-
-function HelpText({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="mt-3 rounded-tile border border-primary/15 bg-[var(--color-blue-dim)] p-3 text-xs leading-relaxed text-tx2">
-      {children}
-    </div>
-  );
-}
-
-function TimeField({ label, h, m, onChange }: { label: string; h: number; m: number; onChange: (h: number, m: number) => void }) {
-  return (
-    <label className="flex flex-col gap-1">
-      <span className="text-xs font-semibold uppercase tracking-wider text-tx3">{label}</span>
-      <input type="time" value={`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`} onChange={(e) => {
-        const [hh, mm] = e.target.value.split(":").map(Number);
-        onChange(hh, mm);
-      }} className="h-11 rounded-tile border border-border bg-bg1 px-3 text-base font-semibold tabular-nums" />
-    </label>
-  );
-}
-
-function Info({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-tile border border-border bg-bg1 p-3 shadow-card ">
-      <div className="text-xs font-semibold uppercase tracking-wider text-tx3">{label}</div>
-      <div className="truncate text-sm font-medium text-tx2">{value}</div>
-    </div>
-  );
-}
-
-function timeLabel(p: IrrigationProgram) {
-  return `${String(p.start_hour).padStart(2, "0")}:${String(p.start_min).padStart(2, "0")}`;
-}
-

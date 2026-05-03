@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, ChevronLeft, ChevronRight, Droplets, Gauge, Ruler, Sparkles, SunMedium } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Download, Droplets, Eye, EyeOff, Gauge, KeyRound, RefreshCw, RotateCcw, Ruler, Sparkles, SunMedium } from "lucide-react";
 import type React from "react";
 import { Section } from "@/components/section";
 import { useStatus } from "@/lib/ws";
@@ -783,9 +783,12 @@ function OtaSection({ fw }: { fw: string }) {
   const [ota, setOta] = useState<OtaStatus | null>(null);
   const [log, setLog] = useState<string[]>([]);
   const [polling, setPolling] = useState(false);
+  const [updateAction, setUpdateAction] = useState<"idle" | "check" | "install" | "rollback">("idle");
   const [tokenDraft, setTokenDraft] = useState("");
+  const [showToken, setShowToken] = useState(false);
   const [tokenBusy, setTokenBusy] = useState(false);
   const [tokenMessage, setTokenMessage] = useState("");
+  const [restartHint, setRestartHint] = useState(false);
   const logRef = useRef<HTMLPreElement>(null);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   useEffect(() => {
@@ -794,19 +797,24 @@ function OtaSection({ fw }: { fw: string }) {
   }, []);
   useEffect(() => { if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight; }, [log]);
 
-  const poll = () => {
+  const poll = (action: "check" | "install" | "rollback") => {
     setPolling(true);
+    setUpdateAction(action);
     if (timer.current) clearInterval(timer.current);
-    timer.current = setInterval(async () => {
+    const tick = async () => {
       const r = await api.otaLog().catch(() => null);
       if (!r) return;
       setLog(r.lines);
       if (!r.running) {
         if (timer.current) clearInterval(timer.current);
         setPolling(false);
+        setUpdateAction("idle");
+        if (action === "install" && r.exit_code === 0) setRestartHint(true);
         api.otaStatus().then(setOta).catch(() => {});
       }
-    }, 1000);
+    };
+    void tick();
+    timer.current = setInterval(tick, 1000);
   };
 
   const saveToken = async () => {
@@ -852,40 +860,101 @@ function OtaSection({ fw }: { fw: string }) {
     : ota.token_ok === true ? "Token OK"
     : ota.token_ok === false ? "Token fehlerhaft"
     : "Token hinterlegt";
+  const statusTone =
+    ota?.running || polling ? "border-primary/20 bg-primary/10 text-primary"
+    : ota?.exit_code && ota.exit_code !== 0 ? "border-danger/20 bg-danger/10 text-danger"
+    : ota?.update_available ? "border-ok/20 bg-ok/10 text-ok"
+    : "border-slate-200 bg-slate-100 text-slate-600";
+  const statusLabel =
+    ota?.running || polling ? "Update-Aktion laeuft"
+    : ota?.exit_code && ota.exit_code !== 0 ? "Letzte Aktion fehlerhaft"
+    : ota?.update_available ? "Online-Update verfuegbar"
+    : "System aktuell oder nicht geprueft";
+  const progress =
+    ota?.running || polling ? (updateAction === "install" ? 68 : updateAction === "rollback" ? 48 : 34)
+    : log.length > 0 && ota?.exit_code === 0 ? 100
+    : log.length > 0 && ota?.exit_code !== null ? 100
+    : 0;
+  const phaseLabel =
+    ota?.running || polling ? (updateAction === "install" ? "Installation" : updateAction === "rollback" ? "Rollback" : "Online-Pruefung")
+    : ota?.exit_code === 0 ? "Fertig"
+    : ota?.exit_code && ota.exit_code !== 0 ? "Fehler"
+    : "Bereit";
 
   return (
     <Section title="System-Update">
-      <div className="rounded-lg border border-white/70 bg-white/80 p-4 shadow-[0_14px_36px_rgba(15,23,42,0.08)] backdrop-blur">
-        <div className="grid gap-3 md:grid-cols-3">
+      <div className="relative overflow-hidden rounded-lg border border-white/70 bg-gradient-to-br from-white/90 via-cyan-50/70 to-emerald-50/60 p-4 shadow-[0_18px_48px_rgba(15,23,42,0.12)] backdrop-blur">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary via-cyan-400 to-ok" />
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <div className="text-sm font-bold text-slate-900">Online-Updates</div>
+            <div className="mt-1 max-w-xl text-xs leading-relaxed text-slate-500">
+              Prueft GitHub Releases, installiert freigegebene Pakete und zeigt den Live-Log direkt hier an.
+            </div>
+          </div>
+          <span className={`inline-flex w-fit rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wider ${statusTone}`}>
+            {statusLabel}
+          </span>
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
           <Info label="Installiert" value={ota?.current_version ?? fw} />
           <Info label="Neueste Version" value={ota?.latest_version ?? "-"} />
           <Info label="Commit" value={ota?.latest_commit?.slice(0, 12) ?? "-"} />
         </div>
-        <div className="mt-4 rounded-lg border border-white/70 bg-gradient-to-br from-white/90 to-sky-50/70 p-3 shadow-sm">
+
+        {ota?.update_available && (
+          <motion.div
+            className="mt-3 rounded-lg border border-ok/20 bg-white/75 p-3 text-sm text-slate-700 shadow-sm backdrop-blur"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <div className="font-semibold text-slate-900">Update bereit: {ota.latest_version}</div>
+            {ota.latest_date && <div className="mt-1 text-xs text-slate-500">Release: {new Date(ota.latest_date).toLocaleString("de-DE")}</div>}
+          </motion.div>
+        )}
+
+        <div className="mt-4 rounded-lg border border-white/70 bg-white/75 p-3 shadow-[0_12px_30px_rgba(15,23,42,0.08)] backdrop-blur">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div>
-              <div className="text-sm font-bold text-slate-900">GitHub Token</div>
-              <div className="text-xs text-slate-500">Wird fuer private Repositories benoetigt. Der Token wird nicht angezeigt.</div>
+              <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                <KeyRound className="h-4 w-4 text-primary" />
+                GitHub Token
+              </div>
+              <div className="mt-1 text-xs leading-relaxed text-slate-500">
+                Fuer private Repositories. Der Token wird lokal gespeichert, nicht zurueckgelesen und dauerhaft nie angezeigt.
+              </div>
             </div>
             <span className={`rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wider ${tokenTone}`}>
               {tokenLabel}
             </span>
           </div>
           <div className="grid gap-2 md:grid-cols-[1fr_auto_auto]">
-            <input
-              type="password"
-              value={tokenDraft}
-              autoComplete="off"
-              placeholder={ota?.token_configured ? "Neuen Token eintragen zum Ersetzen" : "GitHub Fine-Grained Token"}
-              onChange={(e) => setTokenDraft(e.target.value)}
-              className="h-11 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-slate-900 outline-none ring-primary/20 focus:ring-4"
-            />
+            <div className="relative">
+              <input
+                type={showToken ? "text" : "password"}
+                value={tokenDraft}
+                autoComplete="off"
+                placeholder={ota?.token_configured ? "Neuen Token eintragen zum Ersetzen" : "GitHub Fine-Grained Token"}
+                onChange={(e) => setTokenDraft(e.target.value)}
+                className="h-11 w-full rounded-lg border border-border bg-white/90 px-3 pr-11 text-sm font-semibold text-slate-900 outline-none ring-primary/20 focus:ring-4"
+              />
+              <button
+                type="button"
+                onClick={() => setShowToken((v) => !v)}
+                className="absolute right-1 top-1 flex h-9 w-9 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100"
+                aria-label={showToken ? "Token verbergen" : "Token anzeigen"}
+              >
+                {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
             <button
               type="button"
               onClick={saveToken}
               disabled={tokenBusy || tokenDraft.trim().length < 20}
-              className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white disabled:opacity-40"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-white shadow-[0_10px_22px_rgba(37,136,235,0.22)] disabled:opacity-40"
             >
+              <Check className="h-4 w-4" />
               Speichern & pruefen
             </button>
             {ota?.token_configured && (
@@ -893,7 +962,7 @@ function OtaSection({ fw }: { fw: string }) {
                 type="button"
                 onClick={deleteToken}
                 disabled={tokenBusy}
-                className="rounded-lg border border-danger/30 px-4 py-2 text-sm font-bold text-danger disabled:opacity-40"
+                className="h-11 rounded-lg border border-danger/30 bg-white/70 px-4 text-sm font-bold text-danger disabled:opacity-40"
               >
                 Entfernen
               </button>
@@ -903,13 +972,77 @@ function OtaSection({ fw }: { fw: string }) {
             <div className="mt-2 text-xs text-slate-500">{tokenMessage || ota?.token_message}</div>
           )}
         </div>
-        {ota?.changelog && <div className="mt-3 rounded-lg border border-border bg-slate-50 p-3 text-sm text-slate-700 whitespace-pre-line">{ota.changelog}</div>}
-        <div className="mt-4 flex flex-wrap gap-2">
-          <button type="button" onClick={async () => { await api.otaCheck(); poll(); }} disabled={polling || ota?.running} className="rounded-lg border border-border px-4 py-2 text-sm font-bold">Prufen</button>
-          <button type="button" onClick={async () => { await api.otaInstall(ota?.latest_version ?? undefined); poll(); }} disabled={polling || ota?.running || !ota?.update_available} className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white disabled:opacity-40">Installieren</button>
-          <button type="button" onClick={async () => { await api.otaRollback(); poll(); }} disabled={polling || ota?.running} className="rounded-lg border border-warn/40 px-4 py-2 text-sm font-bold text-warn">Rollback</button>
+
+        {ota?.changelog && (
+          <div className="mt-3 rounded-lg border border-white/70 bg-white/75 p-3 text-sm text-slate-700 shadow-sm whitespace-pre-line backdrop-blur">
+            {ota.changelog}
+          </div>
+        )}
+
+        <div className="mt-4 grid gap-2 sm:grid-cols-3">
+          <button
+            type="button"
+            onClick={async () => { await api.otaCheck(); poll("check"); }}
+            disabled={polling || ota?.running}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-border bg-white/75 px-4 text-sm font-bold text-slate-700 shadow-sm disabled:opacity-40"
+          >
+            <RefreshCw className={`h-4 w-4 ${updateAction === "check" ? "animate-spin" : ""}`} />
+            Online pruefen
+          </button>
+          <button
+            type="button"
+            onClick={async () => { setRestartHint(false); await api.otaInstall(ota?.latest_version ?? undefined); poll("install"); }}
+            disabled={polling || ota?.running || !ota?.update_available}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-white shadow-[0_12px_26px_rgba(37,136,235,0.25)] disabled:opacity-40"
+          >
+            <Download className="h-4 w-4" />
+            Installieren
+          </button>
+          <button
+            type="button"
+            onClick={async () => { await api.otaRollback(); poll("rollback"); }}
+            disabled={polling || ota?.running}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-warn/40 bg-white/75 px-4 text-sm font-bold text-warn shadow-sm disabled:opacity-40"
+          >
+            <RotateCcw className="h-4 w-4" />
+            Rollback
+          </button>
         </div>
-        {log.length > 0 && <pre ref={logRef} className="mt-4 max-h-56 overflow-y-auto rounded-lg bg-slate-950 p-3 text-xs text-slate-200">{log.join("\n")}</pre>}
+
+        {(log.length > 0 || polling || ota?.running) && (
+          <motion.div
+            className="mt-4 rounded-lg border border-white/70 bg-white/75 p-3 shadow-sm backdrop-blur"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <div className="mb-2 flex items-center justify-between gap-3 text-xs font-semibold text-slate-600">
+              <span>{phaseLabel}</span>
+              <span>{progress}%</span>
+            </div>
+            <div className="h-3 overflow-hidden rounded-full bg-slate-200">
+              <motion.div
+                className={`h-full rounded-full ${ota?.exit_code && ota.exit_code !== 0 ? "bg-danger" : "bg-gradient-to-r from-primary to-ok"}`}
+                animate={{ width: `${progress}%` }}
+                transition={{ duration: 0.25 }}
+              />
+            </div>
+            {log.length > 0 && (
+              <pre ref={logRef} className="mt-3 max-h-56 overflow-y-auto rounded-lg bg-slate-950 p-3 text-xs leading-relaxed text-slate-200 shadow-inner">
+                {log.join("\n")}
+              </pre>
+            )}
+          </motion.div>
+        )}
+
+        {restartHint && (
+          <motion.div
+            className="mt-3 rounded-lg border border-ok/20 bg-ok/10 p-3 text-sm text-slate-700"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            Update installiert. Falls die UI nicht automatisch neu verbunden ist, Seite einmal neu laden.
+          </motion.div>
+        )}
       </div>
     </Section>
   );

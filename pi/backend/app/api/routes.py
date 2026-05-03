@@ -45,6 +45,9 @@ async def v20_start():
 
 @router.post("/v20/stop")
 async def v20_stop():
+    deps.pi_ctrl.set_manual_stop(True)
+    if deps.irrigation:
+        deps.irrigation.pause_active("Pumpen-Stop")
     await deps.rtu.stop()
     return {"ok": True}
 
@@ -199,6 +202,14 @@ async def irrigation_run(body: RunBody):
 async def irrigation_stop(body: dict | None = None):
     pid = (body or {}).get("program_id", "")
     return deps.irrigation.stop_program(pid, "REST Stop")
+
+
+@router.post("/irrigation/resume")
+async def irrigation_resume():
+    res = deps.irrigation.resume_active()
+    if not res["ok"]:
+        raise HTTPException(status_code=400, detail=res["error"])
+    return res
 
 
 # ── /history ──────────────────────────────────────────────────

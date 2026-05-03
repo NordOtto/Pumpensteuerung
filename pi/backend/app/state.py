@@ -119,6 +119,8 @@ class IrrigationDecision(BaseModel):
     active_program_name: str = ""
     active_preset: str = ""
     phase: str = "idle"
+    paused: bool = False
+    paused_since: str | None = None
     started_by: str = ""
     remaining_s: int = 0
     zone_remaining_s: int = 0

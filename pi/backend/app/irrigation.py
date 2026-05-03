@@ -172,9 +172,14 @@ class _ActiveRun:
     total_runtime_s: int = 0
     zone_remaining_s: float = 0.0
     soaking: bool = False
+    paused: bool = False
+    paused_since: float = 0.0
+    paused_date: str = ""
+    paused_phase: str = "run"
+    paused_remaining_s: float = 0.0
 
     def remaining_s(self, now: float) -> int:
-        current = max(0, self.zone_ends_at - now) if self.zone_ends_at else 0
+        current = self.paused_remaining_s if self.paused else (max(0, self.zone_ends_at - now) if self.zone_ends_at else 0)
         future = max(0, self.zone_remaining_s)
         for zone in self.zones[self.zone_index + 1:]:
             smart = (self.zone_runtimes or {}).get(zone["id"])
@@ -499,12 +504,24 @@ class IrrigationManager:
         d.active_zone_name = (self._active.zone or {}).get("name", "") if self._active else ""
         d.active_program_name = self._active.program["name"] if self._active else ""
         d.active_preset = (self._active.zone or {}).get("preset", "") if self._active else ""
-        d.phase = "soak" if self._active and self._active.soaking else ("run" if self._active else "idle")
+        d.phase = (
+            "paused" if self._active and self._active.paused
+            else "soak" if self._active and self._active.soaking
+            else "run" if self._active else "idle"
+        )
         d.started_by = self._active.started_by if self._active else ""
         now = datetime.now(_TZ).timestamp()
         d.remaining_s = self._active.remaining_s(now) if self._active else 0
-        d.zone_remaining_s = max(0, round((self._active.zone_ends_at or now) - now)) if self._active else 0
-        d.ends_at = datetime.fromtimestamp(self._active.zone_ends_at, tz=_TZ).isoformat() if self._active and self._active.zone_ends_at else None
+        if self._active and self._active.paused:
+            d.zone_remaining_s = max(0, round(self._active.paused_remaining_s))
+            d.ends_at = None
+            d.paused = True
+            d.paused_since = datetime.fromtimestamp(self._active.paused_since, tz=_TZ).isoformat() if self._active.paused_since else None
+        else:
+            d.zone_remaining_s = max(0, round((self._active.zone_ends_at or now) - now)) if self._active else 0
+            d.ends_at = datetime.fromtimestamp(self._active.zone_ends_at, tz=_TZ).isoformat() if self._active and self._active.zone_ends_at else None
+            d.paused = False
+            d.paused_since = None
 
     def publish_decision(self) -> None:
         d = app_state.irrigation.decision
@@ -547,7 +564,7 @@ class IrrigationManager:
         self._active.soaking = False
         self._start_zone_cycle()
 
-    def _start_zone_cycle(self) -> None:
+    def _start_zone_cycle(self, count_runtime: bool = True) -> None:
         if not self._active or not self._active.zone:
             return
         zone = self._active.zone
@@ -559,7 +576,8 @@ class IrrigationManager:
         now = datetime.now(_TZ).timestamp()
         self._active.zone_started_at = now
         self._active.zone_ends_at = now + runtime_s
-        self._active.total_runtime_s += runtime_s
+        if count_runtime:
+            self._active.total_runtime_s += runtime_s
         self._active.zone_remaining_s = max(0, self._active.zone_remaining_s - runtime_s)
 
         if zone.get("preset"):
@@ -617,6 +635,65 @@ class IrrigationManager:
             return
         self._active.soaking = False
         self._start_zone_cycle()
+
+    def pause_active(self, reason: str = "Pumpe gestoppt") -> dict[str, Any]:
+        if not self._active:
+            self._v20_stop()
+            return {"ok": True, "paused": False}
+        if self._active.paused:
+            self._v20_stop()
+            return {"ok": True, "paused": True}
+        now = datetime.now(_TZ).timestamp()
+        if self._active.zone:
+            remaining = max(0, (self._active.zone_ends_at or now) - now)
+            self._publish_zone_command(self._active.zone, "stop", self._active.program, 0)
+            app_state.irrigation.zones[self._active.zone["id"]] = {
+                **app_state.irrigation.zones.get(self._active.zone["id"], {}),
+                "command": "stop",
+                "state": "PAUSED",
+                "ends_at": None,
+                "updated_at": _now_iso(),
+            }
+        else:
+            remaining = 0
+        self._v20_stop()
+        self._active.paused = True
+        self._active.paused_since = now
+        self._active.paused_date = _local_date_key()
+        self._active.paused_phase = "soak" if self._active.soaking else "run"
+        self._active.paused_remaining_s = max(0, round(remaining))
+        self._active.zone_ends_at = 0
+        web_log(f"[IRR] Programm {self._active.program['name']} pausiert ({reason})")
+        self.recompute_decision(self._active.program["id"])
+        self.publish_decision()
+        return {"ok": True, "paused": True}
+
+    def resume_active(self) -> dict[str, Any]:
+        if not self._active or not self._active.paused:
+            return {"ok": False, "error": "Keine pausierte Bewaesserung"}
+        if self._active.paused_date and self._active.paused_date != _local_date_key():
+            self._finish_run("stopped", "Pause abgelaufen")
+            return {"ok": False, "error": "Pause ist nicht mehr vom selben Tag"}
+        if not self._active.zone:
+            return {"ok": False, "error": "Keine pausierte Zone"}
+        self._active.paused = False
+        self._active.paused_since = 0
+        self._active.paused_date = ""
+        remaining = max(30, round(self._active.paused_remaining_s or 0))
+        self._active.paused_remaining_s = 0
+        if self._active.paused_phase == "soak":
+            now = datetime.now(_TZ).timestamp()
+            self._active.soaking = True
+            self._active.zone_ends_at = now + remaining
+            web_log(f"[IRR] Sickerpause fortgesetzt ({round(remaining / 60)} min)")
+        else:
+            self._active.soaking = False
+            self._active.zone_remaining_s = remaining
+            self._start_zone_cycle(count_runtime=False)
+            web_log(f"[IRR] Zone {self._active.zone['name']} fortgesetzt ({round(remaining / 60)} min)")
+        self.recompute_decision(self._active.program["id"])
+        self.publish_decision()
+        return {"ok": True, "resumed": True}
 
     def _finish_run(self, result: str, reason: str = "") -> None:
         if not self._active:
@@ -767,6 +844,13 @@ class IrrigationManager:
         self._last_tick = now
 
         if self._active:
+            if self._active.paused:
+                if self._active.paused_date and self._active.paused_date != _local_date_key():
+                    self._finish_run("stopped", "Pause abgelaufen")
+                    return
+                self.recompute_decision(self._active.program["id"])
+                self.publish_decision()
+                return
             safety = self._safety_block_reason()
             if safety:
                 self._finish_run("stopped", safety)

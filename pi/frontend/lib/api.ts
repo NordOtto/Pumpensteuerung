@@ -58,6 +58,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ program_id: program_id ?? "" }),
     }),
+  resumeProgram: () =>
+    request("/api/irrigation/resume", {
+      method: "POST",
+    }),
   recommendSmartEt: (payload: Record<string, unknown>) =>
     request<{
       zone_patch: Partial<import("./types").IrrigationZone>;

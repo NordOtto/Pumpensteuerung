@@ -93,7 +93,9 @@ export interface IrrigationDecision {
   active_zone_name: string;
   active_program_name: string;
   active_preset: string;
-  phase: "idle" | "run" | "soak";
+  phase: "idle" | "run" | "soak" | "paused";
+  paused: boolean;
+  paused_since: string | null;
   started_by: "" | "manual" | "auto";
   remaining_s: number;
   zone_remaining_s: number;

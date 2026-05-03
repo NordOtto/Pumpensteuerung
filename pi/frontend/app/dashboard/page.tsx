@@ -75,10 +75,21 @@ export default function DashboardPage() {
     }
   };
 
+  const resumeIrrigation = async () => {
+    setActionError("");
+    try {
+      await api.resumeProgram();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Fortsetzen fehlgeschlagen");
+    }
+  };
+
   const handlePumpToggle = async () => {
     setActionError("");
     try {
-      if (v.running) {
+      if (decision.paused) {
+        await api.resumeProgram();
+      } else if (v.running) {
         await api.v20Stop();
       } else {
         await api.v20Start();
@@ -157,14 +168,14 @@ export default function DashboardPage() {
                     <button
                       type="button"
                       onClick={handlePumpToggle}
-                      disabled={!v.running && (v.fault || status.vacation.enabled)}
+                      disabled={!decision.paused && !v.running && (v.fault || status.vacation.enabled)}
                       className={cn(
                         "inline-flex h-14 min-w-44 items-center justify-center gap-2 rounded-lg px-5 text-sm font-bold uppercase tracking-wide text-white shadow-sm transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45",
                         v.running ? "bg-danger hover:bg-danger/90" : "bg-ok hover:bg-ok/90"
                       )}
                     >
                       {v.running ? <Square size={18} /> : <Play size={18} />}
-                      {v.running ? "Pumpe stoppen" : "Pumpe starten"}
+                      {decision.paused ? "Fortsetzen" : v.running ? "Pumpe stoppen" : "Pumpe starten"}
                     </button>
                     {v.fault && (
                       <button
@@ -192,8 +203,8 @@ export default function DashboardPage() {
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div>
                       <div className="mb-2 flex flex-wrap items-center gap-2">
-                        <StatusBadge tone={decision.running ? "ok" : decision.allowed ? "muted" : "warn"} pulse={decision.running}>
-                          {decision.running ? "Bewaessert" : decision.allowed ? "Bereit" : "Wartet"}
+                        <StatusBadge tone={decision.paused ? "warn" : decision.running ? "ok" : decision.allowed ? "muted" : "warn"} pulse={decision.running && !decision.paused}>
+                          {decision.paused ? "Pausiert" : decision.running ? "Bewaessert" : decision.allowed ? "Bereit" : "Wartet"}
                         </StatusBadge>
                         <span className="rounded-full border border-white/70 bg-white/70 px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm">
                           {decision.running
@@ -203,13 +214,18 @@ export default function DashboardPage() {
                         {decision.phase === "soak" && (
                           <span className="rounded-full border border-ok/20 bg-ok/10 px-3 py-1 text-xs font-semibold text-ok">Sickerpause</span>
                         )}
+                        {decision.paused && (
+                          <span className="rounded-full border border-warn/25 bg-warn/10 px-3 py-1 text-xs font-semibold text-warn">Sicher gestoppt</span>
+                        )}
                       </div>
                       <h1 className="text-2xl font-bold text-slate-950">
                         {decision.running ? decision.active_program_name || "Bewaesserung aktiv" : selectedProgram?.name || "Kein Programm"}
                       </h1>
                       <p className="mt-1 max-w-2xl text-sm text-slate-500">
                         {decision.running
-                          ? `${decision.active_zone_name || "Zone"} ${decision.phase === "soak" ? "sickert" : "laeuft"} mit Preset ${decision.active_preset || status.active_preset || "Normal"}.`
+                          ? decision.paused
+                            ? `${decision.active_zone_name || "Zone"} ist pausiert. Du kannst heute fortsetzen oder die Bewaesserung beenden.`
+                            : `${decision.active_zone_name || "Zone"} ${decision.phase === "soak" ? "sickert" : "laeuft"} mit Preset ${decision.active_preset || status.active_preset || "Normal"}.`
                           : `Naechster Automatikstart: ${nextStart}. ${decision.reason || "Bereit"}.`}
                       </p>
                     </div>
@@ -245,9 +261,13 @@ export default function DashboardPage() {
                         })}
                       </div>
                       <div className="grid gap-3 md:grid-cols-3">
-                        <ActionButton icon={<ShieldCheck size={18} />} title="Automatik jetzt" subtitle="nutzt Wetter, ET und Wochenlimit" disabled={!selectedProgram || decision.running} onClick={() => selectedProgram && runProgram(selectedProgram, false)} />
+                        {decision.paused ? (
+                          <ActionButton icon={<Play size={18} />} title="Fortsetzen" subtitle="setzt die pausierte Zone fort" tone="primary" onClick={resumeIrrigation} />
+                        ) : (
+                          <ActionButton icon={<ShieldCheck size={18} />} title="Automatik jetzt" subtitle="nutzt Wetter, ET und Wochenlimit" disabled={!selectedProgram || decision.running} onClick={() => selectedProgram && runProgram(selectedProgram, false)} />
+                        )}
                         <ActionButton icon={<Play size={18} />} title={`Manuell ${manualMinutes} min`} subtitle="uebergeht Wetterpruefung" disabled={!selectedProgram || decision.running} onClick={() => selectedProgram && runProgram(selectedProgram, true, manualMinutes)} />
-                        <ActionButton icon={<Square size={18} />} title="Bewaesserung stoppen" subtitle="Zone und Pumpe stoppen" tone="danger" disabled={!decision.running} onClick={stopIrrigation} />
+                        <ActionButton icon={<Square size={18} />} title={decision.paused ? "Bewaesserung beenden" : "Bewaesserung stoppen"} subtitle={decision.paused ? "setzt den Lauf zurueck" : "Zone und Pumpe stoppen"} tone="danger" disabled={!decision.running} onClick={stopIrrigation} />
                       </div>
                     </div>
                     <div className="rounded-lg border border-white/70 bg-white/70 p-3 shadow-sm">
@@ -299,7 +319,7 @@ export default function DashboardPage() {
                       <InfoRow label="Programm" value={decision.active_program_name || "-"} />
                       <InfoRow label="Zone" value={decision.active_zone_name || "-"} />
                       <InfoRow label="Startart" value={decision.started_by === "manual" ? "Manuell" : "Automatisch"} />
-                      <InfoRow label="Phase" value={decision.phase === "soak" ? "Sickerpause" : "Laeuft"} />
+                      <InfoRow label="Phase" value={decision.paused ? "Pausiert" : decision.phase === "soak" ? "Sickerpause" : "Laeuft"} />
                       <InfoRow label="Preset" value={decision.active_preset || status.active_preset || "Normal"} />
                       <InfoRow label="Rest gesamt" value={formatDuration(decision.remaining_s)} />
                     </div>

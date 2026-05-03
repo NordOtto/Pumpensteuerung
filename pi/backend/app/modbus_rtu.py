@@ -35,6 +35,8 @@ FREQ_WRITE_SCALE = 327.68
 FREQ_READ_SCALE = 0.0030517578
 CURRENT_SCALE = 0.01
 POWER_SCALE = 0.01
+FREQ_MIN_SAFE = 10.0
+FREQ_MAX_SAFE = 60.0
 
 
 class V20RtuClient:
@@ -76,7 +78,7 @@ class V20RtuClient:
     async def set_frequency(self, hz: float) -> None:
         requested = float(hz)
         if requested > 0:
-            requested = max(app_state.pi.freq_min, min(app_state.pi.freq_max, requested))
+            requested = max(FREQ_MIN_SAFE, min(FREQ_MAX_SAFE, requested))
         raw = max(0, min(0xFFFF, int(round(requested * FREQ_WRITE_SCALE))))
         app_state.v20.freq_setpoint = requested
         await self._write(REG_HSW, raw)

@@ -5,7 +5,7 @@ import { Play, Square, RotateCcw, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useStatus } from "@/lib/ws";
 import { api } from "@/lib/api";
-import { cn } from "@/lib/utils";
+import { cn, formatFixed, formatSmart } from "@/lib/utils";
 import type { IrrigationProgram } from "@/lib/types";
 
 const QUICK_MINUTES = [10, 20, 30, 45, 60];
@@ -32,6 +32,16 @@ export default function DashboardPage() {
     ? new Date(decision.next_start).toLocaleString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
     : "—";
 
+  const decisionProgram = programs.find((p) => p.id === decision.program_id);
+  const decisionZones = decisionProgram?.zones.filter((z) => {
+    if (!z.enabled) return false;
+    if (decisionProgram.mode !== "smart_et") return true;
+    return z.deficit_mm >= z.min_deficit_mm;
+  }) ?? [];
+  const nextRunLabel = decisionProgram
+    ? `${decisionProgram.name}${decisionZones.length ? ` ? ${decisionZones.map((z) => z.name).join(", ")}` : ""}`
+    : "Kein Programm";
+
   return (
     <div className="flex flex-col gap-2.5">
 
@@ -53,14 +63,14 @@ export default function DashboardPage() {
 
           {/* KPI Grid */}
           <div className="mb-3.5 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <KpiTile label="Druck" value={status.pressure_bar.toFixed(2)} unit="bar" colorClass="text-primary"
-              sub={`P_ein ${status.pi.p_on.toFixed(1)} / P_aus ${status.pi.p_off.toFixed(1)}`} />
-            <KpiTile label="Durchfluss" value={status.flow_rate.toFixed(1)} unit="L/min" colorClass="text-ok"
+            <KpiTile label="Druck" value={formatFixed(status.pressure_bar, 2)} unit="bar" colorClass="text-primary"
+              sub={`P_ein ${formatFixed(status.pi.p_on, 1)} / P_aus ${formatFixed(status.pi.p_off, 1)}`} />
+            <KpiTile label="Durchfluss" value={formatFixed(status.flow_rate, 1)} unit="L/min" colorClass="text-ok"
               sub={status.flow_estimated ? "geschätzt" : "Sensor"} />
-            <KpiTile label="Frequenz" value={v.frequency.toFixed(1)} unit="Hz" colorClass="text-warn"
-              sub={`Soll ${v.freq_setpoint.toFixed(1)} Hz`} />
-            <KpiTile label="Leistung" value={v.power.toFixed(1)} unit="kW" colorClass="text-purple"
-              sub={`${v.current.toFixed(1)} A / ${v.voltage} V`} />
+            <KpiTile label="Frequenz" value={formatFixed(v.frequency, 1)} unit="Hz" colorClass="text-warn"
+              sub={`Soll ${formatFixed(v.freq_setpoint, 1)} Hz`} />
+            <KpiTile label="Leistung" value={formatSmart(v.power, 0)} unit="W" colorClass="text-purple"
+              sub={`${formatFixed(v.current, 1)} A / ${formatSmart(v.voltage, 0)} V`} />
           </div>
 
           {/* Actions */}
@@ -132,10 +142,12 @@ export default function DashboardPage() {
               <span className="text-tx3">🕐</span>
               <span className="text-xs text-tx2">Nächster Start:</span>
               <span className="num text-xs font-bold text-ok">{nextStart}</span>
+              <span className="text-xs font-semibold text-tx">{nextRunLabel}</span>
             </div>
             <div className="flex gap-2">
-              <Chip label="Wasserbedarf" value={`${decision.water_budget_mm.toFixed(1)} mm`} />
-              <Chip label="Faktor" value={`×${decision.runtime_factor.toFixed(2)}`} />
+              <Chip label="Grund" value={decision.reason || "Bereit"} />
+              <Chip label="Wasserbedarf" value={`${formatFixed(decision.water_budget_mm, 1)} mm`} />
+              <Chip label="Faktor" value={`×${formatSmart(decision.runtime_factor, 2)}`} />
             </div>
           </div>
 
@@ -272,7 +284,7 @@ function ZoneChip({ name, moisture, et, next, active }: {
         <div className="h-full rounded-full" style={{ width: `${moisture}%`, background: color }} />
       </div>
       <div className="flex justify-between text-[10px] text-tx3">
-        <span>ET {et.toFixed(1)} mm</span>
+        <span>ET {formatFixed(et, 1)} mm</span>
         <span>{next}</span>
       </div>
     </div>

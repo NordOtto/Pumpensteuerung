@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { useStatus } from "@/lib/ws";
-import { cn } from "@/lib/utils";
+import { cn, formatFixed, formatSmart } from "@/lib/utils";
 import type { AppStatus, IrrigationProgram } from "@/lib/types";
 
 export default function ZonesPage() {
@@ -13,6 +13,15 @@ export default function ZonesPage() {
   const programs = status.irrigation.programs;
   const w = status.irrigation.weather;
   const decision = status.irrigation.decision;
+  const decisionProgram = programs.find((p) => p.id === decision.program_id);
+  const decisionZones = decisionProgram?.zones.filter((z) => {
+    if (!z.enabled) return false;
+    if (decisionProgram.mode !== "smart_et") return true;
+    return z.deficit_mm >= z.min_deficit_mm;
+  }) ?? [];
+  const nextTarget = decisionProgram
+    ? `${decisionProgram.name}${decisionZones.length ? ` ? ${decisionZones.map((z) => z.name).join(", ")}` : ""}`
+    : "Kein Programm";
 
   return (
     <div className="flex flex-col gap-2.5">
@@ -26,9 +35,10 @@ export default function ZonesPage() {
             <StatBox label="Nächster Start" value={decision.next_start
               ? new Date(decision.next_start).toLocaleString("de-DE", { weekday: "short", hour: "2-digit", minute: "2-digit" })
               : "—"} colorClass="text-ok" />
-            <StatBox label="Entscheidung" value={decision.reason || "Bereit"} colorClass="text-primary" />
-            <StatBox label="Wasserbedarf" value={`${decision.water_budget_mm.toFixed(1)} mm`} colorClass="text-warn" />
-            <StatBox label="Laufzeitfaktor" value={`× ${decision.runtime_factor.toFixed(2)}`} />
+            <StatBox label="Programm / Zonen" value={nextTarget} colorClass="text-primary" />
+            <StatBox label="Grund" value={decision.reason || "Bereit"} />
+            <StatBox label="Wasserbedarf" value={`${formatFixed(decision.water_budget_mm, 1)} mm`} colorClass="text-warn" />
+            <StatBox label="Laufzeitfaktor" value={`× ${formatSmart(decision.runtime_factor, 2)}`} />
           </div>
         </div>
       </div>
@@ -98,7 +108,7 @@ function ProgramPanel({ prog, decision, weather: w }: {
                 </div>
 
                 <div className="grid grid-cols-2 gap-1">
-                  {[["Defizit", `${zone.deficit_mm.toFixed(1)} mm`], ["Laufzeit", `${zone.duration_min} min`]].map(([l, v]) => (
+                  {[["Defizit", `${formatFixed(zone.deficit_mm, 1)} mm`], ["Laufzeit", `${zone.duration_min} min`]].map(([l, v]) => (
                     <div key={l} className="text-[10px]">
                       <span className="text-tx3">{l}: </span>
                       <span className="font-semibold text-tx2">{v}</span>
@@ -111,9 +121,9 @@ function ProgramPanel({ prog, decision, weather: w }: {
                 <div className="border-t border-border bg-bg1 px-3 py-2">
                   <div className="grid grid-cols-2 gap-1">
                     {[
-                      ["ET heute", w.et0_mm != null ? `${w.et0_mm.toFixed(1)} mm` : "—"],
-                      ["Start ab", `${zone.min_deficit_mm.toFixed(1)} mm`],
-                      ["Ziel", `${zone.target_mm.toFixed(1)} mm`],
+                      ["ET heute", w.et0_mm != null ? `${formatFixed(w.et0_mm, 1)} mm` : "—"],
+                      ["Start ab", `${formatFixed(zone.min_deficit_mm, 1)} mm`],
+                      ["Ziel", `${formatFixed(zone.target_mm, 1)} mm`],
                       ["Preset", zone.preset || "Normal"],
                       ["Beregnungsblock", zone.cycle_min ? `${zone.cycle_min} min` : "—"],
                       ["Sickerpause", zone.soak_min ? `${zone.soak_min} min` : "—"],

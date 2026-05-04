@@ -489,7 +489,12 @@ class IrrigationManager:
         if program_id:
             program = next((p for p in programs if p["id"] == program_id), None)
         else:
-            program = next((p for p in programs if p["enabled"]), programs[0] if programs else None)
+            enabled = [p for p in programs if p.get("enabled")]
+            program = min(
+                enabled,
+                key=lambda p: self._next_start_for(p) or "9999-12-31T23:59:59",
+                default=(programs[0] if programs else None),
+            )
         ev = self.evaluate_program(program, manual=False)
         d = app_state.irrigation.decision
         d.allowed = ev["allowed"]

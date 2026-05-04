@@ -105,7 +105,7 @@ function clonePrograms(programs: IrrigationProgram[]) {
 }
 
 function ProgramsSettings({ programs, presets }: { programs: IrrigationProgram[]; presets: Preset[] }) {
-  const [openIdx, setOpenIdx] = useState(0);
+  const [openIdx, setOpenIdx] = useState(-1);
   const [draft, setDraft] = useState<IrrigationProgram[]>(() => clonePrograms(programs));
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);

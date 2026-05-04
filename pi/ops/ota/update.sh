@@ -156,8 +156,8 @@ cmd_apply() {
     ln -sfn "$target" "${CURRENT_LINK}.new"
     mv -Tf "${CURRENT_LINK}.new" "$CURRENT_LINK"
 
-    sudo systemctl restart pumpe-backend.service
     sudo systemctl restart pumpe-frontend.service
+    sudo systemctl restart pumpe-backend.service
 
     local healthy=0
     for _ in $(seq 1 30); do

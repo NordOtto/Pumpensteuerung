@@ -31,7 +31,7 @@ export default function ZonesPage() {
         <div className="absolute inset-x-0 top-0 h-0.5" style={{ background: "linear-gradient(to right, var(--color-green), var(--color-blue))" }} />
         <div className="p-4">
           <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-tx3">Bewässerungs-Entscheidung</div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
             <StatBox label="Nächster Start" value={decision.next_start
               ? new Date(decision.next_start).toLocaleString("de-DE", { weekday: "short", hour: "2-digit", minute: "2-digit" })
               : "—"} colorClass="text-ok" />
@@ -148,7 +148,7 @@ function StatBox({ label, value, colorClass }: { label: string; value: string; c
   return (
     <div className="rounded-tile border border-border bg-bg2 px-3 py-2.5">
       <div className="mb-1 text-[9px] font-bold uppercase tracking-[0.1em] text-tx3">{label}</div>
-      <div className={cn("truncate text-sm font-bold text-tx", colorClass)}>{value}</div>
+      <div className={cn("break-words text-sm font-bold text-tx", colorClass)}>{value}</div>
     </div>
   );
 }

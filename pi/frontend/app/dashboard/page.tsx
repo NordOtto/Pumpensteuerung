@@ -137,14 +137,14 @@ export default function DashboardPage() {
           </div>
 
           {/* Next run info */}
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-tile border border-border bg-bg2 px-3 py-2.5">
-            <div className="flex items-center gap-2">
+          <div className="mb-3 flex flex-col gap-3 rounded-tile border border-border bg-bg2 px-3 py-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
               <span className="text-tx3">🕐</span>
               <span className="text-xs text-tx2">Nächster Start:</span>
               <span className="num text-xs font-bold text-ok">{nextStart}</span>
-              <span className="text-xs font-semibold text-tx">{nextRunLabel}</span>
+              <span className="min-w-0 break-words text-xs font-semibold text-tx">{nextRunLabel}</span>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Chip label="Grund" value={decision.reason || "Bereit"} />
               <Chip label="Wasserbedarf" value={`${formatFixed(decision.water_budget_mm, 1)} mm`} />
               <Chip label="Faktor" value={`×${formatSmart(decision.runtime_factor, 2)}`} />
@@ -152,7 +152,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Action tiles */}
-          <div className="mb-3 grid grid-cols-3 gap-2">
+          <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
             <ActionTile
               icon={<Sparkles size={16} />}
               label="Automatik jetzt"
@@ -262,9 +262,9 @@ function ActionTile({ icon, label, sub, color, disabled, onClick }: {
 
 function Chip({ label, value, valueClass }: { label: string; value: string; valueClass?: string }) {
   return (
-    <div className="flex flex-col gap-0.5 rounded-tile border border-border bg-bg2 px-2.5 py-1.5">
+    <div className="min-w-0 flex flex-col gap-0.5 rounded-tile border border-border bg-bg2 px-2.5 py-1.5">
       <span className="text-[9px] font-bold uppercase tracking-[0.1em] text-tx3">{label}</span>
-      <span className={cn("num text-[13px] font-semibold text-tx", valueClass)}>{value}</span>
+      <span className={cn("break-words text-[13px] font-semibold text-tx", valueClass)}>{value}</span>
     </div>
   );
 }

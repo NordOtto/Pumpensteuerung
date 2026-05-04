@@ -86,11 +86,11 @@ function WeatherSourceCard() {
         </Badge>
       </div>
 
-      <div className="mb-3 grid grid-cols-2 gap-2">
+      <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
         <button type="button" onClick={() => setSource("manual_ha")}
           className={cn("rounded-tile border px-3 py-2 text-left text-xs font-bold", source === "manual_ha" ? "border-[var(--color-green)]/35 bg-[var(--color-green-dim)] text-ok" : "border-border bg-bg2 text-tx2")}>
           HA / Ecowitt
-          <div className="mt-1 text-[10px] font-medium text-tx3">MQTT: pumpensteuerung/irrigation/weather/input</div>
+          <div className="mt-1 break-all text-[10px] font-medium text-tx3">MQTT: pumpensteuerung/irrigation/weather/input</div>
         </button>
         <button type="button" onClick={() => setSource("openweathermap")}
           className={cn("rounded-tile border px-3 py-2 text-left text-xs font-bold", source === "openweathermap" ? "border-[var(--color-blue)]/35 bg-[var(--color-blue-dim)] text-primary" : "border-border bg-bg2 text-tx2")}>
@@ -100,7 +100,7 @@ function WeatherSourceCard() {
       </div>
 
       {source === "openweathermap" && (
-        <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
           <WeatherInput label="API-Key" value={apiKey} onChange={setApiKey} placeholder={cfg?.openweathermap.configured ? "hinterlegt" : "API-Key"} password />
           <WeatherInput label="Breite" value={lat} onChange={setLat} placeholder="52.52" />
           <WeatherInput label="Laenge" value={lon} onChange={setLon} placeholder="13.40" />

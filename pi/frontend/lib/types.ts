@@ -106,6 +106,10 @@ export interface IrrigationDecision {
 
 export interface WeatherState {
   forecast_rain_mm: number;
+  forecast_rain_1h_mm?: number | null;
+  forecast_rain_24h_mm?: number | null;
+  forecast_rain_48h_mm?: number | null;
+  forecast_rain_7d_mm?: number | null;
   rain_24h_mm: number;
   temp_c: number | null;
   humidity_pct: number | null;
@@ -116,15 +120,25 @@ export interface WeatherState {
   et0_mm: number | null;
   soil_moisture_pct: number | null;
   updated_at: string | null;
+  current_source: string;
+  forecast_source: string;
+  current_updated_at: string | null;
+  forecast_updated_at: string | null;
 }
 
 export interface WeatherConfig {
-  source: "manual_ha" | "openweathermap";
+  source: "manual_ha" | "openweathermap" | "hybrid";
   openweathermap: {
     configured: boolean;
     lat: number;
     lon: number;
     refresh_min: number;
+  };
+  location: {
+    name: string;
+    country: string;
+    lat: number;
+    lon: number;
   };
   last_refresh: string | null;
   last_ok: boolean | null;

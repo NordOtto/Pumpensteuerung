@@ -93,6 +93,10 @@ class VacationState(BaseModel):
 
 class WeatherState(BaseModel):
     forecast_rain_mm: float = 0.0
+    forecast_rain_1h_mm: float | None = None
+    forecast_rain_24h_mm: float | None = None
+    forecast_rain_48h_mm: float | None = None
+    forecast_rain_7d_mm: float | None = None
     rain_24h_mm: float = 0.0
     temp_c: float | None = None
     humidity_pct: float | None = None
@@ -103,6 +107,10 @@ class WeatherState(BaseModel):
     et0_mm: float | None = None
     soil_moisture_pct: float | None = None
     updated_at: str | None = None
+    current_source: str = "local"
+    forecast_source: str = "local"
+    current_updated_at: str | None = None
+    forecast_updated_at: str | None = None
 
 
 class IrrigationDecision(BaseModel):

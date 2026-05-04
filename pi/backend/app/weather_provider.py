@@ -17,6 +17,12 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "lon": 0.0,
         "refresh_min": 60,
     },
+    "location": {
+        "name": "",
+        "country": "",
+        "lat": 0.0,
+        "lon": 0.0,
+    },
     "last_refresh": None,
     "last_ok": None,
     "last_message": "",
@@ -42,6 +48,7 @@ class WeatherProvider:
                 "lon": owm["lon"],
                 "refresh_min": owm["refresh_min"],
             },
+            "location": cfg["location"],
             "last_refresh": cfg.get("last_refresh"),
             "last_ok": cfg.get("last_ok"),
             "last_message": cfg.get("last_message", ""),
@@ -50,7 +57,7 @@ class WeatherProvider:
     def update_config(self, body: dict[str, Any]) -> dict[str, Any]:
         cfg = self._normalized(self.config)
         source = body.get("source")
-        if source in ("manual_ha", "openweathermap"):
+        if source in ("manual_ha", "openweathermap", "hybrid"):
             cfg["source"] = source
 
         owm_body = body.get("openweathermap") or {}
@@ -73,7 +80,7 @@ class WeatherProvider:
 
     async def refresh(self) -> dict[str, Any]:
         cfg = self._normalized(self.config)
-        if cfg["source"] != "openweathermap":
+        if cfg["source"] == "manual_ha":
             msg = "Lokale Wetterquelle aktiv. Werte kommen per HA/MQTT oder REST."
             self._mark(False, msg)
             return {"ok": False, "message": msg}
@@ -101,21 +108,23 @@ class WeatherProvider:
                 res = await client.get("https://api.openweathermap.org/data/3.0/onecall", params=params)
                 res.raise_for_status()
                 data = res.json()
+                location = await self._lookup_location(client, owm)
         except Exception as exc:
             msg = f"OpenWeatherMap Fehler: {exc}"
             self._mark(False, msg)
             web_log(f"[Weather] {msg}")
             return {"ok": False, "message": msg}
 
-        payload = self._to_weather_payload(data)
+        payload = self._to_weather_payload(data, forecast_only=cfg["source"] == "hybrid")
         self._ingest_weather(payload)
-        msg = "OpenWeatherMap Wetter aktualisiert."
+        self.config["location"] = location or self._location_from_weather(data, owm)
+        msg = "OpenWeatherMap Forecast aktualisiert." if cfg["source"] == "hybrid" else "OpenWeatherMap Wetter aktualisiert."
         self._mark(True, msg)
         return {"ok": True, "message": msg, "weather": payload}
 
     def should_refresh(self) -> bool:
         cfg = self._normalized(self.config)
-        if cfg["source"] != "openweathermap":
+        if cfg["source"] not in ("openweathermap", "hybrid"):
             return False
         last = cfg.get("last_refresh")
         if not last:
@@ -140,34 +149,92 @@ class WeatherProvider:
         cfg = {**DEFAULT_CONFIG, **(data or {})}
         owm = {**DEFAULT_CONFIG["openweathermap"], **((data or {}).get("openweathermap") or {})}
         cfg["openweathermap"] = owm
-        if cfg.get("source") not in ("manual_ha", "openweathermap"):
+        cfg["location"] = {**DEFAULT_CONFIG["location"], **((data or {}).get("location") or {})}
+        if cfg.get("source") not in ("manual_ha", "openweathermap", "hybrid"):
             cfg["source"] = "manual_ha"
         return cfg
 
     @staticmethod
-    def _to_weather_payload(data: dict[str, Any]) -> dict[str, Any]:
+    def _to_weather_payload(data: dict[str, Any], forecast_only: bool = False) -> dict[str, Any]:
         current = data.get("current") or {}
+        hourly = data.get("hourly") or []
         daily = data.get("daily") or []
         today = daily[0] if daily else {}
-        tomorrow = daily[1] if len(daily) > 1 else {}
         temp = current.get("temp")
         humidity = current.get("humidity")
         wind_ms = float(current.get("wind_speed") or 0)
         gust_ms = current.get("wind_gust")
         rain_24h = float((today.get("rain") or 0) + (current.get("rain") or {}).get("1h", 0))
-        forecast_rain = sum(float(day.get("rain") or 0) for day in daily[:2])
+        forecast_1h = sum(WeatherProvider._rain_from_hour(h) for h in hourly[:1])
+        forecast_24h = sum(WeatherProvider._rain_from_hour(h) for h in hourly[:24])
+        forecast_48h = sum(WeatherProvider._rain_from_hour(h) for h in hourly[:48])
+        forecast_7d = sum(float(day.get("rain") or 0) for day in daily[:7])
+        forecast_rain = forecast_48h or sum(float(day.get("rain") or 0) for day in daily[:2])
         et0 = WeatherProvider._estimate_et0(today, current)
-        return {
+        payload = {
             "forecast_rain_mm": round(forecast_rain, 1),
+            "forecast_rain_1h_mm": round(forecast_1h, 1),
+            "forecast_rain_24h_mm": round(forecast_24h, 1),
+            "forecast_rain_48h_mm": round(forecast_48h, 1),
+            "forecast_rain_7d_mm": round(forecast_7d, 1),
+            "uv_index": current.get("uvi"),
+            "et0_mm": et0,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "forecast_source": "openweathermap",
+        }
+        if forecast_only:
+            payload["forecast_only"] = True
+            return payload
+        payload.update({
             "rain_24h_mm": round(rain_24h, 1),
             "temp_c": temp,
             "humidity_pct": humidity,
             "wind_kmh": round(wind_ms * 3.6, 1),
             "wind_gust_kmh": round(float(gust_ms) * 3.6, 1) if gust_ms is not None else None,
-            "uv_index": current.get("uvi"),
-            "et0_mm": et0,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "current_source": "openweathermap",
+        })
+        return payload
+
+    @staticmethod
+    def _rain_from_hour(hour: dict[str, Any]) -> float:
+        return float((hour.get("rain") or {}).get("1h", 0) or 0)
+
+    @staticmethod
+    def _location_from_weather(data: dict[str, Any], owm: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "name": str(data.get("timezone") or ""),
+            "country": "",
+            "lat": float(data.get("lat") or owm.get("lat") or 0),
+            "lon": float(data.get("lon") or owm.get("lon") or 0),
         }
+
+    @staticmethod
+    async def _lookup_location(client: httpx.AsyncClient, owm: dict[str, Any]) -> dict[str, Any] | None:
+        try:
+            res = await client.get(
+                "https://api.openweathermap.org/geo/1.0/reverse",
+                params={
+                    "lat": owm["lat"],
+                    "lon": owm["lon"],
+                    "limit": 1,
+                    "appid": owm["api_key"],
+                },
+            )
+            res.raise_for_status()
+            items = res.json()
+            if not isinstance(items, list) or not items:
+                return None
+            item = items[0]
+            local_names = item.get("local_names") or {}
+            name = local_names.get("de") or item.get("name") or ""
+            return {
+                "name": str(name),
+                "country": str(item.get("country") or ""),
+                "lat": float(item.get("lat") or owm.get("lat") or 0),
+                "lon": float(item.get("lon") or owm.get("lon") or 0),
+            }
+        except Exception:
+            return None
 
     @staticmethod
     def _estimate_et0(today: dict[str, Any], current: dict[str, Any]) -> float | None:

@@ -307,6 +307,10 @@ class IrrigationManager:
 
         mapping = {
             "forecast_rain_mm": ("forecast_rain_mm", "forecastRainMm", "rain_forecast_mm"),
+            "forecast_rain_1h_mm": ("forecast_rain_1h_mm", "forecastRain1hMm"),
+            "forecast_rain_24h_mm": ("forecast_rain_24h_mm", "forecastRain24hMm"),
+            "forecast_rain_48h_mm": ("forecast_rain_48h_mm", "forecastRain48hMm"),
+            "forecast_rain_7d_mm": ("forecast_rain_7d_mm", "forecastRain7dMm"),
             "rain_24h_mm": ("rain_24h_mm", "rain24hMm", "rain_today_mm"),
             "temp_c": ("temp_c", "tempC", "temperature"),
             "humidity_pct": ("humidity_pct", "humidityPct", "humidity"),
@@ -317,6 +321,18 @@ class IrrigationManager:
             "et0_mm": ("et0_mm", "et0Mm", "evapotranspiration_mm"),
             "soil_moisture_pct": ("soil_moisture_pct", "soilMoisturePct", "soil_moisture"),
         }
+        forecast_only = bool(data.get("forecast_only"))
+        if forecast_only:
+            allowed = {
+                "forecast_rain_mm",
+                "forecast_rain_1h_mm",
+                "forecast_rain_24h_mm",
+                "forecast_rain_48h_mm",
+                "forecast_rain_7d_mm",
+                "uv_index",
+                "et0_mm",
+            }
+            mapping = {k: v for k, v in mapping.items() if k in allowed}
         w = app_state.irrigation.weather
         for target, keys in mapping.items():
             for k in keys:
@@ -326,10 +342,20 @@ class IrrigationManager:
                     except (TypeError, ValueError):
                         pass
                     break
-        w.updated_at = _now_iso()
+        now = _now_iso()
+        w.updated_at = now
+        if forecast_only:
+            w.forecast_source = str(data.get("forecast_source") or "openweathermap")
+            w.forecast_updated_at = now
+        else:
+            w.current_source = str(data.get("current_source") or "local")
+            w.current_updated_at = now
+            if any(k in data for k in ("forecast_rain_mm", "forecastRainMm", "rain_forecast_mm")):
+                w.forecast_source = str(data.get("forecast_source") or w.current_source)
+                w.forecast_updated_at = now
         self._save_weather()
         self.recompute_decision()
-        web_log("[IRR] Wetterdaten via MQTT/API aktualisiert")
+        web_log("[IRR] Wetter-Forecast aktualisiert" if forecast_only else "[IRR] Wetterdaten via MQTT/API aktualisiert")
         return True
 
     # ── Sicherheits-Vorprüfung ────────────────────────────────

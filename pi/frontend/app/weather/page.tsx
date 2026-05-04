@@ -1,6 +1,6 @@
 "use client";
 
-import { CloudRain, Thermometer, Wind, Droplets, Sun, Cloud, CheckCircle2, AlertTriangle } from "lucide-react";
+import { CloudRain, Thermometer, Wind, Droplets, Sun, Cloud, CheckCircle2, AlertTriangle, MapPin } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Card, SectionLabel } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -79,27 +79,32 @@ function WeatherSourceCard() {
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div>
           <SectionLabel>Wetterquelle</SectionLabel>
-          <div className="mt-1 text-sm text-tx2">Ecowitt/HA per MQTT oder OpenWeatherMap direkt aus der Pumpensteuerung.</div>
+          <div className="mt-1 text-sm text-tx2">Ecowitt/HA fuer Ist-Werte, OpenWeatherMap fuer Forecast und Planung.</div>
         </div>
-        <Badge tone={cfg?.last_ok ? "ok" : cfg?.source === "openweathermap" ? "warn" : "muted"}>
-          {cfg?.source === "openweathermap" ? (cfg.openweathermap.configured ? "OpenWeatherMap" : "Key fehlt") : "HA / Ecowitt"}
+        <Badge tone={cfg?.last_ok ? "ok" : cfg?.source !== "manual_ha" ? "warn" : "muted"}>
+          {cfg?.source === "hybrid" ? "Hybrid" : cfg?.source === "openweathermap" ? (cfg.openweathermap.configured ? "OpenWeatherMap" : "Key fehlt") : "HA / Ecowitt"}
         </Badge>
       </div>
 
-      <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+      <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
         <button type="button" onClick={() => setSource("manual_ha")}
           className={cn("rounded-tile border px-3 py-2 text-left text-xs font-bold", source === "manual_ha" ? "border-[var(--color-green)]/35 bg-[var(--color-green-dim)] text-ok" : "border-border bg-bg2 text-tx2")}>
           HA / Ecowitt
           <div className="mt-1 break-all text-[10px] font-medium text-tx3">MQTT: pumpensteuerung/irrigation/weather/input</div>
         </button>
+        <button type="button" onClick={() => setSource("hybrid")}
+          className={cn("rounded-tile border px-3 py-2 text-left text-xs font-bold", source === "hybrid" ? "border-[var(--color-green)]/35 bg-[var(--color-green-dim)] text-ok" : "border-border bg-bg2 text-tx2")}>
+          Hybrid
+          <div className="mt-1 text-[10px] font-medium text-tx3">Lokal jetzt, OpenWeatherMap fuer Planung</div>
+        </button>
         <button type="button" onClick={() => setSource("openweathermap")}
           className={cn("rounded-tile border px-3 py-2 text-left text-xs font-bold", source === "openweathermap" ? "border-[var(--color-blue)]/35 bg-[var(--color-blue-dim)] text-primary" : "border-border bg-bg2 text-tx2")}>
           OpenWeatherMap
-          <div className="mt-1 text-[10px] font-medium text-tx3">One Call 3.0, automatischer Abruf</div>
+          <div className="mt-1 text-[10px] font-medium text-tx3">Nur Online-Wetter, automatischer Abruf</div>
         </button>
       </div>
 
-      {source === "openweathermap" && (
+      {source !== "manual_ha" && (
         <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
           <WeatherInput label="API-Key" value={apiKey} onChange={setApiKey} placeholder={cfg?.openweathermap.configured ? "hinterlegt" : "API-Key"} password />
           <WeatherInput label="Breite" value={lat} onChange={setLat} placeholder="52.52" />
@@ -111,11 +116,21 @@ function WeatherSourceCard() {
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" disabled={busy} onClick={save}
           className="rounded-tile bg-primary px-4 py-2 text-xs font-bold text-white disabled:opacity-40">Speichern</button>
-        <button type="button" disabled={busy || source !== "openweathermap"} onClick={refresh}
+        <button type="button" disabled={busy || source === "manual_ha"} onClick={refresh}
           className="rounded-tile border border-border bg-bg2 px-4 py-2 text-xs font-bold text-tx2 disabled:opacity-40">Jetzt aktualisieren</button>
         {cfg?.last_refresh && <span className="text-[11px] text-tx3">Letzter Abruf: {new Date(cfg.last_refresh).toLocaleString("de-DE")}</span>}
       </div>
       {(message || cfg?.last_message) && <div className="mt-2 text-[11px] text-tx3">{message || cfg?.last_message}</div>}
+      {source !== "manual_ha" && cfg?.location?.name && (
+        <div className="mt-2 flex items-center gap-2 rounded-tile border border-border bg-bg2 px-3 py-2 text-[11px] text-tx2">
+          <MapPin className="h-3.5 w-3.5 text-primary" />
+          <span className="min-w-0 break-words">
+            Standort: <b>{cfg.location.name}{cfg.location.country ? `, ${cfg.location.country}` : ""}</b>
+            {" "}({formatFixed(cfg.location.lat, 4)} / {formatFixed(cfg.location.lon, 4)})
+          </span>
+        </div>
+      )}
+      {source === "hybrid" && <div className="mt-2 text-[10px] text-tx3">Hybrid nutzt Ecowitt/HA fuer aktuelle Werte und OpenWeatherMap nur fuer Forecast, Regenplanung und ET0-Schaetzung.</div>}
       {source === "openweathermap" && <div className="mt-2 text-[10px] text-tx3">Hinweis: ET0 wird aus OpenWeather-Daten geschaetzt. Exakter bleibt ein lokaler Sensor- oder HA-Wetterwert.</div>}
     </Card>
   );
@@ -178,6 +193,10 @@ function WeatherView({ weather: w }: { weather: WeatherState }) {
       {/* Aktuelle Wetterwerte */}
       <Card>
         <SectionLabel>Aktuelle Bedingungen</SectionLabel>
+        <div className="mb-3 flex flex-wrap gap-2 text-[10px] text-tx3">
+          <Badge tone="muted">Ist: {w.current_source === "openweathermap" ? "OpenWeatherMap" : "HA / Ecowitt"}</Badge>
+          <Badge tone={w.forecast_source === "openweathermap" ? "blue" : "muted"}>Forecast: {w.forecast_source === "openweathermap" ? "OpenWeatherMap" : "lokal"}</Badge>
+        </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           <WeatherTile icon={Thermometer} label="Temperatur"   value={formatFixed(w.temp_c, 1) ?? "—"}                                            unit="°C"   accent={w.temp_c != null && w.temp_c > 28 ? "warn" : "blue"} />
           <WeatherTile icon={CloudRain}   label="Regen 24h"    value={formatFixed(w.rain_24h_mm, 1)}                                               unit="mm"   accent={w.rain_24h_mm > 6 ? "ok" : "blue"} hint={w.forecast_rain_mm > 0 ? `+${formatFixed(w.forecast_rain_mm, 1)} mm Prognose` : undefined} />
@@ -188,6 +207,19 @@ function WeatherView({ weather: w }: { weather: WeatherState }) {
         </div>
         {w.updated_at && (
           <div className="mt-3 text-[10px] text-tx3">Aktualisiert: {new Date(w.updated_at).toLocaleString("de-DE")}</div>
+        )}
+      </Card>
+
+      <Card>
+        <SectionLabel>Forecast Planung</SectionLabel>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <WeatherTile icon={CloudRain} label="Naechste Std." value={formatFixed(w.forecast_rain_1h_mm, 1) ?? "0.0"} unit="mm" accent={(w.forecast_rain_1h_mm ?? 0) > 1 ? "blue" : "muted"} />
+          <WeatherTile icon={CloudRain} label="24 Stunden" value={formatFixed(w.forecast_rain_24h_mm, 1) ?? "0.0"} unit="mm" accent={(w.forecast_rain_24h_mm ?? 0) > 4 ? "blue" : "muted"} />
+          <WeatherTile icon={CloudRain} label="48 Stunden" value={formatFixed(w.forecast_rain_48h_mm, 1) ?? "0.0"} unit="mm" accent={(w.forecast_rain_48h_mm ?? 0) > 6 ? "blue" : "muted"} />
+          <WeatherTile icon={CloudRain} label="7 Tage" value={formatFixed(w.forecast_rain_7d_mm, 1) ?? "0.0"} unit="mm" accent={(w.forecast_rain_7d_mm ?? 0) > 10 ? "blue" : "muted"} />
+        </div>
+        {w.forecast_updated_at && (
+          <div className="mt-3 text-[10px] text-tx3">Forecast aktualisiert: {new Date(w.forecast_updated_at).toLocaleString("de-DE")}</div>
         )}
       </Card>
 

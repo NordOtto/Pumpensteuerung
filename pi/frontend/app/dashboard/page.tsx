@@ -14,6 +14,11 @@ export default function DashboardPage() {
   const { status } = useStatus();
   const [selectedProgId, setSelectedProgId] = useState("");
   const [manualMin, setManualMin] = useState(30);
+  const [actionMsg, setActionMsg] = useState("");
+  const [seedMinutes, setSeedMinutes] = useState(2);
+  const [seedInterval, setSeedInterval] = useState(120);
+  const [seedDays, setSeedDays] = useState(7);
+  const [seedZoneIds, setSeedZoneIds] = useState<string[]>([]);
 
   if (!status) {
     return <div className="flex h-64 items-center justify-center text-tx3">Verbinde mit Steuerung...</div>;
@@ -22,6 +27,7 @@ export default function DashboardPage() {
   const v = status.v20;
   const programs = status.irrigation.programs;
   const decision = status.irrigation.decision;
+  const overseeding = status.irrigation.overseeding;
 
   const selectedProg: IrrigationProgram =
     programs.find((p) => p.id === selectedProgId) ??
@@ -41,6 +47,17 @@ export default function DashboardPage() {
   const nextRunLabel = decisionProgram
     ? `${decisionProgram.name}${decisionZones.length ? ` ? ${decisionZones.map((z) => z.name).join(", ")}` : ""}`
     : "Kein Programm";
+
+  const selectedSeedZones = seedZoneIds.length ? seedZoneIds : selectedProg?.zones.filter((z) => z.enabled).map((z) => z.id) ?? [];
+  const runAction = async (fn: () => Promise<unknown>, success: string) => {
+    setActionMsg("");
+    try {
+      await fn();
+      setActionMsg(success);
+    } catch (err) {
+      setActionMsg(err instanceof Error ? err.message : "Aktion fehlgeschlagen");
+    }
+  };
 
   return (
     <div className="flex flex-col gap-2.5">
@@ -159,7 +176,10 @@ export default function DashboardPage() {
               sub="ET + Wetter"
               color="var(--color-blue)"
               disabled={decision.running}
-              onClick={() => selectedProg && api.runProgram(selectedProg.id, false)}
+              onClick={() => selectedProg && runAction(
+                () => api.runProgram(selectedProg.id, false),
+                "Automatik gestartet."
+              )}
             />
             <ActionTile
               icon={<Play size={15} />}
@@ -167,7 +187,10 @@ export default function DashboardPage() {
               sub="Zeitgesteuert"
               color="var(--color-green)"
               disabled={decision.running}
-              onClick={() => selectedProg && api.runProgram(selectedProg.id, true, manualMin)}
+              onClick={() => selectedProg && runAction(
+                () => api.runProgram(selectedProg.id, true, manualMin),
+                `Manuelle Bewaesserung fuer ${manualMin} min gestartet.`
+              )}
             />
             <ActionTile
               icon={<Square size={14} />}
@@ -175,9 +198,17 @@ export default function DashboardPage() {
               sub="Zone + Pumpe"
               color="var(--color-red)"
               disabled={!decision.running}
-              onClick={() => api.stopProgram(decision.active_program || selectedProg?.id)}
+              onClick={() => runAction(
+                () => api.stopProgram(decision.active_program || selectedProg?.id),
+                "Bewaesserung gestoppt."
+              )}
             />
           </div>
+          {actionMsg && (
+            <div className="mb-3 rounded-tile border border-border bg-bg2 px-3 py-2 text-xs font-semibold text-tx2">
+              {actionMsg}
+            </div>
+          )}
 
           {/* Quick time */}
           <div className="flex flex-wrap items-center gap-2">
@@ -192,6 +223,67 @@ export default function DashboardPage() {
                   {m}
                 </button>
               ))}
+            </div>
+          </div>
+
+          <div className="mt-3 rounded-tile border border-border bg-bg2 p-3">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.1em] text-tx3">Nachsaat feucht halten</div>
+                <div className="mt-0.5 text-[11px] text-tx3">Wetterunabhaengig, mehrere Zonen laufen nacheinander.</div>
+              </div>
+              <Badge tone={overseeding.enabled ? "ok" : "muted"} pulse={overseeding.enabled}>
+                {overseeding.enabled ? "Aktiv" : "Aus"}
+              </Badge>
+            </div>
+            <div className="mb-2 flex flex-wrap gap-1.5">
+              {selectedProg?.zones.filter((z) => z.enabled).map((z) => {
+                const active = selectedSeedZones.includes(z.id);
+                return (
+                  <button key={z.id} type="button" onClick={() => {
+                    setSeedZoneIds((prev) => {
+                      const base = prev.length ? prev : selectedProg.zones.filter((zone) => zone.enabled).map((zone) => zone.id);
+                      return base.includes(z.id) ? base.filter((id) => id !== z.id) : [...base, z.id];
+                    });
+                  }} className={cn(
+                    "rounded-tile border px-2.5 py-1.5 text-xs font-bold",
+                    active ? "border-[var(--color-green)]/35 bg-[var(--color-green-dim)] text-ok" : "border-border bg-bg1 text-tx2"
+                  )}>
+                    {z.name}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mb-2 grid grid-cols-3 gap-2">
+              <MiniNumber label="min" value={seedMinutes} setValue={setSeedMinutes} />
+              <MiniNumber label="alle min" value={seedInterval} setValue={setSeedInterval} />
+              <MiniNumber label="Tage" value={seedDays} setValue={setSeedDays} />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" disabled={!selectedProg || !selectedSeedZones.length} onClick={() => selectedProg && runAction(
+                () => api.setOverseeding({
+                  enabled: true,
+                  program_id: selectedProg.id,
+                  zone_ids: selectedSeedZones,
+                  duration_min: seedMinutes,
+                  interval_min: seedInterval,
+                  days: seedDays,
+                }),
+                "Nachsaat-Modus aktiviert."
+              )} className="rounded-tile bg-ok px-3 py-2 text-xs font-bold text-white disabled:opacity-40">
+                Nachsaat starten
+              </button>
+              <button type="button" disabled={!overseeding.enabled} onClick={() => runAction(
+                () => api.setOverseeding({ enabled: false }),
+                "Nachsaat-Modus gestoppt."
+              )} className="rounded-tile border border-border bg-bg1 px-3 py-2 text-xs font-bold text-tx2 disabled:opacity-40">
+                Nachsaat stoppen
+              </button>
+              {overseeding.enabled && overseeding.next_run_at && (
+                <span className="self-center text-[11px] text-tx3">
+                  Naechster Zyklus: {new Date(overseeding.next_run_at).toLocaleString("de-DE", { weekday: "short", hour: "2-digit", minute: "2-digit" })}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -266,6 +358,21 @@ function Chip({ label, value, valueClass }: { label: string; value: string; valu
       <span className="text-[9px] font-bold uppercase tracking-[0.1em] text-tx3">{label}</span>
       <span className={cn("break-words text-[13px] font-semibold text-tx", valueClass)}>{value}</span>
     </div>
+  );
+}
+
+function MiniNumber({ label, value, setValue }: { label: string; value: number; setValue: (value: number) => void }) {
+  return (
+    <label className="rounded-tile border border-border bg-bg1 px-2 py-1.5">
+      <span className="mb-1 block text-[9px] font-bold uppercase tracking-[0.1em] text-tx3">{label}</span>
+      <input
+        type="number"
+        min={label === "min" ? 0.5 : 1}
+        value={String(value)}
+        onChange={(e) => setValue(Number(e.target.value || 0))}
+        className="h-7 w-full bg-transparent text-sm font-bold text-tx outline-none"
+      />
+    </label>
   );
 }
 

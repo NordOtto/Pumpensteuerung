@@ -135,10 +135,25 @@ class IrrigationDecision(BaseModel):
     ends_at: str | None = None
 
 
+class OverseedingState(BaseModel):
+    enabled: bool = False
+    program_id: str = ""
+    zone_ids: list[str] = Field(default_factory=list)
+    duration_min: float = 2.0
+    interval_min: int = 120
+    days: int = 7
+    started_at: str | None = None
+    ends_at: str | None = None
+    next_run_at: str | None = None
+    last_run_at: str | None = None
+    last_message: str = ""
+
+
 class IrrigationState(BaseModel):
     programs: list[dict] = Field(default_factory=list)
     weather: WeatherState = Field(default_factory=WeatherState)
     decision: IrrigationDecision = Field(default_factory=IrrigationDecision)
+    overseeding: OverseedingState = Field(default_factory=OverseedingState)
     zones: dict = Field(default_factory=dict)
     history: list[dict] = Field(default_factory=list)
 

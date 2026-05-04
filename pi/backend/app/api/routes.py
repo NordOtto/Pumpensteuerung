@@ -198,6 +198,7 @@ class RunBody(BaseModel):
     program_id: str
     force_weather: bool = True
     duration_min: float | None = None
+    zone_ids: list[str] | None = None
 
 
 @router.post("/irrigation/run")
@@ -207,6 +208,7 @@ async def irrigation_run(body: RunBody):
         manual=True,
         force_weather=body.force_weather,
         duration_min=body.duration_min,
+        zone_ids=body.zone_ids,
     )
     if not res["ok"]:
         raise HTTPException(status_code=400, detail=res["error"])
@@ -225,6 +227,19 @@ async def irrigation_resume():
     if not res["ok"]:
         raise HTTPException(status_code=400, detail=res["error"])
     return res
+
+
+@router.get("/irrigation/overseeding")
+async def irrigation_overseeding_get():
+    return deps.irrigation.get_overseeding()
+
+
+@router.post("/irrigation/overseeding")
+async def irrigation_overseeding_set(body: dict):
+    try:
+        return deps.irrigation.set_overseeding(body or {})
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 # ── /history ──────────────────────────────────────────────────

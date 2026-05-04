@@ -19,6 +19,7 @@ from zoneinfo import ZoneInfo
 from .config import settings
 from .persistence import (
     IRRIGATION_HISTORY_FILE,
+    IRRIGATION_OVERSEEDING_FILE,
     IRRIGATION_PROGRAMS_FILE,
     IRRIGATION_WEATHER_FILE,
     load_json,
@@ -207,6 +208,7 @@ class IrrigationManager:
     # ── Persistenz ────────────────────────────────────────────
     def load(self) -> None:
         programs = load_json(IRRIGATION_PROGRAMS_FILE)
+        overseeding = load_json(IRRIGATION_OVERSEEDING_FILE)
         weather = load_json(IRRIGATION_WEATHER_FILE)
 
         if isinstance(programs, list) and programs:
@@ -218,6 +220,10 @@ class IrrigationManager:
             for k, v in weather.items():
                 if hasattr(app_state.irrigation.weather, k):
                     setattr(app_state.irrigation.weather, k, v)
+        if isinstance(overseeding, dict):
+            for k, v in overseeding.items():
+                if hasattr(app_state.irrigation.overseeding, k):
+                    setattr(app_state.irrigation.overseeding, k, v)
 
         # Einmalige Migration JSON → SQLite (No-op nach erstem Lauf)
         legacy = load_json(IRRIGATION_HISTORY_FILE)
@@ -243,6 +249,12 @@ class IrrigationManager:
             save_json(IRRIGATION_WEATHER_FILE, app_state.irrigation.weather.model_dump())
         except OSError as exc:
             print(f"[IRR] weather save error: {exc}", flush=True)
+
+    def _save_overseeding(self) -> None:
+        try:
+            save_json(IRRIGATION_OVERSEEDING_FILE, app_state.irrigation.overseeding.model_dump())
+        except OSError as exc:
+            print(f"[IRR] overseeding save error: {exc}", flush=True)
 
     def _add_history(self, entry: dict[str, Any]) -> None:
         entry = {"at": _now_iso(), **entry}
@@ -287,9 +299,46 @@ class IrrigationManager:
             "programs": irr.programs,
             "weather": irr.weather.model_dump(),
             "decision": irr.decision.model_dump(),
+            "overseeding": irr.overseeding.model_dump(),
             "zones": irr.zones,
             "history": irr.history[-25:],
         }
+
+    def set_overseeding(self, body: Any) -> dict[str, Any]:
+        data = body or {}
+        o = app_state.irrigation.overseeding
+        enabled = bool(data.get("enabled"))
+        program_id = str(data.get("program_id") or o.program_id or "")
+        program = next((p for p in app_state.irrigation.programs if p["id"] == program_id), None)
+        if enabled and not program:
+            raise ValueError("Programm fehlt")
+        known_zones = {z["id"] for z in (program or {}).get("zones", [])}
+        zone_ids = [str(z) for z in (data.get("zone_ids") or o.zone_ids or []) if str(z) in known_zones]
+        if enabled and not zone_ids:
+            zone_ids = [z["id"] for z in (program or {}).get("zones", []) if z.get("enabled")]
+        if enabled and not zone_ids:
+            raise ValueError("Keine Zone ausgewaehlt")
+        now = datetime.now(_TZ)
+        days = int(_clamp(data.get("days", o.days), 1, 30))
+        o.enabled = enabled
+        o.program_id = program_id
+        o.zone_ids = zone_ids
+        o.duration_min = _clamp(data.get("duration_min", o.duration_min), 0.5, 30)
+        o.interval_min = int(_clamp(data.get("interval_min", o.interval_min), 15, 12 * 60))
+        o.days = days
+        if enabled:
+            o.started_at = o.started_at or now.isoformat()
+            o.ends_at = (now + timedelta(days=days)).isoformat()
+            o.next_run_at = now.isoformat()
+            o.last_message = "Nachsaat aktiv"
+        else:
+            o.last_message = "Nachsaat gestoppt"
+        self._save_overseeding()
+        self.publish_decision()
+        return o.model_dump()
+
+    def get_overseeding(self) -> dict[str, Any]:
+        return app_state.irrigation.overseeding.model_dump()
 
     def ingest_weather(self, payload: Any) -> bool:
         data = payload
@@ -769,6 +818,8 @@ class IrrigationManager:
         manual: bool = False,
         force_weather: bool = False,
         duration_min: float | None = None,
+        zone_ids: list[str] | None = None,
+        started_by: str | None = None,
     ) -> dict[str, Any]:
         program = next((p for p in app_state.irrigation.programs if p["id"] == program_id), None)
         ev = self.evaluate_program(program, manual=manual, force_weather=force_weather)
@@ -791,6 +842,9 @@ class IrrigationManager:
             self._finish_run("interrupted", "Neues Programm gestartet")
 
         allowed_ids = set(ev.get("zone_ids") or []) if ev.get("zone_ids") else None
+        if zone_ids:
+            requested = set(zone_ids)
+            allowed_ids = requested if allowed_ids is None else allowed_ids & requested
         zones = [z for z in program["zones"]
                  if z["enabled"] and (allowed_ids is None or z["id"] in allowed_ids)]
         if not zones:
@@ -808,7 +862,7 @@ class IrrigationManager:
             runtime_factor=ev.get("runtime_factor", 1),
             water_budget_mm=ev.get("water_budget_mm", 0),
             started_at=datetime.now(_TZ).timestamp(),
-            started_by="manual" if manual else "auto",
+            started_by=started_by or ("manual" if manual else "auto"),
             restore_preset="Normal",
         )
         web_log(f"[IRR] Programm {program['name']} gestartet ({ev['reason']})")
@@ -896,6 +950,9 @@ class IrrigationManager:
             self.publish_decision()
             return
 
+        if self._tick_overseeding(now):
+            return
+
         d = datetime.now(_TZ)
         minute_key = f"{d.year}-{d.month}-{d.day} {d.hour}:{d.minute}"
         if minute_key == self._last_schedule_minute:
@@ -914,3 +971,40 @@ class IrrigationManager:
                 return
         self.recompute_decision()
         self.publish_decision()
+
+    def _tick_overseeding(self, now_ts: float) -> bool:
+        o = app_state.irrigation.overseeding
+        if not o.enabled:
+            return False
+        now = datetime.now(_TZ)
+        try:
+            ends_ts = datetime.fromisoformat(str(o.ends_at).replace("Z", "+00:00")).timestamp() if o.ends_at else 0
+        except ValueError:
+            ends_ts = 0
+        if ends_ts and now_ts >= ends_ts:
+            o.enabled = False
+            o.last_message = "Nachsaat beendet"
+            self._save_overseeding()
+            self.publish_decision()
+            return False
+        try:
+            next_ts = datetime.fromisoformat(str(o.next_run_at).replace("Z", "+00:00")).timestamp() if o.next_run_at else 0
+        except ValueError:
+            next_ts = 0
+        if next_ts and now_ts < next_ts:
+            return False
+
+        res = self.run_program(
+            o.program_id,
+            manual=True,
+            force_weather=True,
+            duration_min=o.duration_min,
+            zone_ids=o.zone_ids,
+            started_by="nachsaat",
+        )
+        o.last_run_at = now.isoformat() if res["ok"] else o.last_run_at
+        o.next_run_at = (now + timedelta(minutes=o.interval_min)).isoformat()
+        o.last_message = "Nachsaat-Zyklus gestartet" if res["ok"] else f"Nachsaat blockiert: {res.get('error', 'unbekannt')}"
+        self._save_overseeding()
+        self.publish_decision()
+        return bool(res["ok"])

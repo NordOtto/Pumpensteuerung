@@ -53,6 +53,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ program_id, force_weather, duration_min }),
     }),
+  runProgramZones: (program_id: string, zone_ids: string[], duration_min: number) =>
+    request("/api/irrigation/run", {
+      method: "POST",
+      body: JSON.stringify({ program_id, force_weather: true, duration_min, zone_ids }),
+    }),
   stopProgram: (program_id?: string) =>
     request("/api/irrigation/stop", {
       method: "POST",
@@ -93,6 +98,11 @@ export const api = {
     }),
   refreshWeather: () =>
     request<{ ok: boolean; message: string }>("/api/irrigation/weather/refresh", { method: "POST" }),
+  setOverseeding: (payload: Record<string, unknown>) =>
+    request<import("./types").OverseedingState>("/api/irrigation/overseeding", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 
   // ── OTA ─────────────────────────────────────────────────
   otaStatus: () => request<OtaStatus>("/api/ota/status"),

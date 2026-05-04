@@ -96,7 +96,7 @@ export interface IrrigationDecision {
   phase: "idle" | "run" | "soak" | "paused";
   paused: boolean;
   paused_since: string | null;
-  started_by: "" | "manual" | "auto";
+  started_by: "" | "manual" | "auto" | "nachsaat";
   remaining_s: number;
   zone_remaining_s: number;
   ends_at: string | null;
@@ -144,6 +144,20 @@ export interface WeatherConfig {
   };
   last_refresh: string | null;
   last_ok: boolean | null;
+  last_message: string;
+}
+
+export interface OverseedingState {
+  enabled: boolean;
+  program_id: string;
+  zone_ids: string[];
+  duration_min: number;
+  interval_min: number;
+  days: number;
+  started_at: string | null;
+  ends_at: string | null;
+  next_run_at: string | null;
+  last_run_at: string | null;
   last_message: string;
 }
 
@@ -201,6 +215,7 @@ export interface AppStatus {
     programs: IrrigationProgram[];
     weather: WeatherState;
     decision: IrrigationDecision;
+    overseeding: OverseedingState;
     zones: Record<string, { state?: string; ends_at?: string | null }>;
     history: Array<Record<string, unknown>>;
   };

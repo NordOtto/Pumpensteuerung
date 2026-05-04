@@ -164,6 +164,21 @@ async def irrigation_weather_set(body: dict):
     return {"ok": True}
 
 
+@router.get("/irrigation/weather/config")
+async def irrigation_weather_config_get():
+    return deps.weather_provider.public_config()
+
+
+@router.post("/irrigation/weather/config")
+async def irrigation_weather_config_set(body: dict):
+    return deps.weather_provider.update_config(body or {})
+
+
+@router.post("/irrigation/weather/refresh")
+async def irrigation_weather_refresh():
+    return await deps.weather_provider.refresh()
+
+
 @router.get("/irrigation/history")
 async def irrigation_history_get():
     return deps.irrigation.get_history()

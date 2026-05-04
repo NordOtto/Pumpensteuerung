@@ -25,6 +25,7 @@ from .mqtt_client import bridge
 from .presets import PresetManager
 from .pressure_ctrl import PressureController
 from .state import app_state, web_log
+from .weather_provider import WeatherProvider
 
 
 # ── Reglerzustand: PressureController bekommt Modbus-Calls als Callbacks ──
@@ -51,6 +52,7 @@ irrigation = IrrigationManager(
     v20_stop=_on_stop,
     presets_apply=preset_mgr.apply,
 )
+weather_provider = WeatherProvider(irrigation.ingest_weather)
 _main_loop: asyncio.AbstractEventLoop | None = None
 
 
@@ -87,6 +89,16 @@ async def _irrigation_loop():
         except Exception as exc:
             web_log(f"[LOOP] Irrigation-Tick Fehler: {exc}")
         await asyncio.sleep(5.0)
+
+
+async def _weather_loop():
+    while True:
+        try:
+            if weather_provider.should_refresh():
+                await weather_provider.refresh()
+        except Exception as exc:
+            web_log(f"[LOOP] Weather-Refresh Fehler: {exc}")
+        await asyncio.sleep(60.0)
 
 
 async def _mqtt_publish_loop():
@@ -190,6 +202,7 @@ async def lifespan(app: FastAPI):
     deps.pi_ctrl = pi_ctrl
     deps.preset_mgr = preset_mgr
     deps.irrigation = irrigation
+    deps.weather_provider = weather_provider
     deps.rtu = modbus_rtu.client
 
     # SQLite-Schema sicherstellen
@@ -200,6 +213,7 @@ async def lifespan(app: FastAPI):
     timeguard.load()
     preset_mgr.load()
     irrigation.load()
+    weather_provider.load()
 
     # Preset-CRUD soll HA-Select aktualisieren
     preset_mgr.on_changed = ha_discovery.refresh_preset_select
@@ -219,6 +233,7 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(_slow_loop()),
         asyncio.create_task(_timeguard_loop()),
         asyncio.create_task(_irrigation_loop()),
+        asyncio.create_task(_weather_loop()),
         asyncio.create_task(_mqtt_publish_loop()),
         asyncio.create_task(_uptime_loop()),
         asyncio.create_task(_pressure_log_loop()),

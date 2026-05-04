@@ -1,5 +1,5 @@
 /** Minimaler REST-Client zum Backend. */
-import type { IrrigationProgram, OtaStatus, Preset } from "./types";
+import type { IrrigationProgram, OtaStatus, Preset, WeatherConfig } from "./types";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
@@ -84,6 +84,15 @@ export const api = {
         running: boolean;
       }>;
     }>(`/api/history/pressure?seconds=${seconds}&max_points=${maxPoints}`),
+
+  weatherConfig: () => request<WeatherConfig>("/api/irrigation/weather/config"),
+  saveWeatherConfig: (payload: Record<string, unknown>) =>
+    request<WeatherConfig>("/api/irrigation/weather/config", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  refreshWeather: () =>
+    request<{ ok: boolean; message: string }>("/api/irrigation/weather/refresh", { method: "POST" }),
 
   // ── OTA ─────────────────────────────────────────────────
   otaStatus: () => request<OtaStatus>("/api/ota/status"),

@@ -1,12 +1,13 @@
 "use client";
 
 import { CloudRain, Thermometer, Wind, Droplets, Sun, Cloud, CheckCircle2, AlertTriangle } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, SectionLabel } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useStatus } from "@/lib/ws";
-import { cn } from "@/lib/utils";
-import type { WeatherState } from "@/lib/types";
+import { cn, formatFixed } from "@/lib/utils";
+import { api } from "@/lib/api";
+import type { WeatherConfig, WeatherState } from "@/lib/types";
 
 export default function WeatherPage() {
   const { status } = useStatus();
@@ -15,13 +16,128 @@ export default function WeatherPage() {
   return <WeatherView weather={w} />;
 }
 
+
+function WeatherSourceCard() {
+  const [cfg, setCfg] = useState<WeatherConfig | null>(null);
+  const [source, setSource] = useState<WeatherConfig["source"]>("manual_ha");
+  const [lat, setLat] = useState("0");
+  const [lon, setLon] = useState("0");
+  const [refreshMin, setRefreshMin] = useState("60");
+  const [apiKey, setApiKey] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+
+  const load = () => api.weatherConfig().then((next) => {
+    setCfg(next);
+    setSource(next.source);
+    setLat(String(next.openweathermap.lat || 0));
+    setLon(String(next.openweathermap.lon || 0));
+    setRefreshMin(String(next.openweathermap.refresh_min || 60));
+  }).catch((err) => setMessage(err instanceof Error ? err.message : "Wetter-Konfiguration konnte nicht geladen werden."));
+
+  useEffect(() => { load(); }, []);
+
+  const save = async () => {
+    setBusy(true);
+    setMessage("");
+    try {
+      const next = await api.saveWeatherConfig({
+        source,
+        openweathermap: {
+          api_key: apiKey.trim() || undefined,
+          lat: Number(lat.replace(",", ".")),
+          lon: Number(lon.replace(",", ".")),
+          refresh_min: Number(refreshMin),
+        },
+      });
+      setApiKey("");
+      setCfg(next);
+      setMessage("Wetterquelle gespeichert.");
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Wetterquelle konnte nicht gespeichert werden.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const refresh = async () => {
+    setBusy(true);
+    setMessage("");
+    try {
+      const res = await api.refreshWeather();
+      setMessage(res.message);
+      load();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Wetter konnte nicht aktualisiert werden.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card>
+      <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <SectionLabel>Wetterquelle</SectionLabel>
+          <div className="mt-1 text-sm text-tx2">Ecowitt/HA per MQTT oder OpenWeatherMap direkt aus der Pumpensteuerung.</div>
+        </div>
+        <Badge tone={cfg?.last_ok ? "ok" : cfg?.source === "openweathermap" ? "warn" : "muted"}>
+          {cfg?.source === "openweathermap" ? (cfg.openweathermap.configured ? "OpenWeatherMap" : "Key fehlt") : "HA / Ecowitt"}
+        </Badge>
+      </div>
+
+      <div className="mb-3 grid grid-cols-2 gap-2">
+        <button type="button" onClick={() => setSource("manual_ha")}
+          className={cn("rounded-tile border px-3 py-2 text-left text-xs font-bold", source === "manual_ha" ? "border-[var(--color-green)]/35 bg-[var(--color-green-dim)] text-ok" : "border-border bg-bg2 text-tx2")}>
+          HA / Ecowitt
+          <div className="mt-1 text-[10px] font-medium text-tx3">MQTT: pumpensteuerung/irrigation/weather/input</div>
+        </button>
+        <button type="button" onClick={() => setSource("openweathermap")}
+          className={cn("rounded-tile border px-3 py-2 text-left text-xs font-bold", source === "openweathermap" ? "border-[var(--color-blue)]/35 bg-[var(--color-blue-dim)] text-primary" : "border-border bg-bg2 text-tx2")}>
+          OpenWeatherMap
+          <div className="mt-1 text-[10px] font-medium text-tx3">One Call 3.0, automatischer Abruf</div>
+        </button>
+      </div>
+
+      {source === "openweathermap" && (
+        <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <WeatherInput label="API-Key" value={apiKey} onChange={setApiKey} placeholder={cfg?.openweathermap.configured ? "hinterlegt" : "API-Key"} password />
+          <WeatherInput label="Breite" value={lat} onChange={setLat} placeholder="52.52" />
+          <WeatherInput label="Laenge" value={lon} onChange={setLon} placeholder="13.40" />
+          <WeatherInput label="Intervall min" value={refreshMin} onChange={setRefreshMin} placeholder="60" />
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" disabled={busy} onClick={save}
+          className="rounded-tile bg-primary px-4 py-2 text-xs font-bold text-white disabled:opacity-40">Speichern</button>
+        <button type="button" disabled={busy || source !== "openweathermap"} onClick={refresh}
+          className="rounded-tile border border-border bg-bg2 px-4 py-2 text-xs font-bold text-tx2 disabled:opacity-40">Jetzt aktualisieren</button>
+        {cfg?.last_refresh && <span className="text-[11px] text-tx3">Letzter Abruf: {new Date(cfg.last_refresh).toLocaleString("de-DE")}</span>}
+      </div>
+      {(message || cfg?.last_message) && <div className="mt-2 text-[11px] text-tx3">{message || cfg?.last_message}</div>}
+      {source === "openweathermap" && <div className="mt-2 text-[10px] text-tx3">Hinweis: ET0 wird aus OpenWeather-Daten geschaetzt. Exakter bleibt ein lokaler Sensor- oder HA-Wetterwert.</div>}
+    </Card>
+  );
+}
+
+function WeatherInput({ label, value, onChange, placeholder, password }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string; password?: boolean }) {
+  return (
+    <label className="rounded-tile border border-border bg-bg2 px-3 py-2">
+      <span className="mb-1 block text-[9px] font-bold uppercase tracking-[0.1em] text-tx3">{label}</span>
+      <input type={password ? "password" : "text"} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
+        className="h-7 w-full bg-transparent text-sm font-semibold text-tx outline-none placeholder:text-tx3" />
+    </label>
+  );
+}
+
 function WeatherView({ weather: w }: { weather: WeatherState }) {
   const rec = useMemo(() => {
     if (w.rain_24h_mm > 6)                   return { action: "Überspringen",    reason: `${w.rain_24h_mm} mm Regen in 24h — ausreichend versorgt.`,          tone: "ok"     as const, score: 0   };
     if ((w.soil_moisture_pct ?? 50) >= 70)   return { action: "Überspringen",    reason: `Bodenfeuchte ${w.soil_moisture_pct}% — kein Bedarf.`,                 tone: "ok"     as const, score: 5   };
     if ((w.soil_moisture_pct ?? 50) < 30)    return { action: "Jetzt bewässern", reason: `Kritisch trockener Boden (${w.soil_moisture_pct}%). Sofort.`,         tone: "danger" as const, score: 100 };
-    if ((w.et0_mm ?? 0) > 5)                 return { action: "Bewässern",       reason: `Hohe Verdunstung (ET₀ ${w.et0_mm?.toFixed(1)} mm) — Bedarf hoch.`,   tone: "warn"   as const, score: 75  };
-    if (w.forecast_rain_mm > 4)              return { action: "Warten",          reason: `Regenvorhersage +${w.forecast_rain_mm.toFixed(1)} mm — abwarten.`,   tone: "blue"   as const, score: 20  };
+    if ((w.et0_mm ?? 0) > 5)                 return { action: "Bewässern",       reason: `Hohe Verdunstung (ET₀ ${formatFixed(w.et0_mm, 1)} mm) — Bedarf hoch.`,   tone: "warn"   as const, score: 75  };
+    if (w.forecast_rain_mm > 4)              return { action: "Warten",          reason: `Regenvorhersage +${formatFixed(w.forecast_rain_mm, 1)} mm — abwarten.`,   tone: "blue"   as const, score: 20  };
     return                                          { action: "Normal",           reason: "Bedingungen im Normalbereich. Automatik übernimmt.",                  tone: "muted"  as const, score: 50  };
   }, [w]);
 
@@ -31,11 +147,12 @@ function WeatherView({ weather: w }: { weather: WeatherState }) {
     { ok: w.wind_kmh <= 35,             icon: Wind,        text: w.wind_kmh <= 35       ? `Wind ${w.wind_kmh} km/h — Bewässerung möglich.`                : `Wind ${w.wind_kmh} km/h — zu stark, Driftverluste.` },
     { ok: (w.temp_c ?? 20) <= 28,       icon: Thermometer, text: (w.temp_c ?? 20) <= 28 ? `${w.temp_c}°C — optimale Bewässerungstemperatur.`              : `${w.temp_c}°C — früh morgens bewässern.` },
     { ok: w.rain_24h_mm < 6,            icon: CloudRain,   text: w.rain_24h_mm >= 6     ? `${w.rain_24h_mm} mm Regen — heute aussetzen.`                  : "Kein nennenswerter Regen. ET-Ausgleich nötig." },
-    { ok: w.forecast_rain_mm >= 4,      icon: Cloud,       text: w.forecast_rain_mm >= 4? `Vorhersage +${w.forecast_rain_mm.toFixed(1)} mm — Bewässerung verschieben.` : "Kein Regen erwartet — nicht verschieben." },
+    { ok: w.forecast_rain_mm >= 4,      icon: Cloud,       text: w.forecast_rain_mm >= 4? `Vorhersage +${formatFixed(w.forecast_rain_mm, 1)} mm — Bewässerung verschieben.` : "Kein Regen erwartet — nicht verschieben." },
   ];
 
   return (
     <div className="flex flex-col gap-4 animate-fade-up">
+      <WeatherSourceCard />
 
       {/* KI-Empfehlung */}
       <Card accent={`linear-gradient(to right, var(--color-${rec.tone === "ok" ? "green" : rec.tone === "danger" ? "red" : rec.tone === "warn" ? "amber" : rec.tone === "blue" ? "blue" : "border"}), transparent)`}>
@@ -62,12 +179,12 @@ function WeatherView({ weather: w }: { weather: WeatherState }) {
       <Card>
         <SectionLabel>Aktuelle Bedingungen</SectionLabel>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          <WeatherTile icon={Thermometer} label="Temperatur"   value={w.temp_c?.toFixed(1) ?? "—"}                                            unit="°C"   accent={w.temp_c != null && w.temp_c > 28 ? "warn" : "blue"} />
-          <WeatherTile icon={CloudRain}   label="Regen 24h"    value={w.rain_24h_mm.toFixed(1)}                                               unit="mm"   accent={w.rain_24h_mm > 6 ? "ok" : "blue"} hint={w.forecast_rain_mm > 0 ? `+${w.forecast_rain_mm.toFixed(1)} mm Prognose` : undefined} />
-          <WeatherTile icon={Sun}         label="ET₀ heute"    value={w.et0_mm?.toFixed(1) ?? "—"}                                            unit="mm"   accent={(w.et0_mm ?? 0) > 5 ? "warn" : "blue"} />
+          <WeatherTile icon={Thermometer} label="Temperatur"   value={formatFixed(w.temp_c, 1) ?? "—"}                                            unit="°C"   accent={w.temp_c != null && w.temp_c > 28 ? "warn" : "blue"} />
+          <WeatherTile icon={CloudRain}   label="Regen 24h"    value={formatFixed(w.rain_24h_mm, 1)}                                               unit="mm"   accent={w.rain_24h_mm > 6 ? "ok" : "blue"} hint={w.forecast_rain_mm > 0 ? `+${formatFixed(w.forecast_rain_mm, 1)} mm Prognose` : undefined} />
+          <WeatherTile icon={Sun}         label="ET₀ heute"    value={formatFixed(w.et0_mm, 1) ?? "—"}                                            unit="mm"   accent={(w.et0_mm ?? 0) > 5 ? "warn" : "blue"} />
           <WeatherTile icon={Droplets}    label="Bodenfeuchte" value={w.soil_moisture_pct != null ? String(Math.round(w.soil_moisture_pct)) : "—"} unit="%" accent={(w.soil_moisture_pct ?? 50) < 30 ? "danger" : (w.soil_moisture_pct ?? 50) < 50 ? "warn" : "ok"} />
-          <WeatherTile icon={Wind}        label="Wind"         value={w.wind_kmh.toFixed(0)}                                                  unit="km/h" accent={w.wind_kmh > 35 ? "warn" : "blue"} />
-          <WeatherTile icon={Cloud}       label="Vorhersage"   value={w.forecast_rain_mm.toFixed(1)}                                          unit="mm"   accent={w.forecast_rain_mm > 4 ? "blue" : "muted"} />
+          <WeatherTile icon={Wind}        label="Wind"         value={formatFixed(w.wind_kmh, 0)}                                                  unit="km/h" accent={w.wind_kmh > 35 ? "warn" : "blue"} />
+          <WeatherTile icon={Cloud}       label="Vorhersage"   value={formatFixed(w.forecast_rain_mm, 1)}                                          unit="mm"   accent={w.forecast_rain_mm > 4 ? "blue" : "muted"} />
         </div>
         {w.updated_at && (
           <div className="mt-3 text-[10px] text-tx3">Aktualisiert: {new Date(w.updated_at).toLocaleString("de-DE")}</div>

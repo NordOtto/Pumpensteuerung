@@ -11,12 +11,14 @@ if TYPE_CHECKING:
     from ..modbus_rtu import V20RtuClient
     from ..presets import PresetManager
     from ..pressure_ctrl import PressureController
+    from ..weather_provider import WeatherProvider
 
 
 class Deps:
     pi_ctrl: "PressureController" = None  # type: ignore[assignment]
     preset_mgr: "PresetManager" = None    # type: ignore[assignment]
     irrigation: "IrrigationManager" = None  # type: ignore[assignment]
+    weather_provider: "WeatherProvider" = None  # type: ignore[assignment]
     rtu: "V20RtuClient" = None            # type: ignore[assignment]
 
 

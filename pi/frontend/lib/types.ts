@@ -118,6 +118,19 @@ export interface WeatherState {
   updated_at: string | null;
 }
 
+export interface WeatherConfig {
+  source: "manual_ha" | "openweathermap";
+  openweathermap: {
+    configured: boolean;
+    lat: number;
+    lon: number;
+    refresh_min: number;
+  };
+  last_refresh: string | null;
+  last_ok: boolean | null;
+  last_message: string;
+}
+
 export interface SysState {
   uptime: number;
   mqtt: boolean;

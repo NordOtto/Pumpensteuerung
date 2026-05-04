@@ -139,7 +139,10 @@ download_release() {
         rm -rf "$target"
         die "${tag}: venv-Setup fehlgeschlagen"
     fi
-    [[ -x "${target}/backend/.venv/bin/uvicorn" ]] || die "${tag}: uvicorn fehlt nach venv-Setup"
+    if [[ ! -x "${target}/backend/.venv/bin/uvicorn" ]]; then
+        rm -rf "$target"
+        die "${tag}: uvicorn fehlt nach venv-Setup"
+    fi
 }
 
 cmd_apply() {

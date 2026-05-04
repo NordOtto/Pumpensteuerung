@@ -125,8 +125,8 @@ function WeatherSourceCard() {
         <div className="mt-2 flex items-center gap-2 rounded-tile border border-border bg-bg2 px-3 py-2 text-[11px] text-tx2">
           <MapPin className="h-3.5 w-3.5 text-primary" />
           <span className="min-w-0 break-words">
-            Standort: <b>{cfg.location.name}{cfg.location.country ? `, ${cfg.location.country}` : ""}</b>
-            {" "}({formatFixed(cfg.location.lat, 4)} / {formatFixed(cfg.location.lon, 4)})
+            Standort: <b>{cfg.location.postal_code ? `${cfg.location.postal_code} ` : ""}{cfg.location.name}{cfg.location.country ? `, ${cfg.location.country}` : ""}</b>
+            {" "}Koordinaten: {formatFixed(cfg.location.lat, 4)} / {formatFixed(cfg.location.lon, 4)}
           </span>
         </div>
       )}

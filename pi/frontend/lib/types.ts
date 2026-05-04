@@ -136,6 +136,7 @@ export interface WeatherConfig {
   };
   location: {
     name: string;
+    postal_code: string;
     country: string;
     lat: number;
     lon: number;

@@ -19,6 +19,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     },
     "location": {
         "name": "",
+        "postal_code": "",
         "country": "",
         "lat": 0.0,
         "lon": 0.0,
@@ -203,6 +204,7 @@ class WeatherProvider:
     def _location_from_weather(data: dict[str, Any], owm: dict[str, Any]) -> dict[str, Any]:
         return {
             "name": str(data.get("timezone") or ""),
+            "postal_code": "",
             "country": "",
             "lat": float(data.get("lat") or owm.get("lat") or 0),
             "lon": float(data.get("lon") or owm.get("lon") or 0),
@@ -210,6 +212,49 @@ class WeatherProvider:
 
     @staticmethod
     async def _lookup_location(client: httpx.AsyncClient, owm: dict[str, Any]) -> dict[str, Any] | None:
+        nominatim = await WeatherProvider._lookup_location_nominatim(client, owm)
+        if nominatim:
+            return nominatim
+        return await WeatherProvider._lookup_location_openweathermap(client, owm)
+
+    @staticmethod
+    async def _lookup_location_nominatim(client: httpx.AsyncClient, owm: dict[str, Any]) -> dict[str, Any] | None:
+        try:
+            res = await client.get(
+                "https://nominatim.openstreetmap.org/reverse",
+                params={
+                    "format": "jsonv2",
+                    "lat": owm["lat"],
+                    "lon": owm["lon"],
+                    "zoom": 18,
+                    "addressdetails": 1,
+                    "accept-language": "de",
+                },
+                headers={"User-Agent": "Pumpensteuerung/1.0"},
+            )
+            res.raise_for_status()
+            item = res.json()
+            address = item.get("address") or {}
+            name = (
+                address.get("village")
+                or address.get("town")
+                or address.get("city")
+                or address.get("municipality")
+                or item.get("name")
+                or ""
+            )
+            return {
+                "name": str(name),
+                "postal_code": str(address.get("postcode") or ""),
+                "country": str(address.get("country_code") or "").upper(),
+                "lat": float(item.get("lat") or owm.get("lat") or 0),
+                "lon": float(item.get("lon") or owm.get("lon") or 0),
+            }
+        except Exception:
+            return None
+
+    @staticmethod
+    async def _lookup_location_openweathermap(client: httpx.AsyncClient, owm: dict[str, Any]) -> dict[str, Any] | None:
         try:
             res = await client.get(
                 "https://api.openweathermap.org/geo/1.0/reverse",
@@ -229,6 +274,7 @@ class WeatherProvider:
             name = local_names.get("de") or item.get("name") or ""
             return {
                 "name": str(name),
+                "postal_code": "",
                 "country": str(item.get("country") or ""),
                 "lat": float(item.get("lat") or owm.get("lat") or 0),
                 "lon": float(item.get("lon") or owm.get("lon") or 0),

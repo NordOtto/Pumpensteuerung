@@ -16,12 +16,15 @@ export default function WeatherPage() {
   return <WeatherView weather={w} />;
 }
 
+function locationLabel(cfg: WeatherConfig | null): string {
+  if (!cfg?.location?.name) return "";
+  return `${cfg.location.postal_code ? `${cfg.location.postal_code} ` : ""}${cfg.location.name}`;
+}
 
 function WeatherSourceCard() {
   const [cfg, setCfg] = useState<WeatherConfig | null>(null);
   const [source, setSource] = useState<WeatherConfig["source"]>("manual_ha");
-  const [lat, setLat] = useState("0");
-  const [lon, setLon] = useState("0");
+  const [locationQuery, setLocationQuery] = useState("");
   const [refreshMin, setRefreshMin] = useState("60");
   const [apiKey, setApiKey] = useState("");
   const [busy, setBusy] = useState(false);
@@ -30,8 +33,7 @@ function WeatherSourceCard() {
   const load = () => api.weatherConfig().then((next) => {
     setCfg(next);
     setSource(next.source);
-    setLat(String(next.openweathermap.lat || 0));
-    setLon(String(next.openweathermap.lon || 0));
+    setLocationQuery(next.openweathermap.location_query || locationLabel(next));
     setRefreshMin(String(next.openweathermap.refresh_min || 60));
   }).catch((err) => setMessage(err instanceof Error ? err.message : "Wetter-Konfiguration konnte nicht geladen werden."));
 
@@ -45,14 +47,18 @@ function WeatherSourceCard() {
         source,
         openweathermap: {
           api_key: apiKey.trim() || undefined,
-          lat: Number(lat.replace(",", ".")),
-          lon: Number(lon.replace(",", ".")),
+          location_query: locationQuery.trim(),
           refresh_min: Number(refreshMin),
         },
       });
       setApiKey("");
       setCfg(next);
       setMessage("Wetterquelle gespeichert.");
+      if (source !== "manual_ha") {
+        const res = await api.refreshWeather();
+        setMessage(res.message);
+        load();
+      }
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Wetterquelle konnte nicht gespeichert werden.");
     } finally {
@@ -105,10 +111,9 @@ function WeatherSourceCard() {
       </div>
 
       {source !== "manual_ha" && (
-        <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-[1.2fr_1fr_0.7fr]">
           <WeatherInput label="API-Key" value={apiKey} onChange={setApiKey} placeholder={cfg?.openweathermap.configured ? "hinterlegt" : "API-Key"} password />
-          <WeatherInput label="Breite" value={lat} onChange={setLat} placeholder="52.52" />
-          <WeatherInput label="Laenge" value={lon} onChange={setLon} placeholder="13.40" />
+          <WeatherInput label="Ort oder PLZ" value={locationQuery} onChange={setLocationQuery} placeholder="z. B. 29229 Celle" />
           <WeatherInput label="Intervall min" value={refreshMin} onChange={setRefreshMin} placeholder="60" />
         </div>
       )}

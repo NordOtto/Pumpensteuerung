@@ -130,6 +130,7 @@ export interface WeatherConfig {
   source: "manual_ha" | "openweathermap" | "hybrid";
   openweathermap: {
     configured: boolean;
+    location_query: string;
     lat: number;
     lon: number;
     refresh_min: number;

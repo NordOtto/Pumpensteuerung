@@ -130,8 +130,10 @@ class IrrigationDecision(BaseModel):
     paused: bool = False
     paused_since: str | None = None
     started_by: str = ""
+    started_at: str | None = None
     remaining_s: int = 0
     zone_remaining_s: int = 0
+    total_planned_s: int = 0
     ends_at: str | None = None
 
 

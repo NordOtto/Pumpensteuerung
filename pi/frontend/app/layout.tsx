@@ -8,6 +8,12 @@ import { BottomNav } from "@/components/bottom-nav";
 export const metadata: Metadata = {
   title: "Pumpensteuerung",
   description: "Brunnenpumpe + smarte Bewässerung",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Pumpe",
+  },
+  formatDetection: { telephone: false },
 };
 
 export const viewport: Viewport = {

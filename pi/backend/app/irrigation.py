@@ -370,19 +370,23 @@ class IrrigationManager:
             "et0_mm": ("et0_mm", "et0Mm", "evapotranspiration_mm"),
             "soil_moisture_pct": ("soil_moisture_pct", "soilMoisturePct", "soil_moisture"),
         }
+        # Klare Daten-Domänen:
+        #   forecast_only=True  → OWM-Forecast (Regen/ET0/UV für Planung)
+        #   forecast_only=False → Ecowitt/HA Ist-Daten (Temp, Wind, Regen-Ist, Boden...)
+        # Jede Quelle schreibt NUR ihre Domäne. Forecast-Felder sind für Ist-Updates
+        # grundsätzlich schreibgeschützt – unabhängig vom aktuellen forecast_source.
+        _FORECAST_KEYS = {
+            "forecast_rain_mm", "forecast_rain_1h_mm", "forecast_rain_24h_mm",
+            "forecast_rain_48h_mm", "forecast_rain_7d_mm",
+        }
         forecast_only = bool(data.get("forecast_only"))
-        if forecast_only:
-            allowed = {
-                "forecast_rain_mm",
-                "forecast_rain_1h_mm",
-                "forecast_rain_24h_mm",
-                "forecast_rain_48h_mm",
-                "forecast_rain_7d_mm",
-                "uv_index",
-                "et0_mm",
-            }
-            mapping = {k: v for k, v in mapping.items() if k in allowed}
         w = app_state.irrigation.weather
+        if forecast_only:
+            # OWM: nur Forecast-Felder + UV/ET0 für Bewässerungsplanung
+            mapping = {k: v for k, v in mapping.items() if k in _FORECAST_KEYS | {"uv_index", "et0_mm"}}
+        else:
+            # Ecowitt/HA: Forecast-Felder immer schreibgeschützt
+            mapping = {k: v for k, v in mapping.items() if k not in _FORECAST_KEYS}
         for target, keys in mapping.items():
             for k in keys:
                 if k in data and data[k] not in (None, ""):
@@ -399,9 +403,6 @@ class IrrigationManager:
         else:
             w.current_source = str(data.get("current_source") or "local")
             w.current_updated_at = now
-            if any(k in data for k in ("forecast_rain_mm", "forecastRainMm", "rain_forecast_mm")):
-                w.forecast_source = str(data.get("forecast_source") or w.current_source)
-                w.forecast_updated_at = now
         self._save_weather()
         self.recompute_decision()
         web_log("[IRR] Wetter-Forecast aktualisiert" if forecast_only else "[IRR] Wetterdaten via MQTT/API aktualisiert")
@@ -592,6 +593,15 @@ class IrrigationManager:
         d.started_by = self._active.started_by if self._active else ""
         now = datetime.now(_TZ).timestamp()
         d.remaining_s = self._active.remaining_s(now) if self._active else 0
+        if self._active:
+            started_ts = float(self._active.started_at or now)
+            paused_ts = float(self._active.paused_since or 0)
+            elapsed_s = (paused_ts - started_ts) if (self._active.paused and paused_ts > started_ts) else (now - started_ts)
+            d.started_at = datetime.fromtimestamp(started_ts, tz=_TZ).isoformat()
+            d.total_planned_s = max(d.remaining_s, round(max(0.0, elapsed_s)) + d.remaining_s)
+        else:
+            d.started_at = None
+            d.total_planned_s = 0
         if self._active and self._active.paused:
             d.zone_remaining_s = max(0, round(self._active.paused_remaining_s))
             d.ends_at = None

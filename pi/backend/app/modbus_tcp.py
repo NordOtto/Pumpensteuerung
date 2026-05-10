@@ -8,7 +8,8 @@ Skalierungen entsprechen src/modbus_tcp.cpp:
   Reg 2 (HR:3) Durchfluss:    raw / 100   → L/min  (Sensor 200…1000 raw → 0…85 L/min,
                                                     siehe Anpassung in der LOGO)
   Reg 3 (HR:4) Druck:         raw / 100   → bar
-  Reg 4 (HR:5) Wassertemp:    raw / 10    → °C
+  Reg 4 (HR:5) Wassertemp:    (raw - 200) * 0.1875 - 25    → °C
+                              (LOGO-Pt1000-Block: 9.375 * (raw - 200) * 0.02 - 25)
 """
 from __future__ import annotations
 
@@ -49,11 +50,18 @@ class _ObservedDataBlock(ModbusSequentialDataBlock):
                 else:
                     flow = raw / 100.0
                 # Sensor-Messbereich beginnt praktisch erst bei ca. 5 L/min.
-                app_state.flow_rate = flow if flow >= 5.0 else 0.0
+                # Plausibilität: ohne laufende Pumpe kann kein Wasser fließen.
+                # (Filtert Sensor-Spikes wie das gelegentliche 18,3-L/min-Phantom.)
+                if not app_state.v20.running:
+                    app_state.flow_rate = 0.0
+                else:
+                    app_state.flow_rate = flow if flow >= 5.0 else 0.0
             elif reg == REG_PRESSURE:
                 app_state.pressure_bar = raw / 100.0
             elif reg == REG_WATER_TEMP:
-                app_state.water_temp = raw / 10.0
+                # LOGO-Pt1000: Skalierung passend zum HA value_template
+                # 9.375 * (raw - 200) * 0.02 - 25 == (raw - 200) * 0.1875 - 25
+                app_state.water_temp = (raw - 200) * 0.1875 - 25.0
 
 
 _context: ModbusServerContext | None = None

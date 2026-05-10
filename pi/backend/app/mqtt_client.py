@@ -96,6 +96,9 @@ class MqttBridge:
             client.subscribe(f"{self._base}/irrigation/program/+/start", qos=0)
             client.subscribe(f"{self._base}/irrigation/program/+/stop", qos=0)
             client.subscribe(f"{self._base}/irrigation/zone/+/state", qos=0)
+            # Ventil-State von ESPHome (retained)
+            client.subscribe(f"{self._base}/valve/+/state", qos=0)
+            client.subscribe(f"{self._base}/valve/availability", qos=0)
             for cb in self._connected_cbs:
                 try:
                     cb()

@@ -201,6 +201,11 @@ class AppState(BaseModel):
     irrigation: IrrigationState = Field(default_factory=IrrigationState)
     ota: OtaState = Field(default_factory=OtaState)
 
+    # Ventil-Zustände (ESPHome publisht retained nach pumpensteuerung/valve/<zone>/state)
+    # zone_id -> {"state": "ON"|"OFF"|"unknown", "updated_at": iso, "online": bool}
+    valves: dict[str, dict[str, str | bool | None]] = Field(default_factory=dict)
+    valves_online: bool = False
+
     # Log-Ringbuffer (deque ist nicht serialisierbar via pydantic — separat halten)
     model_config = {"arbitrary_types_allowed": True}
 

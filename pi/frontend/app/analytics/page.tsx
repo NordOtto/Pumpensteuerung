@@ -5,7 +5,7 @@ import { useStatus } from "@/lib/ws";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-type Sample = { ts: number; pressure: number; flow: number; frequency: number; running: boolean };
+type Sample = { ts: number; pressure: number; flow: number; frequency: number; power: number | null; water_temp: number | null; running: boolean };
 type Range = { label: string; seconds: number };
 
 const RANGES: Range[] = [
@@ -44,6 +44,8 @@ export default function AnalyticsPage() {
     pressure: status.pressure_bar,
     flow: status.flow_rate,
     frequency: status.v20.frequency,
+    power: status.v20.power,
+    water_temp: status.water_temp,
     running: status.v20.running,
   } : null;
 
@@ -82,6 +84,8 @@ export default function AnalyticsPage() {
             <HistoryChart samples={chartSamples} accessor={(s) => s.pressure} color="var(--color-blue)"  unit="bar"   label="Druck" />
             <HistoryChart samples={chartSamples} accessor={(s) => s.flow}     color="var(--color-green)" unit="L/min" label="Durchfluss" />
             <HistoryChart samples={chartSamples} accessor={(s) => s.frequency} color="var(--color-amber)" unit="Hz"   label="Pumpenfrequenz" />
+            <HistoryChart samples={chartSamples} accessor={(s) => s.power ?? 0}      color="var(--color-purple)" unit="W"  label="Leistung" />
+            <HistoryChart samples={chartSamples} accessor={(s) => s.water_temp ?? 0} color="var(--color-blue)"   unit="°C" label="Wassertemp" />
           </div>
         )}
       </div>

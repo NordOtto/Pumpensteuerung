@@ -68,6 +68,12 @@ def init_schema() -> None:
             running     INTEGER NOT NULL DEFAULT 0
         );
         """)
+        # Migration: Spalten power + water_temp ergänzen, falls noch nicht vorhanden
+        cols = {row["name"] for row in c.execute("PRAGMA table_info(pressure_log)").fetchall()}
+        if "power" not in cols:
+            c.execute("ALTER TABLE pressure_log ADD COLUMN power REAL")
+        if "water_temp" not in cols:
+            c.execute("ALTER TABLE pressure_log ADD COLUMN water_temp REAL")
 
 
 # ── Irrigation History ────────────────────────────────────────
@@ -146,13 +152,15 @@ def migrate_irrigation_json(json_history: list[dict[str, Any]]) -> int:
 
 
 # ── Pressure Log ──────────────────────────────────────────────
-def insert_pressure_sample(pressure: float, flow: float, frequency: float, running: bool) -> None:
+def insert_pressure_sample(pressure: float, flow: float, frequency: float, running: bool,
+                            power: float | None = None, water_temp: float | None = None) -> None:
     ts = int(time.time())
     with db() as c:
         c.execute(
-            """INSERT OR REPLACE INTO pressure_log (ts, pressure, flow, frequency, running)
-               VALUES (?, ?, ?, ?, ?)""",
-            (ts, pressure, flow, frequency, 1 if running else 0),
+            """INSERT OR REPLACE INTO pressure_log
+               (ts, pressure, flow, frequency, running, power, water_temp)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (ts, pressure, flow, frequency, 1 if running else 0, power, water_temp),
         )
         # Retention
         cutoff = ts - PRESSURE_RETENTION_S
@@ -167,10 +175,12 @@ def get_pressure_history(seconds: int = 3600, max_points: int = 360) -> list[dic
     with db() as c:
         rows = c.execute(
             """SELECT (ts / ?) * ? AS bucket,
-                      AVG(pressure)  AS pressure,
-                      AVG(flow)      AS flow,
-                      AVG(frequency) AS frequency,
-                      MAX(running)   AS running
+                      AVG(pressure)   AS pressure,
+                      AVG(flow)       AS flow,
+                      AVG(frequency)  AS frequency,
+                      AVG(power)      AS power,
+                      AVG(water_temp) AS water_temp,
+                      MAX(running)    AS running
                FROM pressure_log
                WHERE ts >= ?
                GROUP BY bucket
@@ -183,6 +193,8 @@ def get_pressure_history(seconds: int = 3600, max_points: int = 360) -> list[dic
             "pressure": r["pressure"],
             "flow": r["flow"],
             "frequency": r["frequency"],
+            "power": r["power"],
+            "water_temp": r["water_temp"],
             "running": bool(r["running"]),
         }
         for r in rows

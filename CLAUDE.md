@@ -63,7 +63,8 @@ Browser (HTTPS :443)
 
 FastAPI ──RTU──→ V20 Frequenzumrichter (500ms Takt)
         ←─TCP──  LOGO 8.4 SPS (schreibt Sensor-Register 2–4)
-        ──MQTT─→ Broker 192.168.1.136:1883 ←→ Home Assistant
+        ──MQTT─→ Broker 192.168.1.136:1883 ──┬──→ Home Assistant (Status)
+                                              └──→ ESP32 ESPHome (Ventile, valve/<zone>/set)
 ```
 
 **Backend-Module (`pi/backend/app/`):**
@@ -138,6 +139,42 @@ Aktuelles Verhalten (seit Mai 2026):
   - Skip nur bei akutem Regen heute (`forecast_24h_mm ≥ skip_rain_mm`)
   - Sonst reduzierte Laufzeit statt komplett aussetzen
 - **Frequenz-Slider** pro Zone skaliert effektives `min_deficit_mm` mit Faktor 0.4 (häufig) bis 2.0 (selten).
+
+## Ventile (ESPHome direkt per MQTT)
+
+Die Magnetventile hängen an einem ESP32 mit ESPHome (`esp32-garage`, Datei `esphome/esp32-garage.yaml` im HA-Add-on). Pumpensteuerung schaltet **direkt per MQTT** — keine HA-Automation mehr.
+
+**Mapping:**
+| Zone-ID    | ESPHome-Switch  | GPIO |
+|------------|-----------------|------|
+| `garten`   | `relay_1`       | 14   |
+| `vorgarten`| `relay_2`       | 27   |
+| `hecke`    | `relay_3`       | 32   |
+
+**MQTT-Topics:**
+- `pumpensteuerung/valve/<zone>/set` — Pumpensteuerung publisht `ON`/`OFF`, ESPHome subscribt
+- `pumpensteuerung/valve/<zone>/state` — ESPHome publisht retained `ON`/`OFF` nach Schaltung
+- `pumpensteuerung/valve/availability` — ESPHome-LWT (`online`/`offline`)
+
+**Code-Stellen:**
+- `irrigation.py:_publish_zone_command()` — publisht bei Zone-Start/-Stop auf `valve/<id>/set`
+- `mqtt_client.py` — subscribt `valve/+/state` + `availability`
+- `main.py:_on_mqtt_command` — schreibt State in `app_state.valves[zone_id]`
+- `api/routes.py: POST /api/valve/{zone}/{open|close}` — direktes Schalten aus der App, mit 15-min-Watchdog für Auto-Off bei manuellem Open. Geblockt während Bewässerung läuft.
+
+Bei neuer Zone: ESPHome-YAML um `on_message`-Subscriber für `valve/<neue-zone>/set` ergänzen, sonst wird das Ventil nicht geschaltet. Frontend-Liste in `settings/page.tsx` (`VALVE_ZONES`) mit erweitern.
+
+## HA-Einbindung
+
+Pumpe ist als iframe-Panel in HA verlinkt. nginx `Content-Security-Policy: frame-ancestors` whitelistet die HA-Origins. Bei neuer HA-URL: `pi/ops/nginx/pumpe.conf` anpassen + nginx reloaden. HA-Config:
+
+```yaml
+panel_iframe:
+  pumpe:
+    title: "Pumpensteuerung"
+    icon: mdi:water-pump
+    url: "https://pumpe.local"
+```
 
 ## Architektur-Notizen für Code-Änderungen
 

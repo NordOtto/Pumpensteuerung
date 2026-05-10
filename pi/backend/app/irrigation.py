@@ -725,7 +725,9 @@ class IrrigationManager:
             "duration_s": max(0, round(runtime_s or 0)),
             "at": _now_iso(),
         }
-        self._publish(f"{BASE}/irrigation/zone/{zone['id']}/command", json.dumps(payload), False)
+        # ESPHome lauscht direkt auf valve/<zone>/set — schaltet das Magnetventil
+        valve_state = "ON" if action == "start" else "OFF"
+        self._publish(f"{BASE}/valve/{zone['id']}/set", valve_state, False)
 
     # ── Lauf-Steuerung ────────────────────────────────────────
     def _start_zone(self) -> None:

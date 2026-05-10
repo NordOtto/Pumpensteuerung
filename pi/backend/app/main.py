@@ -145,6 +145,8 @@ async def _pressure_log_loop():
                 flow=app_state.flow_rate,
                 frequency=app_state.v20.frequency,
                 running=app_state.v20.running,
+                power=app_state.v20.power,
+                water_temp=app_state.water_temp,
             )
         except Exception as exc:
             web_log(f"[LOOP] pressure log Fehler: {exc}")
@@ -162,6 +164,23 @@ def _on_mqtt_command(topic: str, payload: str) -> None:
         # paho-Callback läuft in einem Thread ohne Eventloop, daher darf diese
         # Verarbeitung nicht hinter asyncio.get_event_loop() hängen.
         irrigation.handle_mqtt(topic, payload)
+        return
+
+    # Ventil-State von ESPHome (pumpensteuerung/valve/<zone>/state, /availability)
+    if topic.startswith(f"{base}/valve/"):
+        from datetime import datetime
+        rest = topic[len(f"{base}/valve/"):]
+        if rest == "availability":
+            app_state.valves_online = (payload.strip().lower() == "online")
+            return
+        parts = rest.split("/")
+        if len(parts) == 2 and parts[1] == "state":
+            zone = parts[0]
+            app_state.valves[zone] = {
+                "state": payload.strip().upper(),
+                "updated_at": datetime.now().isoformat(),
+                "online": True,
+            }
         return
 
     loop = _main_loop

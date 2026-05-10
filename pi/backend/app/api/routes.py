@@ -12,9 +12,11 @@ from typing import Any
 from fastapi import APIRouter, Body, HTTPException
 from pydantic import BaseModel
 
-from ..state import app_state, log_buffer, log_seq
+from ..state import app_state, log_buffer, log_seq, web_log
 from ..storage import get_pressure_history
 from ..irrigation_wizard import recommend_smart_et
+from ..mqtt_client import bridge
+from ..config import settings
 from .deps import deps
 
 router = APIRouter(prefix="/api")
@@ -435,3 +437,54 @@ async def _validate_ota_token() -> tuple[bool, str]:
         return True, "Token gueltig, Release-Info konnte geladen werden"
     tail = text.splitlines()[-1] if text else "Release-Info konnte nicht geladen werden"
     return False, tail
+
+
+# ── /valve ────────────────────────────────────────────────────
+# Direktes Schalten der ESPHome-Ventile via MQTT. Wird im Wartungsbereich
+# der App genutzt. Bei aktivem Bewässerungs-Lauf blockiert, weil sonst die
+# Pumpe gegen ein geschlossenes Ventil arbeiten würde.
+import asyncio
+_VALVE_WATCHDOGS: dict[str, asyncio.Task] = {}
+_VALVE_AUTO_OFF_S = 15 * 60  # Auto-Off nach 15 min für manuelles Open
+
+VALVE_ZONES = {"garten", "vorgarten", "hecke"}
+
+
+async def _valve_watchdog(zone: str, delay_s: float) -> None:
+    try:
+        await asyncio.sleep(delay_s)
+        bridge.publish(f"{settings.mqtt_topic_prefix}/valve/{zone}/set", "OFF", retain=False)
+        web_log(f"[VALVE] Watchdog: {zone} nach {int(delay_s)} s automatisch geschlossen")
+    except asyncio.CancelledError:
+        pass
+    finally:
+        _VALVE_WATCHDOGS.pop(zone, None)
+
+
+@router.get("/valve")
+async def get_valve_state() -> dict:
+    return {"valves": app_state.valves, "online": app_state.valves_online}
+
+
+@router.post("/valve/{zone}/{action}")
+async def set_valve(zone: str, action: str) -> dict:
+    if zone not in VALVE_ZONES:
+        raise HTTPException(status_code=404, detail=f"Unbekannte Zone: {zone}")
+    if action not in {"open", "close"}:
+        raise HTTPException(status_code=400, detail="action muss 'open' oder 'close' sein")
+    if app_state.irrigation.decision.running:
+        raise HTTPException(status_code=409, detail="Bewässerung läuft — Ventil-Schalten blockiert")
+    if not app_state.valves_online:
+        raise HTTPException(status_code=503, detail="Ventil-Modul (ESPHome) offline")
+
+    payload = "ON" if action == "open" else "OFF"
+    bridge.publish(f"{settings.mqtt_topic_prefix}/valve/{zone}/set", payload, retain=False)
+    web_log(f"[VALVE] Manuell {zone} → {payload}")
+
+    # Watchdog: bestehenden Timer löschen, bei open neu starten
+    existing = _VALVE_WATCHDOGS.pop(zone, None)
+    if existing:
+        existing.cancel()
+    if action == "open":
+        _VALVE_WATCHDOGS[zone] = asyncio.create_task(_valve_watchdog(zone, _VALVE_AUTO_OFF_S))
+    return {"ok": True, "zone": zone, "state": payload}

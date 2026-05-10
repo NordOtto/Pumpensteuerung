@@ -86,9 +86,14 @@ export const api = {
         pressure: number;
         flow: number;
         frequency: number;
+        power: number | null;
+        water_temp: number | null;
         running: boolean;
       }>;
     }>(`/api/history/pressure?seconds=${seconds}&max_points=${maxPoints}`),
+
+  setValve: (zone: string, action: "open" | "close") =>
+    request<{ ok: boolean; zone: string; state: string }>(`/api/valve/${zone}/${action}`, { method: "POST" }),
 
   weatherConfig: () => request<WeatherConfig>("/api/irrigation/weather/config"),
   saveWeatherConfig: (payload: Record<string, unknown>) =>

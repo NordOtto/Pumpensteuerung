@@ -15,6 +15,7 @@ const SECTIONS = [
   { id: "presets",   label: "Presets" },
   { id: "pi",        label: "PI-Regler" },
   { id: "timeguard", label: "Zeitfenster" },
+  { id: "valves",    label: "Ventile" },
   { id: "system",    label: "System" },
 ] as const;
 type SectionId = typeof SECTIONS[number]["id"];
@@ -49,6 +50,7 @@ export default function SettingsPage() {
       {active === "presets"   && <PresetsSettings active={status.active_preset} data={presetData} onReload={loadPresets} />}
       {active === "pi"        && <PiSettings pi={status.pi} />}
       {active === "timeguard" && <TimeguardSettings tg={status.timeguard} />}
+      {active === "valves"    && <ValvesSettings valves={status.valves} valvesOnline={status.valves_online} irrigationRunning={status.irrigation.decision.running} />}
       {active === "system"    && <SystemSettings sys={status.sys} />}
     </div>
   );
@@ -701,6 +703,103 @@ function TimeguardSettings({ tg }: { tg: { enabled: boolean; start_hour: number;
         className="rounded-tile bg-primary px-4 py-2 text-xs font-bold text-white">
         Speichern
       </button>
+    </div>
+  );
+}
+
+// ── Ventile (Wartung) ─────────────────────────────────────────────────────────
+const VALVE_ZONES = [
+  { id: "garten", label: "Garten" },
+  { id: "vorgarten", label: "Vorgarten" },
+  { id: "hecke", label: "Hecke" },
+] as const;
+
+function ValvesSettings({ valves, valvesOnline, irrigationRunning }: {
+  valves: Record<string, { state: string; updated_at: string; online: boolean }>;
+  valvesOnline: boolean;
+  irrigationRunning: boolean;
+}) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const toggle = async (zone: string, current: string) => {
+    setError(null);
+    setBusy(zone);
+    try {
+      await api.setValve(zone, current === "ON" ? "close" : "open");
+    } catch (err) {
+      let detail = err instanceof Error ? err.message : "Fehler";
+      try { detail = (JSON.parse(detail) as { detail?: string }).detail ?? detail; } catch { /* */ }
+      setError(detail);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div className="rounded-card border border-border bg-bg1 p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-tx3">Ventile (Wartung)</div>
+        <span className={cn(
+          "rounded-tile px-2 py-0.5 text-[10px] font-bold uppercase",
+          valvesOnline ? "bg-[var(--color-green-dim)] text-ok" : "bg-bg2 text-tx3"
+        )}>
+          {valvesOnline ? "Modul online" : "Modul offline"}
+        </span>
+      </div>
+
+      {irrigationRunning && (
+        <div className="mb-3 rounded-tile border border-warn/35 bg-[var(--color-amber-dim)] px-3 py-2 text-[11px] text-warn">
+          Bewässerung läuft — Ventil-Schalten ist gesperrt, bis der Lauf endet.
+        </div>
+      )}
+      {error && (
+        <div className="mb-3 rounded-tile border border-danger/35 bg-[var(--color-red-dim)] px-3 py-2 text-[11px] text-danger">
+          {error}
+        </div>
+      )}
+
+      <div className="flex flex-col gap-2">
+        {VALVE_ZONES.map((z) => {
+          const v = valves[z.id];
+          const state = v?.state ?? "unknown";
+          const isOpen = state === "ON";
+          const disabled = irrigationRunning || !valvesOnline || busy === z.id;
+          return (
+            <div key={z.id} className="flex items-center gap-3 rounded-tile border border-border bg-bg2 px-3 py-2">
+              <div className={cn(
+                "h-3 w-3 shrink-0 rounded-full",
+                state === "unknown" ? "bg-tx3" : isOpen ? "bg-danger animate-pulse" : "bg-ok"
+              )} />
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-semibold text-tx">{z.label}</div>
+                <div className={cn(
+                  "text-[10px]",
+                  isOpen ? "font-bold text-danger" : "text-tx3"
+                )}>
+                  {state === "unknown" ? "Status unbekannt" : isOpen ? "Offen — Wasser fließt" : "Geschlossen"}
+                  {v?.updated_at ? ` · ${new Date(v.updated_at).toLocaleTimeString("de-DE")}` : ""}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => toggle(z.id, state)}
+                disabled={disabled}
+                className={cn(
+                  "shrink-0 rounded-tile px-4 py-2 text-xs font-bold uppercase tracking-wide transition",
+                  isOpen ? "bg-ok text-white" : "bg-tx2 text-white",
+                  disabled && "opacity-40"
+                )}>
+                {busy === z.id ? "..." : isOpen ? "Schließen" : "Öffnen"}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="mt-3 text-[10px] text-tx3">
+        Manuell geöffnete Ventile werden nach 15 Minuten automatisch geschlossen (Sicherheit).
+      </div>
     </div>
   );
 }

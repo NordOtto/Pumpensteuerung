@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Play, Square, RotateCcw, AlertCircle, CheckCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useStatus } from "@/lib/ws";
@@ -34,6 +34,15 @@ export default function DashboardPage() {
   const [manualMin, setManualMin] = useState(30);
   const [showPicker, setShowPicker] = useState(false);
   const [actionMsg, setActionMsg] = useState<{ text: string; isError: boolean } | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
+  const decisionRunning = status?.irrigation.decision.running ?? false;
+  const decisionPaused = status?.irrigation.decision.paused ?? false;
+  useEffect(() => {
+    if (!decisionRunning || decisionPaused) return;
+    const id = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [decisionRunning, decisionPaused]);
 
   if (!status) {
     return <div className="flex h-64 items-center justify-center text-tx3">Verbinde mit Steuerung...</div>;
@@ -62,7 +71,15 @@ export default function DashboardPage() {
     ? `${decisionProgram.name}${decisionZones.length ? ` · ${decisionZones.map((z) => z.name).join(", ")}` : ""}`
     : "Kein Programm";
   const totalPlannedS = Math.max(decision.total_planned_s || 0, decision.remaining_s || 0);
-  const elapsedS = decision.running ? Math.max(0, totalPlannedS - decision.remaining_s) : 0;
+  // Lokaler 1s-Timer interpoliert zwischen Backend-Ticks (Backend ticked nur alle 30s)
+  const startedMs = decision.started_at ? new Date(decision.started_at).getTime() : 0;
+  const liveElapsedS = decision.running && startedMs > 0 && !decision.paused
+    ? Math.max(0, Math.floor((nowMs - startedMs) / 1000))
+    : Math.max(0, totalPlannedS - decision.remaining_s);
+  const elapsedS = decision.running ? Math.min(totalPlannedS || liveElapsedS, liveElapsedS) : 0;
+  const liveRemainingS = decision.running
+    ? Math.max(0, totalPlannedS - elapsedS)
+    : decision.remaining_s;
   const progressPct = totalPlannedS > 0 ? Math.min(100, Math.max(0, (elapsedS / totalPlannedS) * 100)) : 0;
   const startedAtLabel = decision.started_at
     ? new Date(decision.started_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })
@@ -106,7 +123,7 @@ export default function DashboardPage() {
           </div>
 
           {/* KPI Grid */}
-          <div className="mb-3.5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="mb-3.5 grid grid-cols-2 gap-2 sm:grid-cols-5">
             <KpiTile label="Druck" value={formatFixed(status.pressure_bar, 2)} unit="bar" colorClass="text-primary"
               sub={`P_ein ${formatFixed(status.pi.p_on, 1)} / P_aus ${formatFixed(status.pi.p_off, 1)}`} />
             <KpiTile label="Durchfluss" value={formatFixed(status.flow_rate, 1)} unit="L/min" colorClass="text-ok"
@@ -115,6 +132,8 @@ export default function DashboardPage() {
               sub={`Soll ${formatFixed(v.freq_setpoint, 1)} Hz`} />
             <KpiTile label="Leistung" value={formatSmart(v.power, 0)} unit="W" colorClass="text-purple"
               sub={`${formatFixed(v.current, 1)} A / ${formatSmart(v.voltage, 0)} V`} />
+            <KpiTile label="Wassertemp" value={formatFixed(status.water_temp, 1)} unit="°C" colorClass="text-primary"
+              sub="Brunnen" />
           </div>
 
           {/* Actions */}
@@ -221,7 +240,7 @@ export default function DashboardPage() {
                 <div><span className="text-tx3">Start</span><div className="num font-bold text-tx">{startedAtLabel}</div></div>
                 <div><span className="text-tx3">Ende</span><div className="num font-bold text-tx">{expectedEndLabel}</div></div>
                 <div><span className="text-tx3">Verstrichen</span><div className="num font-bold text-tx">{formatDurationCompact(elapsedS)}</div></div>
-                <div><span className="text-tx3">Verbleibend</span><div className="num font-bold text-ok">{formatDurationCompact(decision.remaining_s)}</div></div>
+                <div><span className="text-tx3">Verbleibend</span><div className="num font-bold text-ok">{formatDurationCompact(liveRemainingS)}</div></div>
               </div>
             </div>
           )}

@@ -241,6 +241,8 @@ export interface AppStatus {
     history: Array<Record<string, unknown>>;
   };
   sys: SysState;
+  valves: Record<string, { state: string; updated_at: string; online: boolean }>;
+  valves_online: boolean;
 }
 
 export type SystemMode = "AUTO" | "MANUELL" | "FEHLER";

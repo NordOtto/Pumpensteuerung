@@ -1,276 +1,92 @@
-# Projektstand - Pumpensteuerung und Bewaesserung
+# Projektstand — Pumpensteuerung & Bewässerung
 
-Stand: 2026-05-03
+Stand: 2026-05-09
 
 ## Zielbild
 
-Die Pumpensteuerung laeuft als lokale Webapp auf dem Raspberry Pi. Der Pi ist
-das zentrale System fuer Druckregelung, V20-Ansteuerung, Presets,
-Bewaesserungsprogramme, Smart-ET-Empfehlungen, OTA-Updates und die HMI-UI.
-Home Assistant bleibt optional ueber MQTT angebunden, ist aber keine harte
-Abhaengigkeit fuer die Bedienung.
+Lokale Webapp auf einem Raspberry Pi 3B+. Der Pi ist das **einzige** Steuerungssystem:
 
-Aktueller Pi:
+- Druckregelung (PI), V20-Frequenzumrichter via Modbus RTU
+- Sensordaten (Druck, Durchfluss, Wassertemperatur) via Modbus TCP von einer Siemens LOGO 8.4
+- Smarte Bewässerung mit Wetter-Integration (OpenWeatherMap + Ecowitt)
+- HTTPS-UI über nginx → Next.js + FastAPI
+- MQTT-Integration für Home Assistant (optional)
+- Android-App als Capacitor-Wrapper (lädt UI live vom Pi)
 
 | Bereich | Stand |
 |---|---|
-| Pi-IP | `192.168.1.86` |
-| Backend | FastAPI auf `127.0.0.1:8000`, Service `pumpe-backend.service` |
-| Frontend | Next.js Standalone auf `127.0.0.1:3001`, Service `pumpe-frontend.service` |
-| Aktueller Release-Link | `/opt/pumpe/current` -> `/opt/pumpe/releases/b4b0c56-main` |
+| Pi-IP | `192.168.1.86` (mDNS: `pumpe.local`) |
+| Backend | FastAPI auf `127.0.0.1:8000` (`pumpe-backend.service`) |
+| Frontend | Next.js Standalone auf `127.0.0.1:3001` (`pumpe-frontend.service`) |
+| nginx | HTTPS auf `:443` mit Self-Signed-Cert |
+| Aktueller Release | `/opt/pumpe/current` |
 | OTA-Repo | `NordOtto/Pumpensteuerung` |
+| Android-APK | `https://pumpe.local/pumpe.apk` (Capacitor-Wrapper) |
 
-## Zuletzt umgesetzt
+## Zuletzt umgesetzt (Mai 2026)
 
-### UI-Redesign
+### Bewässerungs-Refactor — Hintergrund-Automatik & Manuell
 
-- Dashboard-Leitstand entfernt, weil die Werte bereits in der UI vorhanden sind.
-- Helle Webapp/HMI-Oberflaeche eingefuehrt:
-  - Tailwind-Glassmorphism mit `bg-white/75`, `backdrop-blur`, feinen Borders,
-    weichen Schatten und leichten Verlaeufen.
-  - Framer-Motion fuer Seiteneinstieg, Karten und Guide-Wechsel.
-  - App-Shell mit modernerem Profi-Look statt generischem Dashboard.
-- Bestehende Bereiche optisch aufgewertet statt neue doppelte Top-Metriken
-  einzubauen.
-- OTA-Log darf als funktionale dunkle Konsole bleiben; normale UI-Flaechen sind
-  hell gehalten.
+**Konzept klar getrennt:**
+- **Automatik = Hintergrund.** Läuft nach fester Tagesstartzeit (z.B. täglich 06:00) sofern Wetter+Defizit es zulassen. Kein Knopf nötig.
+- **Manuell = Knopf.** Du klickst, du gibst die Dauer vor. Sperren (Sperrtag/Sperrzeit) gelten auch für Manuell.
 
-Wichtiger Commit:
+**Schema-Änderungen pro Programm:**
+- `days` (feste Bewässerungstage) **entfernt**
+- `blocked_days[7]` neu: Tage an denen NICHT bewässert wird
+- `blocked_window` neu: Sperr-Stundenfenster (z.B. 11:00–18:00)
 
-- `3feb4f1 feat: redesign pump ui shell`
+**Schema-Änderungen pro Zone:**
+- `precipitation_mm_per_h` — Niederschlagsrate (Garten/Vorgarten MP-Rotator: 10 mm/h, Hecke Tropfschlauch: ~15 mm/h)
+- `frequency_pref` — Slider 0.0 (kurz/häufig) bis 1.0 (lang/selten); skaliert effektives `min_deficit_mm` mit Faktor 0.4–2.0
+- `area_value` + `area_unit` — Fläche m² (Rasen/Beet) oder Länge m (Hecke/Tropfschlauch); UI-Label wechselt automatisch je nach `plant_type`
 
-### Smart-ET-Guide
+### Hydrawise-ähnliche Wetter-Logik
 
-- Dunklen Smart-ET-Assistenten durch hellen gefuehrten Guide ersetzt.
-- Guide fuehrt in vier Schritten:
-  1. Nutzung und Preset
-  2. Boden und Sonne
-  3. Messwerte
-  4. Empfehlung pruefen und uebernehmen
-- Empfehlung wird in das aktuell geoeffnete Programm uebernommen.
-- Live-Status-Updates ueberschreiben lokale, noch nicht gespeicherte
-  Programmaenderungen nicht mehr.
-- Umschalten von `fixed` auf `smart_et` bleibt nun erhalten.
-- Messfelder umbenannt:
-  - `Test-mm` -> `Gemessene Regenhoehe mm`
-  - `Test-min` -> `Testdauer min`
-  - zusaetzlich wird die berechnete Rate in `mm/h` gezeigt.
+Statt binär „skip wenn 13mm Regenprognose":
+- **Regen-Credit** = `rain_24h_mm + 0.7 × forecast_48h_mm`
+- Pro Zone wird Credit vom Defizit abgezogen → Zone läuft **reduziert** statt komplett ausgesetzt
+- Skip nur bei akutem Regen heute (`forecast_24h_mm ≥ skip_rain_mm`), nicht bei Regen übermorgen
 
-Wichtige Commits:
+### Durchfluss-Integration in Defizit
 
-- `e63df02 fix: keep program edits during live updates`
-- `0abfd9b chore: clarify irrigation wizard measurement labels`
+- Während aktiver Zone wird `flow_rate` (L/min) integriert → tatsächliche Liter
+- Beim Lauf-Ende: `applied_mm = Liter / Fläche_m²` (1 L/m² = 1 mm)
+- Geclamped auf 0.5×–2× vom theoretischen Wert (Schutz vor Sensorfehlern, Lecks)
+- Ohne Sensor/Fläche: Fallback auf theoretisch (`duration × precipitation_mm_per_h`)
 
-### Smart-ET und Tiefenbewaesserung
+### Manueller Lauf rechnet ins Defizit
 
-- Rasen-Profil realistischer gemacht:
-  - Ziel grob 25 mm pro Bewaesserung.
-  - Mindestdefizit grob 16 mm.
-  - Bei voller Sonne/Stress bis ca. 30 mm Ziel und 19.2 mm Mindestdefizit.
-- Lange Bewaesserung mit Cycle-and-Soak ergaenzt:
-  - Zonen koennen in Beregnungsbloecke und Sickerpausen aufgeteilt werden.
-  - Beispiel: 12 min beregnen, 25 min sickern, dann naechster Block.
-  - Backend stoppt waehrend der Sickerpause Zone und Pumpe, danach laeuft die
-    Zone weiter.
-- ZoneEditor hat Felder fuer `Beregnungsblock min` und `Sickerpause min`.
+Bug-Fix: `applied_mm` war für manuelle Läufe hardcoded `0.0` → Defizit wurde nicht reduziert. Jetzt:
+- `applied_mm = duration_min/60 × precipitation_mm_per_h` (theoretisch)
+- bzw. echte Sensorwerte wenn verfügbar
+- Bei vorzeitigem Stop wird der **proportionale** Anteil mitgerechnet
+- Auch im fixed-Mode (vorher nur smart_et)
 
-Wichtiger Commit:
+### UI-Refactor
 
-- `dbb2ef5 feat: add deep watering cycle soak`
+- **TopBar:** zeigt nur noch Live-Werte (Druck/L-min/Hz) + aktives Preset. Kein Logo, kein Pumpensteuerung-Text, kein Theme-Toggle. Theme-Switcher (Hell/Dunkel/System) ist nun in Settings → System → Erscheinungsbild.
+- **Dashboard:** „Jetzt smart starten"-Button entfernt (verwirrend gewesen). Nur noch „Manuell" + „Stoppen". Subtitle erklärt: „Automatik läuft täglich um HH:MM, sofern Wetter+Defizit es zulassen."
+- **Custom Duration Picker** neben den Quick-Buttons (10/20/30/45/60) — beliebige Minuten frei wählbar.
+- **Regen-Chips** im Bewässerungs-Panel: „Regen 24h" und „Regen 48h" mit Live-Werten.
+- **Settings → Programme:** Wochentag-Auswahl ersetzt durch Sperrtage (rot = gesperrt). Sperrzeit-Editor pro Programm. Pro Zone: Niederschlag mm/h, Fläche m²/Länge m (kontextsensitives Label), Frequenz-Slider.
+- **Fehler-Mapping** für Backend-Reasons in lesbare deutsche Texte.
 
-### Hahnmodus und Presets
+### Android-App
 
-- Neuer Preset-Modus `3`: Hahnmodus.
-- Hahnmodus ist als Standard gedacht fuer Wasserhahn, Schlauchtrommel,
-  Giesskanne und spontane Entnahme.
-- Hahnmodus regelt nicht per PI, sondern arbeitet mit:
-  - Einschaltdruck `p_on`
-  - Ausschaltdruck `p_off`
-  - fester Drehzahl in Hz
-- Beispiel auf dem Pi gesetzt:
-  - `Normal` als Hahnmodus
-  - `p_on=2.2`
-  - `p_off=3.7`
-  - `setpoint_hz=45`
-- Bewaesserungsmodi koennen weiterhin fuer Rasen, Tropfschlauch, Pool usw.
-  eigene Presets mit PI-Regelung oder Fix-Hz nutzen.
-- Presets sind jetzt im Zonen-Editor sichtbar; eigene Presets koennen einer Zone
-  zugewiesen werden.
-- Hahnmodus-Preset zeigt Ein-/Ausschaltdruck im Preset-Manager.
-- Zahlenfelder lassen sich wieder normal bearbeiten, ohne haengende fuehrende
-  Null.
+- **Capacitor-Wrapper** im Remote-URL-Modus. Lädt UI live von `https://pumpe.local`.
+- **Auto-Update** der UI über Service Worker — keine APK-Updates nötig solange nichts Natives geändert wird.
+- **Cert-Pinning:** Pi-Cert (Self-Signed) ist in der APK eingebettet, kein Cleartext.
+- **PWA-Setup** parallel: Browser-User auf Android können auch „Zum Startbildschirm hinzufügen".
+- APK-Distribution: `https://pumpe.local/pumpe.apk` (Sideload).
 
-Wichtige Commits:
+## Nächste sinnvolle Schritte
 
-- `f40c1f7 feat: add tap pressure preset mode`
-- `8154fc1 fix: share preset list with zone editor`
-- `de1a44b fix: allow editing numeric fields naturally`
-- `a33fb96 feat: configure tap pressure per preset`
+- Pro Zone die `area_value` (m² für Rasen, m für Hecke) eintragen, damit der Durchflussmesser-basierte Defizit-Update genau wird
+- Längeres Real-Test-Fenster: Automatik mit Sperrtagen/Sperrzeiten + Hydrawise-Logik beobachten
+- ggf. Frequenz-Slider in den Settings noch leicht ausgleichen wenn er zu aggressiv/lasch wirkt
+- Trockenlauf-Diagnose ausbauen (Druck stagniert trotz Pumpe an → Warnung)
 
-### OTA und Versionierung
+## Repo-Hinweis
 
-- OTA-Konfiguration auf das korrekte Release-Repo gesetzt:
-  - `GITHUB_REPO=NordOtto/Pumpensteuerung`
-- Pi-Konfiguration unter `/opt/pumpe/ota/config.env` entsprechend korrigiert.
-- OTA-Check konnte danach Release-Info laden und meldete den aktuellen Release.
-
-Wichtiger Commit:
-
-- `50fa271 fix: point ota config to release repo`
-
-Wichtig: Der direkte Pi-Deploy wurde zuletzt mehrfach per Datei-/Build-Kopie
-gemacht. Das funktioniert fuer schnelle Tests, ersetzt aber noch keinen sauber
-getaggten OTA-Release mit aktuellem Stand.
-
-### Programm-Speichern
-
-- Fehler `422 Field required body.body` beim Speichern von
-  Bewaesserungsprogrammen behoben.
-- Ursache: FastAPI interpretierte den Endpoint so, als muesste ein JSON-Feld
-  `body` existieren. Das Frontend sendet aber korrekt `{ "programs": [...] }`.
-- Backend-Endpoint nimmt nun den kompletten JSON-Body direkt an.
-- Auf dem Pi deployed, Backend neu gestartet und direkt gegen
-  `127.0.0.1:8000/api/irrigation/programs` getestet:
-  - Programme lesen: OK
-  - Programme speichern: `200 OK`
-
-Wichtiger Commit:
-
-- `829d80b fix: accept irrigation program save body`
-
-### Dashboard-Bewaesserungssteuerung
-
-- Hauptseite hat jetzt eine kompakte Bewaesserungs-Karte statt nur einzelner
-  Schnellstart-Karten.
-- Programme koennen direkt auf dem Dashboard gewaehlt werden.
-- Zwei Startarten sind sichtbar getrennt:
-  - `Automatik jetzt`: nutzt Wetter, ET, Defizit und Wochenlimit.
-  - `Manuell X min`: uebergeht Wetterpruefung und nutzt die eingestellte
-    Laufzeit.
-- Manuelle Laufzeit hat Schnellwerte und ein Minutenfeld.
-- Stop-Button stoppt die aktive Bewaesserung.
-- Waerend eines Laufs zeigt das Dashboard:
-  - manuell oder automatisch gestartet
-  - aktives Programm
-  - aktive Zone
-  - Lauf-/Sickerphase
-  - aktives Zonen-Preset
-  - Restzeit gesamt und aktueller Schritt
-- Backend liefert diese Laufstatus-Felder im WebSocket-State.
-- Nach Bewaesserungsende wird automatisch wieder das Rueckfall-Preset `Normal`
-  aktiviert, damit der Hahnmodus wieder Standard ist.
-
-Wichtiger Commit:
-
-- `70ed4ca feat: add dashboard irrigation controls`
-
-### Bedienlogik bereinigt
-
-- Hauptseite ist jetzt der zentrale Bedienort.
-- Live-Werte stehen oben nebeneinander.
-- Pumpensteuerung steht direkt unter den Live-Werten.
-- Pumpensteuerung hat einen dynamischen Hauptbutton:
-  - `Pumpe starten`, wenn sie aus ist.
-  - `Pumpe stoppen`, wenn sie laeuft.
-- `FU Reset` wird nur bei FU-Fehler angezeigt.
-- Die aktive Programmuebersicht wird nur waehrend einer laufenden
-  Bewaesserung angezeigt.
-- `Steuerung` wurde aus der Navigation entfernt.
-- `/control` leitet auf `/dashboard` weiter.
-- Start/Stop-Buttons wurden von der Zonenseite entfernt; Zonen ist jetzt
-  Uebersicht/Diagnose.
-
-Wichtiger Commit:
-
-- `a13c843 refactor: centralize dashboard controls`
-
-### Mobile Dashboard anpassbar
-
-- Hauptseite ist jetzt mobile-first gedacht; Desktop ist nur sekundaere
-  Darstellung.
-- Dashboard-Bereiche sind einklappbar.
-- Dashboard-Bereiche koennen per Drag-and-Drop verschoben werden.
-- Reihenfolge und Einklappstatus werden lokal im Browser gespeichert.
-
-Wichtiger Commit:
-
-- `afd4a5e feat: make dashboard panels reorderable`
-
-## Was aktuell funktioniert
-
-- Webapp auf dem Pi laeuft.
-- Backend-Service laeuft.
-- Frontend-Service laeuft.
-- Druck-/Pumpenstatus wird ueber WebSocket in der UI angezeigt.
-- Presets lassen sich verwalten und anwenden.
-- Zonen koennen Presets aus der Preset-Liste verwenden.
-- Hahnmodus kann als normaler Standard-Pumpenmodus genutzt werden.
-- Bewaesserungsprogramme koennen gespeichert werden.
-- Bewaesserung kann auf der Hauptseite automatisch oder manuell mit Minutenwert
-  gestartet und gestoppt werden.
-- Aktive Bewaesserung zeigt Restzeit, Zone, Phase und Startart.
-- Pumpenstart/-stop und Bewaesserungsstart/-stop sind nur noch auf der
-  Hauptseite bedienbar.
-- Zonenseite ist eine reine Uebersicht.
-- Smart-ET-Guide kann Empfehlungen erzeugen und ins geoeffnete Programm
-  uebernehmen.
-- Cycle-and-Soak ist im Backend und in der UI konfigurierbar.
-- OTA-Check kann Release-Info laden.
-
-## Wichtige Dateien
-
-| Datei | Zweck |
-|---|---|
-| `pi/backend/app/pressure_ctrl.py` | Druckregelung, PI-Regler, Hahnmodus, Schutzlogik |
-| `pi/backend/app/presets.py` | Preset-Verwaltung und Preset-Normalisierung |
-| `pi/backend/app/irrigation.py` | Programme, Zonen, Smart-ET-Entscheidung, Cycle-and-Soak |
-| `pi/backend/app/irrigation_wizard.py` | Smart-ET-Empfehlungslogik |
-| `pi/backend/app/api/routes.py` | REST-API, inklusive Programmspeichern und OTA |
-| `pi/frontend/app/dashboard/page.tsx` | Dashboard/UI-Hauptseite |
-| `pi/frontend/app/settings/page.tsx` | Programme, Smart-ET-Guide, Presets, OTA, Settings |
-| `pi/frontend/lib/api.ts` | Frontend-REST-Client |
-| `pi/frontend/lib/types.ts` | Gemeinsame Frontend-Typen |
-| `pi/ops/ota/config.env.example` | Beispielkonfiguration fuer OTA |
-| `pi/ops/ota/update.sh` | OTA-Check, Install und Rollback |
-
-## Test- und Deploy-Stand
-
-Lokal zuletzt erfolgreich:
-
-- `npm run typecheck` in `pi/frontend`
-- `npm run build` in `pi/frontend`
-- Python Compile-Check fuer `pi/backend/app/api/routes.py`
-
-Auf dem Pi zuletzt geprueft:
-
-- `pumpe-frontend.service`: active
-- `/settings`: HTTP 200
-- `/dashboard`: HTTP 200
-- `/zones`: HTTP 200
-- `/control`: Redirect 307 auf Dashboard
-- `pumpe-backend.service`: active
-- `GET /api/irrigation/programs`: OK
-- `POST /api/irrigation/programs`: HTTP 200
-
-Hinweis: Lokale Windows-Python-Umgebung ist nicht vollstaendig fuer Backend-Tests
-eingerichtet (`fastapi` fehlt dort). Backend-Tests sollten in der Backend-venv
-oder auf dem Pi laufen.
-
-## Bekannte offene Punkte
-
-- Aktueller Code ist lokal committed, aber ein sauberer OTA-Release mit den
-  neuesten Commits muss noch erstellt und getestet werden.
-- Version in der App/Backend-Meldung zeigt noch nicht zwingend die aktuellsten
-  lokalen Commits, weil Direktdeploys am Release-System vorbei gingen.
-- Smart-ET-Bewaesserung sollte real mit Regenmesser/Messbecher kalibriert
-  werden, damit `mm/h` stimmt.
-- Cycle-and-Soak muss im echten Betrieb beobachtet werden:
-  - Ventile sauber aus?
-  - Pumpe waehrend Sickerpause wirklich aus?
-  - Home-Assistant/MQTT-Zonen reagieren korrekt auf Start/Stop?
-- Hahnmodus-Werte muessen in der Praxis feinjustiert werden, damit die Pumpe
-  bei kleiner Entnahme angenehm startet und nicht taktet.
-- OTA-Flow braucht noch eine End-to-End-Probe mit neuem Tag und Rollback.
-- OTA-Check gegen GitHub liefert aktuell 404 fuer
-  `NordOtto/Pumpensteuerung`, obwohl GitHub erreichbar ist. Wahrscheinliche
-  Ursache: privates Repo ohne GitHub-Token auf dem Pi.
+ESP32-Code wird aus dem Repo entfernt — die Architektur ist Pi-only. Siehe [DEPLOYMENT.md](DEPLOYMENT.md) für den aktuellen Deploy-Workflow und [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md) für die Gesamtarchitektur.

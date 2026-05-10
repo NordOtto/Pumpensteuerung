@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -101,10 +101,36 @@ def _normalize_id(value: Any, fallback: str) -> str:
     return safe or fallback
 
 
-def _normalize_days(days: Any) -> list[bool]:
+def _normalize_days(days: Any, default: bool = True) -> list[bool]:
+    """7-Tage-Liste (Mo–So). default = Wert für fehlende/ungültige Eingabe."""
     if not isinstance(days, list) or len(days) != 7:
-        return [True] * 7
+        return [default] * 7
     return [bool(d) for d in days]
+
+
+def _normalize_blocked_window(bw: Any) -> dict[str, Any]:
+    bw = bw or {}
+    return {
+        "enabled": bool(bw.get("enabled")),
+        "start_hour": int(_clamp(bw.get("start_hour", 11), 0, 23)),
+        "start_min": int(_clamp(bw.get("start_min", 0), 0, 59)),
+        "end_hour": int(_clamp(bw.get("end_hour", 18), 0, 23)),
+        "end_min": int(_clamp(bw.get("end_min", 0), 0, 59)),
+    }
+
+
+def _in_blocked_window(now: datetime, bw: dict[str, Any]) -> bool:
+    """True wenn `now` im Sperrfenster bw liegt (über Mitternacht-fähig)."""
+    if not bw or not bw.get("enabled"):
+        return False
+    now_min = now.hour * 60 + now.minute
+    start_min = int(bw.get("start_hour", 0)) * 60 + int(bw.get("start_min", 0))
+    end_min = int(bw.get("end_hour", 0)) * 60 + int(bw.get("end_min", 0))
+    if start_min == end_min:
+        return False
+    if start_min < end_min:
+        return start_min <= now_min < end_min
+    return now_min >= start_min or now_min < end_min
 
 
 def _normalize_program(input_: dict[str, Any], idx: int = 0) -> dict[str, Any]:
@@ -117,7 +143,8 @@ def _normalize_program(input_: dict[str, Any], idx: int = 0) -> dict[str, Any]:
         "id": pid,
         "name": str(input_.get("name") or pid),
         "enabled": bool(input_.get("enabled")),
-        "days": _normalize_days(input_.get("days")),
+        "blocked_days": _normalize_days(input_.get("blocked_days"), default=False),
+        "blocked_window": _normalize_blocked_window(input_.get("blocked_window")),
         "start_hour": int(_clamp(input_.get("start_hour"), 0, 23)),
         "start_min": int(_clamp(input_.get("start_min"), 0, 59)),
         "mode": mode,
@@ -133,26 +160,60 @@ def _normalize_program(input_: dict[str, Any], idx: int = 0) -> dict[str, Any]:
             "soil_moisture_skip_pct": _clamp(thresholds["soil_moisture_skip_pct"], 0, 100),
             "et0_default_mm": _clamp(thresholds["et0_default_mm"], 0.1, 12),
         },
-        "zones": [
-            {
-                "id": _normalize_id(z.get("id") or z.get("name"), f"zone_{zi + 1}"),
-                "name": str(z.get("name") or z.get("id") or f"Zone {zi + 1}"),
-                "enabled": z.get("enabled") is not False,
-                "duration_min": _clamp(z.get("duration_min", z.get("duration", 10)), 1, 240),
-                "water_mm": _clamp(z.get("water_mm", 6), 0.1, 50),
-                "min_deficit_mm": _clamp(z.get("min_deficit_mm", 8), 0.1, 80),
-                "target_mm": _clamp(z.get("target_mm", 12), 0.1, 100),
-                "cycle_min": _clamp(z.get("cycle_min", 0), 0, 240),
-                "soak_min": _clamp(z.get("soak_min", 0), 0, 240),
-                "deficit_mm": _clamp(z.get("deficit_mm", 0), 0, 200),
-                "preset": str(z.get("preset") or "Normal"),
-                "plant_type": str(z.get("plant_type") or ""),
-            }
-            for zi, z in enumerate(zones_in)
-        ],
+        "zones": [_normalize_zone(z, zi) for zi, z in enumerate(zones_in)],
         "last_balance_date": input_.get("last_balance_date"),
         "last_run_at": input_.get("last_run_at"),
         "last_skip_reason": input_.get("last_skip_reason") or "",
+    }
+
+
+HECKE_DEFAULT_WIRKBREITE_M = 0.5  # Tropfschlauch: angenommene 0.5 m breiter Wurzelstreifen
+PLANT_LINEAR_HINTS = ("hecke", "tropf", "drip", "strauch")  # plant_type-Trigger für Strecken-Modus
+
+
+def _is_linear_zone(zone: dict[str, Any]) -> bool:
+    if str(zone.get("area_unit") or "").lower() == "m":
+        return True
+    pt = str(zone.get("plant_type") or "").lower()
+    return any(h in pt for h in PLANT_LINEAR_HINTS)
+
+
+def _zone_area_m2(zone: dict[str, Any]) -> float:
+    """Effektive Fläche der Zone in m². Bei Strecke (Tropfschlauch) wird mit Wirkbreite multipliziert."""
+    val = float(zone.get("area_value", 0) or 0)
+    if val <= 0:
+        return 0.0
+    if _is_linear_zone(zone):
+        return val * HECKE_DEFAULT_WIRKBREITE_M
+    return val
+
+
+def _normalize_zone(z: dict[str, Any], zi: int) -> dict[str, Any]:
+    duration_min = _clamp(z.get("duration_min", z.get("duration", 10)), 1, 240)
+    water_mm = _clamp(z.get("water_mm", 6), 0.1, 50)
+    # Default mm/h aus duration_min + water_mm berechnen (falls nicht explizit gesetzt)
+    default_mm_h = water_mm / max(duration_min / 60.0, 0.01)
+    plant_type = str(z.get("plant_type") or "")
+    linear_hint = any(h in plant_type.lower() for h in PLANT_LINEAR_HINTS)
+    area_unit_raw = str(z.get("area_unit") or ("m" if linear_hint else "m2")).lower()
+    area_unit = "m" if area_unit_raw == "m" else "m2"
+    return {
+        "id": _normalize_id(z.get("id") or z.get("name"), f"zone_{zi + 1}"),
+        "name": str(z.get("name") or z.get("id") or f"Zone {zi + 1}"),
+        "enabled": z.get("enabled") is not False,
+        "duration_min": duration_min,
+        "water_mm": water_mm,
+        "precipitation_mm_per_h": _clamp(z.get("precipitation_mm_per_h", default_mm_h), 0.5, 60),
+        "frequency_pref": _clamp(z.get("frequency_pref", 0.5), 0.0, 1.0),
+        "area_value": _clamp(z.get("area_value", 0), 0, 10000),
+        "area_unit": area_unit,
+        "min_deficit_mm": _clamp(z.get("min_deficit_mm", 8), 0.1, 80),
+        "target_mm": _clamp(z.get("target_mm", 12), 0.1, 100),
+        "cycle_min": _clamp(z.get("cycle_min", 0), 0, 240),
+        "soak_min": _clamp(z.get("soak_min", 0), 0, 240),
+        "deficit_mm": _clamp(z.get("deficit_mm", 0), 0, 200),
+        "preset": str(z.get("preset") or "Normal"),
+        "plant_type": plant_type,
     }
 
 
@@ -178,6 +239,9 @@ class _ActiveRun:
     paused_date: str = ""
     paused_phase: str = "run"
     paused_remaining_s: float = 0.0
+    # Durchfluss-Integration (Liter pro Zone, Schlüssel = zone_id)
+    flow_liters_by_zone: dict[str, float] = field(default_factory=dict)
+    flow_last_sample_ts: float = 0.0
 
     def remaining_s(self, now: float) -> int:
         current = self.paused_remaining_s if self.paused else (max(0, self.zone_ends_at - now) if self.zone_ends_at else 0)
@@ -461,8 +525,9 @@ class IrrigationManager:
         return True
 
     @staticmethod
-    def _smart_zone_runtime(zone: dict[str, Any]) -> dict[str, float]:
-        desired = min(float(zone.get("deficit_mm", 0)), float(zone.get("target_mm", zone.get("water_mm", 1))))
+    def _smart_zone_runtime(zone: dict[str, Any], rain_credit_mm: float = 0.0) -> dict[str, float]:
+        deficit = max(0.0, float(zone.get("deficit_mm", 0)) - max(0.0, rain_credit_mm))
+        desired = min(deficit, float(zone.get("target_mm", zone.get("water_mm", 1))))
         base_water = max(float(zone.get("water_mm", 1)), 0.1)
         base_min = max(float(zone.get("duration_min", 1)), 1)
         factor = _clamp(desired / base_water, 0.05, 3)
@@ -483,6 +548,15 @@ class IrrigationManager:
         if not manual and not program["enabled"]:
             return {"allowed": False, "reason": "Programm deaktiviert", "runtime_factor": 0, "water_budget_mm": 0}
 
+        # Sperrtag-/Sperrzeit-Check gilt nur für Automatik. Manuell darf jederzeit gestartet werden.
+        if not manual:
+            now_local = datetime.now(_TZ)
+            blocked_days = program.get("blocked_days") or [False] * 7
+            if blocked_days[now_local.weekday()]:
+                return {"allowed": False, "reason": "Sperrtag", "runtime_factor": 0, "water_budget_mm": 0}
+            if _in_blocked_window(now_local, program.get("blocked_window") or {}):
+                return {"allowed": False, "reason": "Sperrzeit aktiv", "runtime_factor": 0, "water_budget_mm": 0}
+
         if not force_weather and program["mode"] == "smart_et":
             self._update_water_balance(program)
             count = self._weekly_run_count(program)
@@ -498,47 +572,61 @@ class IrrigationManager:
         if not force_weather and program["weather_enabled"]:
             w = app_state.irrigation.weather
             t = program["thresholds"]
-            rain = float(w.forecast_rain_mm or 0) + float(w.rain_24h_mm or 0)
+            # Regen-Credit: gefallener Regen (24h) + 70% der 48h-Vorhersage werden vom Defizit abgezogen
+            # 70% weil nicht der ganze Regen im Wurzelraum ankommt (Verdunstung, Abfluss).
+            rain_past = float(w.rain_24h_mm or 0)
+            rain_forecast_48h = float(w.forecast_rain_48h_mm if w.forecast_rain_48h_mm is not None else (w.forecast_rain_mm or 0))
+            rain_credit = rain_past + 0.7 * rain_forecast_48h
+            rain_imminent = float(w.forecast_rain_24h_mm if w.forecast_rain_24h_mm is not None else 0)
+
             if float(w.wind_kmh or 0) > t["wind_max_kmh"]:
                 return {"allowed": False, "reason": "Wind zu hoch", "runtime_factor": 0, "water_budget_mm": 0}
             if w.soil_moisture_pct is not None and float(w.soil_moisture_pct) >= t["soil_moisture_skip_pct"]:
                 return {"allowed": False, "reason": "Bodenfeuchte ausreichend", "runtime_factor": 0, "water_budget_mm": 0}
-            if rain >= t["skip_rain_mm"]:
-                return {"allowed": False, "reason": "Regenprognose", "runtime_factor": 0, "water_budget_mm": 0}
+            # Skip nur bei akutem Regen heute (24h) — übermorgen-Regen darf nicht trockene Pflanzen bestrafen
+            if rain_imminent >= t["skip_rain_mm"]:
+                return {"allowed": False, "reason": "Regen kommt heute", "runtime_factor": 0, "water_budget_mm": 0}
+
             et0 = w.et0_mm if w.et0_mm is not None else t["et0_default_mm"]
-            budget = (
-                max((float(z.get("deficit_mm", 0)) for z in program["zones"]), default=0)
-                if program["mode"] == "smart_et" else max(0.0, et0 - rain)
-            )
 
             if program["mode"] == "smart_et":
-                due = [z for z in program["zones"]
-                       if z["enabled"] and float(z.get("deficit_mm", 0)) >= float(z.get("min_deficit_mm", 0))]
+                # Pro Zone Defizit nach Regen-Credit prüfen
+                # frequency_pref skaliert die Startschwelle: 0=häufig (×0.4), 1=selten (×2.0)
+                due = []
+                for z in program["zones"]:
+                    if not z["enabled"]:
+                        continue
+                    eff_deficit = float(z.get("deficit_mm", 0)) - rain_credit
+                    slider = _clamp(float(z.get("frequency_pref", 0.5)), 0.0, 1.0)
+                    eff_min_deficit = float(z.get("min_deficit_mm", 0)) * (0.4 + 1.6 * slider)
+                    if eff_deficit >= eff_min_deficit:
+                        due.append(z)
+                budget = max((float(z.get("deficit_mm", 0)) - rain_credit for z in due), default=0.0)
                 if not due:
-                    return {"allowed": False, "reason": "Defizit zu gering",
-                            "runtime_factor": 0, "water_budget_mm": budget}
+                    return {"allowed": False, "reason": "Regen kompensiert Defizit",
+                            "runtime_factor": 0, "water_budget_mm": max(budget, 0.0)}
                 runtimes = {}
                 max_factor = 0.0
                 for z in due:
-                    r = self._smart_zone_runtime(z)
+                    r = self._smart_zone_runtime(z, rain_credit_mm=rain_credit)
                     runtimes[z["id"]] = r
                     max_factor = max(max_factor, r["factor"])
                 return {
                     "allowed": True,
                     "reason": "Smart ET Freigabe",
                     "runtime_factor": max_factor or 1.0,
-                    "water_budget_mm": budget,
+                    "water_budget_mm": max(budget, 0.0),
                     "zone_ids": [z["id"] for z in due],
                     "zone_runtimes": runtimes,
                     "weekly_runs": self._weekly_run_count(program),
                 }
 
+            # Fixed-Mode: ET0 minus Regen-Credit als Bedarf
+            budget = max(0.0, et0 - rain_credit)
             factor = (budget / max(t["et0_default_mm"], 0.1)) * program["seasonal_factor"]
-            if rain >= t["reduce_rain_mm"]:
-                factor *= 0.6
             factor = _clamp(factor, program["min_runtime_factor"], program["max_runtime_factor"])
             if budget <= 0.2:
-                return {"allowed": False, "reason": "Budget ausreichend",
+                return {"allowed": False, "reason": "Regen deckt Bedarf",
                         "runtime_factor": 0, "water_budget_mm": budget}
             return {"allowed": True, "reason": "ET Freigabe", "runtime_factor": factor, "water_budget_mm": budget}
 
@@ -552,11 +640,12 @@ class IrrigationManager:
     @staticmethod
     def _next_start_for(program: dict[str, Any], from_dt: datetime | None = None) -> str | None:
         base = from_dt or datetime.now(_TZ)
+        blocked_days = program.get("blocked_days") or [False] * 7
         for offset in range(14):
             d = base + timedelta(days=offset)
             d = d.replace(hour=program["start_hour"], minute=program["start_min"],
                           second=0, microsecond=0)
-            if program["days"][d.weekday()] and d > base:
+            if not blocked_days[d.weekday()] and d > base:
                 return d.isoformat()
         return None
 
@@ -666,6 +755,7 @@ class IrrigationManager:
         now = datetime.now(_TZ).timestamp()
         self._active.zone_started_at = now
         self._active.zone_ends_at = now + runtime_s
+        self._active.flow_last_sample_ts = now
         if count_runtime:
             self._active.total_runtime_s += runtime_s
         self._active.zone_remaining_s = max(0, self._active.zone_remaining_s - runtime_s)
@@ -687,7 +777,26 @@ class IrrigationManager:
         self.recompute_decision(self._active.program["id"])
         self.publish_decision()
 
+    def _sample_flow(self, now_ts: float) -> None:
+        """Integriert app_state.flow_rate (L/min) über die Zeit für die aktive Zone."""
+        if not self._active or not self._active.zone or self._active.soaking:
+            return
+        last = self._active.flow_last_sample_ts or now_ts
+        delta_s = max(0.0, now_ts - last)
+        self._active.flow_last_sample_ts = now_ts
+        if delta_s <= 0:
+            return
+        flow_lpm = float(getattr(app_state, "flow_rate", 0) or 0)
+        if flow_lpm <= 0:
+            return
+        liters = flow_lpm * (delta_s / 60.0)
+        zid = self._active.zone["id"]
+        prev = float(self._active.flow_liters_by_zone.get(zid, 0.0))
+        self._active.flow_liters_by_zone[zid] = prev + liters
+
     def _finish_zone(self) -> None:
+        # Letzten Flow-Sample integrieren bevor wir die Zone abschließen
+        self._sample_flow(datetime.now(_TZ).timestamp())
         if not self._active or not self._active.zone:
             return
         self._publish_zone_command(self._active.zone, "stop", self._active.program, 0)
@@ -788,16 +897,46 @@ class IrrigationManager:
     def _finish_run(self, result: str, reason: str = "") -> None:
         if not self._active:
             return
+        # Letzten Flow-Sample integrieren (sofern aktive Zone)
+        self._sample_flow(datetime.now(_TZ).timestamp())
         if self._active.zone:
             self._publish_zone_command(self._active.zone, "stop", self._active.program, 0)
         self._v20_stop()
         program = self._active.program
         restore_preset = self._active.restore_preset or "Normal"
-        if result == "completed" and program["mode"] == "smart_et":
-            for zone in self._active.zones:
+        # Defizit reduzieren — auch bei manuellen Läufen und im fixed-Mode.
+        # Bei vorzeitigem Stop nur die tatsächlich vergangene Zeit mitrechnen.
+        if result in ("completed", "stopped"):
+            now_ts = datetime.now(_TZ).timestamp()
+            for zi, zone in enumerate(self._active.zones):
                 smart = (self._active.zone_runtimes or {}).get(zone["id"])
-                applied = (smart["applied_mm"] if smart
-                           else float(zone.get("water_mm", 0)) * (self._active.runtime_factor or 1))
+                planned_s = float(smart["runtime_s"]) if smart else float(zone.get("duration_min", 0) or 0) * 60
+                planned_mm = float(smart["applied_mm"]) if smart else float(zone.get("water_mm", 0) or 0) * (self._active.runtime_factor or 1)
+                # Wieviel von dieser Zone ist tatsächlich gelaufen?
+                if zi < self._active.zone_index:
+                    fraction = 1.0  # vollständig durch
+                elif zi == self._active.zone_index and self._active.zone_started_at and not self._active.soaking:
+                    elapsed = max(0.0, now_ts - self._active.zone_started_at)
+                    fraction = min(1.0, elapsed / max(planned_s, 1))
+                else:
+                    fraction = 0.0
+                if fraction <= 0 or planned_mm <= 0:
+                    continue
+                theoretical = planned_mm * fraction
+                # Wenn Durchflussmesser & Zonenfläche vorhanden: gemessene mm berechnen
+                area_m2 = _zone_area_m2(zone)
+                liters = float(self._active.flow_liters_by_zone.get(zone["id"], 0.0))
+                applied = theoretical
+                if area_m2 > 0 and liters > 0:
+                    measured_mm = liters / area_m2  # 1 L/m² = 1 mm
+                    # Clamp auf 0.5×–2× des theoretischen Werts (Schutz vor Sensor-Anomalien)
+                    lo = theoretical * 0.5
+                    hi = theoretical * 2.0
+                    applied = max(lo, min(hi, measured_mm))
+                    if abs(measured_mm - applied) > 0.5:
+                        web_log(f"[IRR] Zone {zone['name']}: Sensor {measured_mm:.1f}mm geclamped auf {applied:.1f}mm (theor. {theoretical:.1f}mm)")
+                    else:
+                        web_log(f"[IRR] Zone {zone['name']}: gemessen {liters:.1f}L / {area_m2:.1f}m² = {applied:.1f}mm")
                 zone["deficit_mm"] = _clamp(float(zone.get("deficit_mm", 0)) - applied, 0, 200)
         program["last_run_at"] = _now_iso()
         program["last_skip_reason"] = "" if result == "completed" else reason
@@ -848,7 +987,16 @@ class IrrigationManager:
             self.publish_decision()
             return {"ok": False, "error": ev["reason"], "decision": ev}
 
+        # Wenn ein Lauf aktiv ist: nicht automatisch unterbrechen.
+        # Manuelle Starts während aktiver Automatik werden abgewiesen — User soll bewusst stoppen.
         if self._active:
+            active_by = self._active.started_by or "auto"
+            if manual and active_by == "auto":
+                return {"ok": False, "error": "Automatik läuft — bitte zuerst stoppen", "decision": ev}
+            if not manual:
+                # Automatischer Start während aktivem Lauf: nicht stören
+                return {"ok": False, "error": "Programm läuft bereits", "decision": ev}
+            # manuell + manuell: alten Lauf beenden für neuen
             self._finish_run("interrupted", "Neues Programm gestartet")
 
         allowed_ids = set(ev.get("zone_ids") or []) if ev.get("zone_ids") else None
@@ -863,7 +1011,17 @@ class IrrigationManager:
         zone_runtimes = ev.get("zone_runtimes")
         if manual and duration_min is not None:
             duration_s = max(30, min(8 * 3600, round(float(duration_min) * 60)))
-            zone_runtimes = {z["id"]: {"runtime_s": duration_s, "applied_mm": 0.0, "factor": 1.0} for z in zones}
+            zone_runtimes = {}
+            for z in zones:
+                # applied_mm aus der pro-Zone Niederschlagsrate berechnen, damit Defizit korrekt sinkt
+                rate = float(z.get("precipitation_mm_per_h", 0) or 0)
+                if rate <= 0:
+                    # Fallback: aus water_mm/duration_min ableiten
+                    base_water = float(z.get("water_mm", 0) or 0)
+                    base_min = float(z.get("duration_min", 0) or 0)
+                    rate = base_water / max(base_min / 60.0, 0.01) if base_min > 0 else 0.0
+                applied_mm = round((duration_s / 3600.0) * rate, 2)
+                zone_runtimes[z["id"]] = {"runtime_s": duration_s, "applied_mm": applied_mm, "factor": 1.0}
 
         self._active = _ActiveRun(
             program=program,
@@ -950,6 +1108,8 @@ class IrrigationManager:
             if safety:
                 self._finish_run("stopped", safety)
                 return
+            # Durchfluss-Integration: nur wenn wir aktiv eine Zone bewässern (nicht in Sickerpause)
+            self._sample_flow(now)
             if self._active.soaking and now >= self._active.zone_ends_at:
                 self._finish_soak()
                 return
@@ -972,7 +1132,10 @@ class IrrigationManager:
         self._last_schedule_minute = minute_key
 
         for program in app_state.irrigation.programs:
-            if not program["enabled"] or not program["days"][d.weekday()]:
+            if not program["enabled"]:
+                continue
+            blocked_days = program.get("blocked_days") or [False] * 7
+            if blocked_days[d.weekday()]:
                 continue
             if program["start_hour"] == d.hour and program["start_min"] == d.minute:
                 res = self.run_program(program["id"], manual=False, force_weather=False)

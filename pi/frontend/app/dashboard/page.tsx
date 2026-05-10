@@ -1,24 +1,39 @@
 "use client";
 
 import { useState } from "react";
-import { Play, Square, RotateCcw, Sparkles } from "lucide-react";
+import { Play, Square, RotateCcw, AlertCircle, CheckCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useStatus } from "@/lib/ws";
 import { api } from "@/lib/api";
 import { cn, formatFixed, formatSmart } from "@/lib/utils";
+import { DurationPicker } from "@/components/duration-picker";
 import type { IrrigationProgram } from "@/lib/types";
 
 const QUICK_MINUTES = [10, 20, 30, 45, 60];
+
+function mapBackendError(detail: string, prog?: IrrigationProgram): string {
+  if (detail.includes("Automatik läuft")) return "Automatik läuft gerade — bitte erst stoppen";
+  if (detail.includes("läuft bereits")) return "Programm läuft bereits";
+  if (detail.includes("Sperrtag")) return "Heute ist Sperrtag";
+  if (detail.includes("Sperrzeit")) return "Aktuell Sperrzeit aktiv";
+  if (detail.includes("Wochenlimit")) return `Wochenlimit erreicht — max. ${prog?.max_runs_per_week ?? "?"} Starts/Woche`;
+  if (detail.includes("Wind")) return "Zu windig für Bewässerung";
+  if (detail.includes("Bodenfeuchte")) return "Boden ist noch feucht genug";
+  if (detail.includes("Regen kommt heute")) return "Regen heute vorhergesagt — Bewässerung wartet";
+  if (detail.includes("Regen kompensiert")) return "Vorhergesagter Regen deckt das Defizit";
+  if (detail.includes("Regen deckt")) return "Regen deckt den Wasserbedarf";
+  if (detail.includes("Regenprognose")) return "Regen vorhergesagt — Bewässerung übersprungen";
+  if (detail.includes("Defizit")) return "Kein Wasserbedarf — Defizit zu klein";
+  if (detail.includes("Budget")) return "Wasserbudget bereits ausreichend";
+  return detail;
+}
 
 export default function DashboardPage() {
   const { status } = useStatus();
   const [selectedProgId, setSelectedProgId] = useState("");
   const [manualMin, setManualMin] = useState(30);
-  const [actionMsg, setActionMsg] = useState("");
-  const [seedMinutes, setSeedMinutes] = useState(2);
-  const [seedInterval, setSeedInterval] = useState(120);
-  const [seedDays, setSeedDays] = useState(7);
-  const [seedZoneIds, setSeedZoneIds] = useState<string[]>([]);
+  const [showPicker, setShowPicker] = useState(false);
+  const [actionMsg, setActionMsg] = useState<{ text: string; isError: boolean } | null>(null);
 
   if (!status) {
     return <div className="flex h-64 items-center justify-center text-tx3">Verbinde mit Steuerung...</div>;
@@ -27,7 +42,6 @@ export default function DashboardPage() {
   const v = status.v20;
   const programs = status.irrigation.programs;
   const decision = status.irrigation.decision;
-  const overseeding = status.irrigation.overseeding;
 
   const selectedProg: IrrigationProgram =
     programs.find((p) => p.id === selectedProgId) ??
@@ -45,17 +59,30 @@ export default function DashboardPage() {
     return z.deficit_mm >= z.min_deficit_mm;
   }) ?? [];
   const nextRunLabel = decisionProgram
-    ? `${decisionProgram.name}${decisionZones.length ? ` ? ${decisionZones.map((z) => z.name).join(", ")}` : ""}`
+    ? `${decisionProgram.name}${decisionZones.length ? ` · ${decisionZones.map((z) => z.name).join(", ")}` : ""}`
     : "Kein Programm";
+  const totalPlannedS = Math.max(decision.total_planned_s || 0, decision.remaining_s || 0);
+  const elapsedS = decision.running ? Math.max(0, totalPlannedS - decision.remaining_s) : 0;
+  const progressPct = totalPlannedS > 0 ? Math.min(100, Math.max(0, (elapsedS / totalPlannedS) * 100)) : 0;
+  const startedAtLabel = decision.started_at
+    ? new Date(decision.started_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })
+    : "--:--";
+  const expectedEndLabel = decision.started_at && totalPlannedS > 0
+    ? new Date(new Date(decision.started_at).getTime() + totalPlannedS * 1000).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })
+    : "--:--";
 
-  const selectedSeedZones = seedZoneIds.length ? seedZoneIds : selectedProg?.zones.filter((z) => z.enabled).map((z) => z.id) ?? [];
   const runAction = async (fn: () => Promise<unknown>, success: string) => {
-    setActionMsg("");
+    setActionMsg(null);
     try {
       await fn();
-      setActionMsg(success);
+      setActionMsg({ text: success, isError: false });
     } catch (err) {
-      setActionMsg(err instanceof Error ? err.message : "Aktion fehlgeschlagen");
+      let detail = err instanceof Error ? err.message : "Aktion fehlgeschlagen";
+      try {
+        const parsed = JSON.parse(detail);
+        detail = parsed?.detail ?? detail;
+      } catch { /* detail bleibt */ }
+      setActionMsg({ text: mapBackendError(detail, selectedProg), isError: true });
     }
   };
 
@@ -165,22 +192,51 @@ export default function DashboardPage() {
               <Chip label="Grund" value={decision.reason || "Bereit"} />
               <Chip label="Wasserbedarf" value={`${formatFixed(decision.water_budget_mm, 1)} mm`} />
               <Chip label="Faktor" value={`×${formatSmart(decision.runtime_factor, 2)}`} />
+              <Chip
+                label="Regen 24h"
+                value={`${formatFixed(status.irrigation.weather.forecast_rain_24h_mm ?? 0, 1)} mm`}
+                valueClass={(status.irrigation.weather.forecast_rain_24h_mm ?? 0) >= 1 ? "text-primary" : "text-tx2"}
+              />
+              <Chip
+                label="Regen 48h"
+                value={`${formatFixed(status.irrigation.weather.forecast_rain_48h_mm ?? 0, 1)} mm`}
+                valueClass={(status.irrigation.weather.forecast_rain_48h_mm ?? 0) >= 5 ? "text-primary" : "text-tx2"}
+              />
             </div>
           </div>
 
+          {decision.running && (
+            <div className="mb-3 rounded-tile border border-border bg-bg2 px-3 py-2.5">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-tx3">Aktueller Lauf</span>
+                <Badge tone="ok">{Math.round(progressPct)}%</Badge>
+              </div>
+              <div className="mb-2 h-2 overflow-hidden rounded-full bg-bg3">
+                <div
+                  className="h-full rounded-full bg-ok transition-all"
+                  style={{ width: `${Math.max(0, Math.min(100, progressPct))}%` }}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-[11px] text-tx2 sm:grid-cols-4">
+                <div><span className="text-tx3">Start</span><div className="num font-bold text-tx">{startedAtLabel}</div></div>
+                <div><span className="text-tx3">Ende</span><div className="num font-bold text-tx">{expectedEndLabel}</div></div>
+                <div><span className="text-tx3">Verstrichen</span><div className="num font-bold text-tx">{formatDurationCompact(elapsedS)}</div></div>
+                <div><span className="text-tx3">Verbleibend</span><div className="num font-bold text-ok">{formatDurationCompact(decision.remaining_s)}</div></div>
+              </div>
+            </div>
+          )}
+
+          {/* Auto-Hinweis */}
+          {selectedProg && (
+            <div className="mb-3 rounded-tile border border-border bg-bg2 px-3 py-2 text-[11px] text-tx3">
+              Automatik läuft täglich um <span className="num font-bold text-tx2">
+                {String(selectedProg.start_hour).padStart(2, "0")}:{String(selectedProg.start_min).padStart(2, "0")}
+              </span>, sofern Wetter+Defizit es zulassen. Manueller Start nur wenn keine Automatik gerade läuft.
+            </div>
+          )}
+
           {/* Action tiles */}
-          <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
-            <ActionTile
-              icon={<Sparkles size={16} />}
-              label="Automatik jetzt"
-              sub="ET + Wetter"
-              color="var(--color-blue)"
-              disabled={decision.running}
-              onClick={() => selectedProg && runAction(
-                () => api.runProgram(selectedProg.id, false),
-                "Automatik gestartet."
-              )}
-            />
+          <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
             <ActionTile
               icon={<Play size={15} />}
               label={`Manuell ${manualMin} min`}
@@ -189,7 +245,7 @@ export default function DashboardPage() {
               disabled={decision.running}
               onClick={() => selectedProg && runAction(
                 () => api.runProgram(selectedProg.id, true, manualMin),
-                `Manuelle Bewaesserung fuer ${manualMin} min gestartet.`
+                `Manuelle Bewässerung für ${manualMin} min gestartet.`
               )}
             />
             <ActionTile
@@ -200,117 +256,57 @@ export default function DashboardPage() {
               disabled={!decision.running}
               onClick={() => runAction(
                 () => api.stopProgram(decision.active_program || selectedProg?.id),
-                "Bewaesserung gestoppt."
+                "Bewässerung gestoppt."
               )}
             />
           </div>
+
           {actionMsg && (
-            <div className="mb-3 rounded-tile border border-border bg-bg2 px-3 py-2 text-xs font-semibold text-tx2">
-              {actionMsg}
+            <div className={cn(
+              "mb-3 flex items-center gap-2 rounded-tile border px-3 py-2 text-xs font-semibold",
+              actionMsg.isError
+                ? "border-[var(--color-red)]/30 bg-[var(--color-red-dim)] text-danger"
+                : "border-[var(--color-green)]/30 bg-[var(--color-green-dim)] text-ok"
+            )}>
+              {actionMsg.isError
+                ? <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                : <CheckCircle className="h-3.5 w-3.5 shrink-0" />}
+              {actionMsg.text}
             </div>
           )}
 
-          {/* Quick time */}
+          {/* Quick time + custom picker */}
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-tx3 shrink-0">Laufzeit min:</span>
-            <div className="flex gap-1.5">
+            <div className="flex flex-wrap gap-1.5">
               {QUICK_MINUTES.map((m) => (
-                <button key={m} type="button" onClick={() => setManualMin(m)}
+                <button key={m} type="button" onClick={() => { setManualMin(m); setShowPicker(false); }}
                   className={cn(
                     "h-8 min-w-9 rounded-tile border px-2 text-xs font-bold transition",
-                    manualMin === m ? "border-[var(--color-green)]/35 bg-[var(--color-green-dim)] text-ok" : "border-border bg-bg2 text-tx2"
+                    manualMin === m && !showPicker ? "border-[var(--color-green)]/35 bg-[var(--color-green-dim)] text-ok" : "border-border bg-bg2 text-tx2"
                   )}>
                   {m}
                 </button>
               ))}
+              <button type="button" onClick={() => setShowPicker(!showPicker)}
+                className={cn(
+                  "h-8 rounded-tile border px-2.5 text-xs font-bold transition",
+                  showPicker ? "border-[var(--color-blue)]/35 bg-[var(--color-blue-dim)] text-primary" : "border-border bg-bg2 text-tx2"
+                )}>
+                {showPicker ? `${manualMin} min ✓` : "Eigene…"}
+              </button>
             </div>
           </div>
 
-          <div className="mt-3 rounded-tile border border-border bg-bg2 p-3">
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <div className="text-[10px] font-bold uppercase tracking-[0.1em] text-tx3">Nachsaat feucht halten</div>
-                <div className="mt-0.5 text-[11px] text-tx3">Wetterunabhaengig, mehrere Zonen laufen nacheinander.</div>
-              </div>
-              <Badge tone={overseeding.enabled ? "ok" : "muted"} pulse={overseeding.enabled}>
-                {overseeding.enabled ? "Aktiv" : "Aus"}
-              </Badge>
+          {showPicker && (
+            <div className="mt-2">
+              <DurationPicker value={manualMin} onChange={(v) => setManualMin(v)} />
             </div>
-            <div className="mb-2 flex flex-wrap gap-1.5">
-              {selectedProg?.zones.filter((z) => z.enabled).map((z) => {
-                const active = selectedSeedZones.includes(z.id);
-                return (
-                  <button key={z.id} type="button" onClick={() => {
-                    setSeedZoneIds((prev) => {
-                      const base = prev.length ? prev : selectedProg.zones.filter((zone) => zone.enabled).map((zone) => zone.id);
-                      return base.includes(z.id) ? base.filter((id) => id !== z.id) : [...base, z.id];
-                    });
-                  }} className={cn(
-                    "rounded-tile border px-2.5 py-1.5 text-xs font-bold",
-                    active ? "border-[var(--color-green)]/35 bg-[var(--color-green-dim)] text-ok" : "border-border bg-bg1 text-tx2"
-                  )}>
-                    {z.name}
-                  </button>
-                );
-              })}
-            </div>
-            <div className="mb-2 grid grid-cols-3 gap-2">
-              <MiniNumber label="min" value={seedMinutes} setValue={setSeedMinutes} />
-              <MiniNumber label="alle min" value={seedInterval} setValue={setSeedInterval} />
-              <MiniNumber label="Tage" value={seedDays} setValue={setSeedDays} />
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button type="button" disabled={!selectedProg || !selectedSeedZones.length} onClick={() => selectedProg && runAction(
-                () => api.setOverseeding({
-                  enabled: true,
-                  program_id: selectedProg.id,
-                  zone_ids: selectedSeedZones,
-                  duration_min: seedMinutes,
-                  interval_min: seedInterval,
-                  days: seedDays,
-                }),
-                "Nachsaat-Modus aktiviert."
-              )} className="rounded-tile bg-ok px-3 py-2 text-xs font-bold text-white disabled:opacity-40">
-                Nachsaat starten
-              </button>
-              <button type="button" disabled={!overseeding.enabled} onClick={() => runAction(
-                () => api.setOverseeding({ enabled: false }),
-                "Nachsaat-Modus gestoppt."
-              )} className="rounded-tile border border-border bg-bg1 px-3 py-2 text-xs font-bold text-tx2 disabled:opacity-40">
-                Nachsaat stoppen
-              </button>
-              {overseeding.enabled && overseeding.next_run_at && (
-                <span className="self-center text-[11px] text-tx3">
-                  Naechster Zyklus: {new Date(overseeding.next_run_at).toLocaleString("de-DE", { weekday: "short", hour: "2-digit", minute: "2-digit" })}
-                </span>
-              )}
-            </div>
-          </div>
+          )}
+
         </div>
       </div>
 
-      {/* ── ZONEN-STATUS ── */}
-      <div>
-        <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-tx3">Zonen-Status</div>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-          {dashboardZones(programs).map((z, idx) => {
-            const moisture = status.irrigation.weather.soil_moisture_pct ?? [70, 28, 55][idx] ?? 50;
-            const isActive = decision.running && decision.active_zone === z.id;
-            return (
-              <ZoneChip
-                key={z.id}
-                name={z.name}
-                moisture={moisture}
-                et={status.irrigation.weather.et0_mm ?? 3.2}
-                next={decision.next_start
-                  ? new Date(decision.next_start).toLocaleString("de-DE", { weekday: "short", hour: "2-digit", minute: "2-digit" })
-                  : "—"}
-                active={isActive}
-              />
-            );
-          })}
-        </div>
-      </div>
     </div>
   );
 }
@@ -361,53 +357,15 @@ function Chip({ label, value, valueClass }: { label: string; value: string; valu
   );
 }
 
-function MiniNumber({ label, value, setValue }: { label: string; value: number; setValue: (value: number) => void }) {
-  return (
-    <label className="rounded-tile border border-border bg-bg1 px-2 py-1.5">
-      <span className="mb-1 block text-[9px] font-bold uppercase tracking-[0.1em] text-tx3">{label}</span>
-      <input
-        type="number"
-        min={label === "min" ? 0.5 : 1}
-        value={String(value)}
-        onChange={(e) => setValue(Number(e.target.value || 0))}
-        className="h-7 w-full bg-transparent text-sm font-bold text-tx outline-none"
-      />
-    </label>
-  );
-}
-
-function ZoneChip({ name, moisture, et, next, active }: {
-  name: string; moisture: number; et: number; next: string; active: boolean;
-}) {
-  const color = moisture >= 60 ? "var(--color-green)" : moisture >= 30 ? "var(--color-amber)" : "var(--color-red)";
-  const tone = moisture >= 60 ? "ok" : moisture >= 30 ? "warn" : "danger";
-  return (
-    <div className={cn("rounded-tile border bg-bg1 p-2.5", active ? "border-[var(--color-green)]" : "border-border")}>
-      <div className="mb-2 flex items-center justify-between">
-        <span className="text-xs font-bold text-tx">{name}</span>
-        <Badge tone={tone}>{Math.round(moisture)}%</Badge>
-      </div>
-      <div className="mb-2 h-1 overflow-hidden rounded-full bg-bg3">
-        <div className="h-full rounded-full" style={{ width: `${moisture}%`, background: color }} />
-      </div>
-      <div className="flex justify-between text-[10px] text-tx3">
-        <span>ET {formatFixed(et, 1)} mm</span>
-        <span>{next}</span>
-      </div>
-    </div>
-  );
-}
-
 function modeLabel(mode: number) {
   return ["Druck", "Durchfl.", "Fix-Hz", "Hahn"][mode] ?? "?";
 }
 
-function dashboardZones(programs: IrrigationProgram[]) {
-  const zones = programs.flatMap((p) => p.zones).slice(0, 3);
-  if (zones.length) return zones.map((z) => ({ id: z.id, name: z.name }));
-  return [
-    { id: "hecke", name: "Hecke" },
-    { id: "garten", name: "Garten" },
-    { id: "vorgarten", name: "Vorgarten" },
-  ];
+function formatDurationCompact(totalSeconds: number) {
+  const secs = Math.max(0, Math.round(totalSeconds));
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  return `${m}:${String(s).padStart(2, "0")}`;
 }

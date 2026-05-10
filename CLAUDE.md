@@ -96,6 +96,14 @@ TZ=Europe/Berlin
 
 ## CI/CD
 
+Es gibt **zwei** Deploy-Pfade:
+
+**1. Direkt-Deploy (Entwicklung)** — siehe [DEPLOYMENT.md](DEPLOYMENT.md)
+   - Lokal `npm run build`, dann tar + scp + entpacken in `/opt/pumpe/current/frontend/.next/standalone/`
+   - Backend: einzelne `.py`-Dateien per `scp` + `systemctl restart pumpe-backend`
+   - **Wichtig:** Standalone-Verzeichnis vor dem Entpacken **immer** mit `rm -rf` leeren — sonst zeigt der Service alte Builds.
+
+**2. OTA-Release (Stable)** — siehe [OTA-UPDATE-SYSTEM.md](OTA-UPDATE-SYSTEM.md)
 ```
 git push vX.Y.Z → GitHub Actions (pi-release.yml)
     → Next.js standalone build
@@ -105,6 +113,38 @@ git push vX.Y.Z → GitHub Actions (pi-release.yml)
         ↓
     Pi OTA-Timer (≤60 min) → update.sh → verify + install + restart
 ```
+
+## Android-App (Capacitor)
+
+Die App ist ein **Wrapper im Remote-URL-Modus** — sie lädt UI live von `https://pumpe.local`. UI-Änderungen brauchen **keine** neue APK; der Service Worker zieht den neuen Build beim nächsten App-Start.
+
+- APK-Distribution: `https://pumpe.local/pumpe.apk` (nginx-Alias auf `/var/www/pumpe/downloads/pumpe.apk`)
+- Cert-Pinning: Pi-Cert ist in `pi/frontend/android/app/src/main/res/raw/pumpe.crt` eingebettet
+- Bei Cert-Wechsel auf dem Pi muss die APK neu gebaut werden — siehe DEPLOYMENT.md
+
+## Bewässerungs-Modell
+
+Aktuelles Verhalten (seit Mai 2026):
+
+- **Automatik = Hintergrund.** Programm startet täglich zu seiner `start_hour:start_min`-Zeit, sofern Wetter+Defizit es zulassen. Kein manueller "Start"-Button auf dem Dashboard.
+- **Manuell = Knopf.** Im Dashboard "Manuell N min" startet einen einzelnen Lauf mit fester Dauer. Wird bei aktiver Automatik blockiert (User muss bewusst "Stoppen" drücken).
+- **Sperren** (`blocked_days`, `blocked_window` pro Programm) gelten **nur für Automatik**. Manuell ist jederzeit möglich (außer Safety-Block).
+- **Defizit-Update**:
+  - Theoretisch aus `precipitation_mm_per_h × duration` (Fallback)
+  - Sensorbasiert aus `flow_rate × Zeit / area_m²`, geclamped auf 0.5×–2× theoretisch (gegen Sensor-Anomalien)
+  - Bei vorzeitigem Stop: proportional
+- **Wetter-Logik** (Hydrawise-Stil):
+  - `Regen-Credit = rain_24h_mm + 0.7 × forecast_48h_mm` wird vom Defizit abgezogen
+  - Skip nur bei akutem Regen heute (`forecast_24h_mm ≥ skip_rain_mm`)
+  - Sonst reduzierte Laufzeit statt komplett aussetzen
+- **Frequenz-Slider** pro Zone skaliert effektives `min_deficit_mm` mit Faktor 0.4 (häufig) bis 2.0 (selten).
+
+## Architektur-Notizen für Code-Änderungen
+
+- **`days`** im Programm-Schema gibt es **nicht mehr** — verwende `blocked_days` (true = nicht bewässern).
+- **Bei Schema-Änderungen in `irrigation.py`** immer auch `_normalize_program()` und `_normalize_zone()` mit Defaults erweitern, sonst crash beim Laden alter JSON.
+- **TopBar-Layout** ist bewusst minimalistisch (Druck/L-min/Hz + Preset). Theme-Toggle ist in Settings → System.
+- **ESP32-Code wurde aus dem Repo entfernt.** Frühere `src/`, `platformio.ini`, `partitions.csv` etc. existieren nicht mehr.
 
 ## Bekannte Fehler & Lösungen
 

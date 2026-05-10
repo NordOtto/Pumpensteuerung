@@ -1,293 +1,142 @@
-# TODO - Pumpensteuerung und Bewaesserung
+# TODO — Pumpensteuerung & Bewässerung
 
-Stand: 2026-05-03
+Stand: 2026-05-09
 
-Diese Datei ist die Arbeitsliste fuer die naechsten Sessions. Erledigtes steht
-kurz unten als Kontext, offene Punkte sind nach Prioritaet sortiert.
+Arbeitsliste für die nächsten Sessions. Erledigtes steht unten als Kontext.
 
-## Sofort pruefen
+## Sofort prüfen / pflegen
 
-### 1. Programm-Speichern in der UI testen
+### 1. Zonen-Daten eintragen
 
-Status: erledigt im Backend, bitte einmal im Browser gegenpruefen.
+Damit die neue **Durchfluss-basierte Defizit-Berechnung** sauber funktioniert, müssen pro Zone in Settings → Programme:
 
-- In Settings ein Bewaesserungsprogramm oeffnen.
-- Modus auf `smart_et` stellen.
-- Eine Zone bearbeiten oder Wizard-Empfehlung uebernehmen.
-- `Alle Programme speichern` klicken.
-- Erwartung: kein `422`, Aenderung bleibt nach Reload erhalten.
+- `Niederschlag mm/h` korrekt setzen (MP-Rotator typ. 10 mm/h, Tropfschlauch je nach Hersteller)
+- `Fläche m²` (Rasen, Beet) bzw. `Länge m` (Hecke, Tropfschlauch) eintragen — Label wechselt automatisch je nach `plant_type`
+- Slider „Frequenz" je Zone:
+  - Rasen: eher Richtung „lang & selten" (rechts) — fördert tiefe Wurzeln
+  - Hecke/Beet: ausgewogen oder „kurz & häufig" (links)
+- `min_deficit_mm` und `target_mm` je nach Pflanzentyp einstellen
 
-Technischer Fix:
+### 2. Sperrzeiten + Sperrtage konfigurieren
 
-- Commit `829d80b fix: accept irrigation program save body`
-- Auf Pi deployed und per API mit HTTP 200 getestet.
+Pro Programm in Settings → Programme:
 
-### 2. Hahnmodus real testen
+- Sperrtage markieren (z.B. Sonntag wenn Hausgebrauch hoch)
+- Sperrzeit aktivieren (typisch 11:00–18:00 — Mittagshitze, Wasserverdunstung)
 
-Ziel: Standardbetrieb fuer Wasserhahn/Schlauchtrommel.
+### 3. Echtbetrieb beobachten (1–2 Wochen)
 
-- Hahn oeffnen und beobachten:
-  - Start bei ca. `p_on`
-  - Lauf mit fixer Hz
-  - Stop bei ca. `p_off`
-- Typische Szenarien testen:
-  - Giesskanne fuellen
-  - Schlauchtrommel halb offen
-  - kurzer Zapfvorgang
-  - laengerer Zapfvorgang
-- Falls die Pumpe taktet:
-  - `p_on` etwas senken
-  - `p_off` etwas anheben oder senken
-  - feste Hz leicht anpassen
+- Läuft die Automatik täglich zur Startzeit?
+- Wird bei Regen 24h ≥ Threshold übersprungen, bei Regen 48h reduziert?
+- Stimmt das Defizit-Update nach manuellem Lauf? (Vorher/Nachher-Wert in Zone-Details)
+- Wenn Durchflussmesser-Wert vom theoretischen abweicht → Web-Log gibt's Hinweis; ggf. `precipitation_mm_per_h` korrigieren
 
-### 3. Dashboard-Bewaesserung real testen
+### 4. Hahnmodus weiter testen
 
-Status: UI und Backend sind umgesetzt und auf dem Pi deployed. Die
-Bedienlogik wurde danach weiter aufgeraeumt.
+(Übernommen aus früherem Stand — bleibt offen)
 
-- Auf der Hauptseite ein Programm waehlen.
-- `Automatik jetzt` testen:
-  - Erwartung: startet nur, wenn Wetter/ET/Defizit es erlauben.
-- `Manuell X min` testen:
-  - Erwartung: startet mit der eingestellten Laufzeit und uebergeht die
-    Wetterpruefung.
-- Waerend des Laufs pruefen:
-  - Restzeit gesamt
-  - aktueller Schritt
-  - manuell/automatisch
-  - aktive Zone
-  - Laufphase oder Sickerpause
-- `Bewaesserung stoppen` pruefen.
-- Nach Ende/Stop pruefen:
-  - aktives Preset springt zurueck auf `Normal`.
+- Hahn öffnen, beobachten ob `p_on`/`p_off` und feste Hz vernünftig schalten
+- Szenarien: Gießkanne, Schlauchtrommel halb offen, kurzer/langer Zapfvorgang
+- Bei Takten: `p_on`/`p_off`/Hz feinjustieren
 
-Technischer Stand:
+## Nächste wichtige Fixes
 
-- Commit `70ed4ca feat: add dashboard irrigation controls`
-- Commit `a13c843 refactor: centralize dashboard controls`
-- Auf Pi deployed; `/dashboard` und `/zones` antworten mit HTTP 200,
-  `/control` leitet auf `/dashboard` weiter.
+### ESP32-Code aus Repo entfernen
 
-### 4. Smart-ET-Messung kalibrieren
+Die Architektur ist Pi-only — ESP32-Reste in `src/`, `platformio.ini`, alte `docker/`-Strukturen, README-Erwähnungen etc. werden bereinigt. Siehe Kontext-Notiz.
 
-Ziel: Wizard soll echte Laufzeiten liefern, nicht Schaetzwerte.
+### Versionierung & OTA sauber halten
 
-- Regenmesser oder mehrere gerade Becher in die Zone stellen.
-- Zone z. B. 10 Minuten laufen lassen.
-- Wasserhoehe in mm messen.
-- Im Wizard eintragen:
-  - `Gemessene Regenhoehe mm`
-  - `Testdauer min`
-- Daraus berechnet die App `mm/h`.
+- Direkt-Deploys (siehe [DEPLOYMENT.md](DEPLOYMENT.md)) werden zwischen den Sessions oft gemacht — sind aber **nicht** OTA-Releases.
+- Stabile Stände sollten als `git tag vX.Y.Z` getaggt werden, damit GitHub Actions ein signiertes Release-Tarball baut.
+- App-Version aus Git-Commit/Tag in Build schreiben → UI zeigt installierte Version + OTA-Verfügbarkeit.
 
-Hinweis: `1 mm` auf dem Rasen entspricht `1 Liter pro m2`. Fuer Laufzeiten ist
-`mm/h` wichtiger als nur `l/min`, weil die Flaeche und Duesenverteilung
-entscheidend sind.
+### Backend-Testumgebung
 
-## Naechste wichtige Fixes
-
-### Versionierung und OTA sauberziehen
-
-Problem: Es gab direkte Deploys auf den Pi. Das ist fuer Entwicklung schnell,
-aber die angezeigte Version und GitHub-Releases koennen hinterherhinken.
-Zusatzbefund: Der Pi erreicht GitHub, aber
-`https://api.github.com/repos/NordOtto/Pumpensteuerung/releases/latest`
-antwortet mit 404. Das spricht fuer ein privates Repo ohne Token auf dem Pi.
-
-Vorschlag:
-
-- GitHub Fine-Grained Token mit Repository `NordOtto/Pumpensteuerung` und
-  `Contents: Read-only` erstellen.
-- Token auf dem Pi unter `/opt/pumpe/ota/.github_token` ablegen.
-- In `/opt/pumpe/ota/config.env` setzen:
-  `GITHUB_TOKEN_FILE=/opt/pumpe/ota/.github_token`
-- Datei auf `chmod 600` setzen und `update.sh check` testen.
-- App-Version aus Git-Commit/Tag in Build schreiben.
-- UI zeigt:
-  - installierte Version
-  - Commit-SHA
-  - Build-Zeit
-  - OTA-Release-Version
-- Neuen Release-Tag fuer den aktuellen Stand erstellen.
-- OTA-Update einmal komplett testen:
-  - Check
-  - Install
-  - Smoke-Test
-  - Rollback
-
-### Backend-Testumgebung reparieren
-
-Problem: Lokale Windows-Python-Umgebung hatte kein `fastapi`; `pytest` konnte
-das `app`-Modul nicht importieren.
-
-Vorschlag:
-
-- Backend-venv dokumentieren und einrichten.
-- Einen kurzen Befehl standardisieren:
-  - `cd pi/backend`
-  - `.venv/Scripts/python -m pytest` auf Windows oder
-  - `.venv/bin/python -m pytest` auf Pi/Linux
-- API-Regressionstest fuer Programmspeichern aufnehmen.
+- `pytest` Setup für `pi/backend` — venv aktivieren und API-Regressionstests anlegen
+- Insbesondere für `irrigation.py` (Schema-Migration, evaluate_program, applied_mm-Logik)
 
 ### Programmeditor weiter absichern
 
-Sinnvolle Validierungen:
-
-- Programmnamen duerfen nicht leer sein.
-- Zonen-ID stabil halten und nicht versehentlich duplizieren.
-- Laufzeit, Ziel-mm, Mindestdefizit, Cycle und Soak mit Min/Max validieren.
-- Warnung anzeigen, wenn Smart-ET aktiv ist, aber Zone `water_mm` oder Rate
-  unplausibel ist.
-- Speichern-Button mit sichtbarem "ungespeichert" Zustand.
+- Programmnamen nicht leer
+- Zonen-ID stabil halten
+- Validierung: `precipitation_mm_per_h` 0.5–60, `area_value` plausibel
+- Speichern-Button mit „ungespeichert"-Zustand
 
 ## UI-Verbesserungen
 
-### Mehr HMI-Profi-Gefuehl
+### Dashboard
 
-Die grobe Bedienhierarchie ist jetzt bereinigt. Weitere sinnvolle Schritte:
+- Mini-Verlaufskurve für Druck (letzte 5 Min)
+- Aktive Regelart prävisuell darstellen (Hahnmodus / PI / Fix-Hz)
+- Warnungen/Interlocks als ruhige Statuszeile
 
-- Kleine Verlaufslinie fuer Druck direkt auf Dashboard.
-- Aktive Regelart noch praevisueller darstellen:
-  - `Hahnmodus: Ein/Aus nach Druck`
-  - `PI-Regelung: haelt Solldruck`
-  - `Fix-Hz: feste Drehzahl`
-- Warnungen/Interlocks als ruhige, aber klare Statuszeile direkt unter der
-  Pumpensteuerung.
+### Wetter-Tab
 
-### Preset-Manager besser erklaeren
+- „In 3h kommt 2mm Regen"-Komponente (Stunden-Timeline der OWM-Vorhersage)
+- Trend-Anzeige für ET₀ der letzten 7 Tage
 
-Bereits teilweise umgesetzt, sollte weiter verfeinert werden.
+### Settings
 
-Noch sinnvoll:
+- Inline-Hilfen (Tooltips) für Kp, Ki, p_on, p_off, target_mm etc.
+- Preset-Modi als Klartext (nicht als Nummer)
 
-- Modus nicht als Nummer zeigen, sondern als Klartext:
-  - Druckregelung
-  - Durchflussregelung
-  - Feste Drehzahl
-  - Hahnmodus
-- `Setpoint` dauerhaft in Fachsprache umbenennen:
-  - bei Druckregelung: `Solldruck`
-  - bei Durchflussregelung: `Soll-Durchfluss`
-  - bei Fix-Hz: `Feste Drehzahl`
-- Inline-Hilfen:
-  - `Kp`: wie stark die Pumpe sofort auf Druckfehler reagiert.
-  - `Ki`: wie stark dauerhafte Abweichung ueber Zeit nachgeregelt wird.
-  - `p_on`: Einschaltdruck.
-  - `p_off`: Ausschaltdruck.
+## Features, die fachlich nützlich wären
 
-### Wizard weiter verbessern
+### Trockenlauf- & Leckage-Diagnose
 
-Vorschlaege:
+- Pumpe läuft, Druck steigt nicht → Warnung
+- Pumpe taktet zu oft im Hahnmodus → Warnung
+- Druck fällt nachts ohne Entnahme → Leck?
+- Flow-Sensor meldet Durchfluss obwohl keine Zone aktiv → Leck/Verstopfung
 
-- Wizard-Ergebnis als verstaendliche Entscheidung anzeigen:
-  - "Deine Zone bringt 30 mm/h."
-  - "Fuer 25 mm braucht sie ca. 50 Minuten."
-  - "Aufgeteilt in 4 Bloecke mit Sickerpausen."
-- Warnung bei unplausibler Messung:
-  - sehr kleine mm bei langer Testdauer
-  - sehr hohe mm/h
-  - Testdauer unter 5 Minuten
-- Optionaler Flaechenrechner:
-  - Flaeche in m2
-  - Wasserbedarf in Litern
-  - Vergleich mit gemessener Niederschlagsrate
+### Saison- & Wetterlogik verfeinern
 
-## Features, die fachlich nuetzlich waeren
+`seasonal_factor` ist ein pauschaler Faktor. Besser:
+- Auto-Ableitung aus Monat, Temperatur, ET₀, Sonnenlage
+- Manuell übersteuerbar
+- UI-Erklärung: 1.0 normal, 0.7 weniger, 1.3 mehr Wasser
 
-### Trockenlauf- und Leckage-Diagnose
+### Bewässerungsprotokoll & Auswertung
 
-Moegliche Logik:
-
-- Pumpe laeuft, aber Druck steigt nicht ausreichend.
-- Pumpe taktet ungewoehnlich oft im Hahnmodus.
-- Druck faellt nachts ohne Entnahme.
-- Flow-Sensor meldet Durchfluss, obwohl keine Zone aktiv ist.
-
-UI-Ausgabe:
-
-- klare Diagnose
-- Zeitpunkt
-- betroffene Messwerte
-- Handlungsempfehlung
-
-### Saison- und Wetterlogik verbessern
-
-Der aktuelle `seasonal_factor` ist ein pauschaler Faktor. Nuetzlicher waere:
-
-- Automatisch aus Monat, Temperatur, ET0 und Sonnenlage ableiten.
-- Manuell uebersteuerbar lassen.
-- In der UI erklaeren:
-  - `1.0` = normal
-  - `0.7` = weniger Wasser
-  - `1.3` = mehr Wasser
-
-### Zonen-Kalibrierung speichern
-
-Pro Zone speichern:
-
-- Flaeche in m2
-- Duesentyp, z. B. Rain Bird RVAN
-- gemessene Niederschlagsrate mm/h
-- letzte Kalibrierung
-- Gleichmaessigkeitsnotiz
-
-Damit kann der Wizard spaeter genauer arbeiten und muss nicht jedes Mal neu
-erklaert werden.
-
-### Bewaesserungsprotokoll mit Auswertung
-
-Ausbauen in `/analytics`:
-
+In `/analytics` ausbauen:
 - Laufzeit pro Zone/Woche
-- geschaetzte Wassermenge pro Zone
+- gemessene Wassermenge (jetzt verfügbar dank Durchflussmesser-Integration!) vs. theoretisch
 - Smart-ET-Defizitverlauf
-- uebersprungene Starts mit Grund
-- Vergleich Regen/ET0/Bewaesserung
+- Übersprungene Starts mit Grund
+- Vergleich Regen/ET₀/Bewässerung
 
-### Manuelle Schnellaktionen
+### Backup & Export
 
-Praktisch fuer Alltag:
+- Export von Presets, Programmen, Drucksettings, Timeguard
+- Import/Restore über UI
+- Automatisches Backup vor OTA-Install
 
-- "Hahnmodus aktivieren"
-- "Rasen jetzt 30 min"
-- "Zone 1 testen 2 min"
-- "Alle Bewaesserung stoppen"
-- "Pumpe sperren fuer 30 min"
+## Erledigt — als Kontext
 
-Alle mit klarer Rueckmeldung und Long-Press fuer kritische Aktionen.
+### Mai 2026
 
-### Backup und Export
+- Bewässerungs-Refactor: `days` → `blocked_days` + `blocked_window`
+- Hydrawise-ähnliche Wetter-Logik (24h Skip, 48h Credit gegen Defizit)
+- Durchflussmesser-Integration für `applied_mm`-Berechnung mit Clamping
+- `applied_mm`-Bug bei manuellem Lauf gefixt + proportionaler Anteil bei Stop
+- Manueller Start während Automatik blockiert (statt unterbrechen)
+- Frequenz-Slider pro Zone (kurz/häufig ↔ lang/selten)
+- Niederschlagsrate `precipitation_mm_per_h` und `area_value`/`area_unit` pro Zone
+- TopBar minimalistisch (Druck/L-min/Hz + Preset)
+- Theme-Switcher in Settings → System (Hell/Dunkel/System)
+- Custom Duration Picker auf Dashboard
+- Capacitor Android-APK mit Cert-Pinning + Auto-Update via Service Worker
+- nginx-Location für APK-Download
+- Schnell-Deploy-Workflow dokumentiert ([DEPLOYMENT.md](DEPLOYMENT.md))
 
-Nuetzlich vor groesseren Aenderungen:
+### Vor Mai 2026
 
-- Export von:
-  - Presets
-  - Programmen
-  - Drucksettings
-  - Timeguard
-- Import/Restore ueber UI.
-- Automatisches Backup vor OTA-Install.
-
-## Erledigt als Kontext
-
-- Dashboard-Leitstand entfernt.
-- Helle, modernere UI mit Tailwind, Framer Motion und Glassmorphism eingefuehrt.
-- Smart-ET-Wizard als Guide neu gebaut.
-- OTA-Repo-Konfiguration korrigiert.
-- Hahnmodus als Preset-Modus ergaenzt.
-- Eigene Presets im Zonen-Editor verfuegbar gemacht.
-- Zahlenfelder repariert.
-- Ein-/Ausschaltdruck fuer Hahnmodus-Presets ergaenzt.
-- Live-Updates ueberschreiben Programmedits nicht mehr.
-- Smart-ET fuer tiefe, seltenere Rasenbewaesserung angepasst.
-- Cycle-and-Soak fuer Sickerphasen ergaenzt.
-- Wizard-Messlabels erklaert und `mm/h` sichtbar gemacht.
-- Programmspeichern-422 behoben und auf Pi getestet.
-- Dashboard-Bewaesserungssteuerung mit Automatikstart, manuellem Minutenstart,
-  Stop und Restzeit umgesetzt.
-- Nach Bewaesserung wird wieder `Normal` als Rueckfall-Preset aktiviert.
-- Bedienlogik bereinigt: Live-Werte oben, Pumpensteuerung darunter,
-  Bewaesserung zentral auf der Hauptseite, Steuerungsseite entfernt,
-  Zonenseite ohne Start/Stop.
-- Dashboard-Bereiche sind einklappbar und per Drag-and-Drop verschiebbar;
-  Zustand wird im Browser gespeichert.
+- Dashboard-Leitstand entfernt
+- Helle UI mit Tailwind/Framer-Motion/Glassmorphism
+- Smart-ET-Wizard als Guide
+- OTA-Repo-Konfiguration
+- Hahnmodus als Preset-Modus
+- Eigene Presets im Zonen-Editor
+- Programmspeichern-422 behoben
+- Dashboard-Bereiche einklappbar + Drag-and-Drop

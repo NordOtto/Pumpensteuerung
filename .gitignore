@@ -1,18 +1,34 @@
-.pio
-.vscode/.browse.c_cpp.db*
-.vscode/c_cpp_properties.json
-.vscode/launch.json
-.vscode/ipch
-
 # Private Credentials (nicht einchecken!)
-src/secrets.h
 .env
 
-# Frontend Build Tools
-docker/frontend/tailwindcss.exe
-docker/frontend/node_modules/
-docker/backend/node_modules/
+# Frontend Build / Caches
 pi/frontend/.next/
 pi/frontend/node_modules/
 pi/frontend/tsconfig.tsbuildinfo
 pi/frontend/next-env.d.ts
+
+# next-pwa generierte Service Worker (Build-Output)
+pi/frontend/public/sw.js
+pi/frontend/public/sw.js.map
+pi/frontend/public/workbox-*.js
+pi/frontend/public/workbox-*.js.map
+pi/frontend/public/swe-worker-*.js
+pi/frontend/public/swe-worker-*.js.map
+
+# Backend Caches
+pi/backend/.venv/
+pi/backend/.pytest_cache/
+__pycache__/
+*.pyc
+
+# Capacitor / Android Build & Keystores (NIE committen)
+pi/frontend/android/.gradle/
+pi/frontend/android/app/build/
+pi/frontend/android/build/
+pi/frontend/android/*.jks
+pi/frontend/android/*.keystore
+pi/frontend/android/keystore.properties
+
+# OS / Editor
+.DS_Store
+Thumbs.db

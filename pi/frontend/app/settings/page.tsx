@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { RefreshCw, RotateCcw } from "lucide-react";
+import { RefreshCw, RotateCcw, Sun, Moon, Smartphone } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useStatus } from "@/lib/ws";
+import { useTheme } from "@/components/theme-provider";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import type { IrrigationProgram, IrrigationZone, OtaStatus, Preset } from "@/lib/types";
+import type { IrrigationProgram, IrrigationZone, OtaStatus, OverseedingState, Preset } from "@/lib/types";
 
 const DAY_NAMES = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 const SECTIONS = [
@@ -44,7 +45,7 @@ export default function SettingsPage() {
         ))}
       </div>
 
-      {active === "programs"  && <ProgramsSettings programs={status.irrigation.programs} presets={presetData?.presets ?? []} />}
+      {active === "programs"  && <ProgramsSettings programs={status.irrigation.programs} presets={presetData?.presets ?? []} overseeding={status.irrigation.overseeding} />}
       {active === "presets"   && <PresetsSettings active={status.active_preset} data={presetData} onReload={loadPresets} />}
       {active === "pi"        && <PiSettings pi={status.pi} />}
       {active === "timeguard" && <TimeguardSettings tg={status.timeguard} />}
@@ -60,6 +61,10 @@ const EMPTY_ZONE: IrrigationZone = {
   enabled: true,
   duration_min: 20,
   water_mm: 10,
+  precipitation_mm_per_h: 10,
+  frequency_pref: 0.5,
+  area_value: 0,
+  area_unit: "m2",
   min_deficit_mm: 8,
   deficit_mm: 0,
   target_mm: 15,
@@ -76,7 +81,8 @@ const EMPTY_PROGRAM: IrrigationProgram = {
   mode: "smart_et",
   start_hour: 7,
   start_min: 0,
-  days: [true, true, true, true, true, false, false],
+  blocked_days: [false, false, false, false, false, false, false],
+  blocked_window: { enabled: false, start_hour: 11, start_min: 0, end_hour: 18, end_min: 0 },
   seasonal_factor: 1,
   weather_enabled: true,
   max_runs_per_week: 3,
@@ -98,23 +104,43 @@ function clonePrograms(programs: IrrigationProgram[]) {
   return programs.map((p) => ({
     ...EMPTY_PROGRAM,
     ...p,
-    days: [...(p.days ?? EMPTY_PROGRAM.days)],
+    blocked_days: [...(p.blocked_days ?? EMPTY_PROGRAM.blocked_days)],
+    blocked_window: { ...EMPTY_PROGRAM.blocked_window, ...(p.blocked_window ?? {}) },
     thresholds: { ...EMPTY_PROGRAM.thresholds, ...(p.thresholds ?? {}) },
     zones: (p.zones ?? []).map((z) => ({ ...EMPTY_ZONE, ...z })),
   })) as IrrigationProgram[];
 }
 
-function ProgramsSettings({ programs, presets }: { programs: IrrigationProgram[]; presets: Preset[] }) {
+function ProgramsSettings({ programs, presets, overseeding }: { programs: IrrigationProgram[]; presets: Preset[]; overseeding: OverseedingState }) {
   const [openIdx, setOpenIdx] = useState(-1);
   const [draft, setDraft] = useState<IrrigationProgram[]>(() => clonePrograms(programs));
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [seedProgramId, setSeedProgramId] = useState(overseeding.program_id || "");
+  const [seedMinutes, setSeedMinutes] = useState(overseeding.duration_min || 2);
+  const [seedInterval, setSeedInterval] = useState(overseeding.interval_min || 120);
+  const [seedDays, setSeedDays] = useState(overseeding.days || 7);
+  const [seedZoneIds, setSeedZoneIds] = useState<string[]>(overseeding.zone_ids || []);
   const presetNames = Array.from(new Set(presets.map((p) => p.name)));
 
   useEffect(() => {
     if (!dirty) setDraft(clonePrograms(programs));
   }, [programs, dirty]);
+
+  useEffect(() => {
+    if (!seedProgramId && programs.length) {
+      setSeedProgramId(overseeding.program_id || programs[0].id);
+    }
+  }, [seedProgramId, programs, overseeding.program_id]);
+
+  useEffect(() => {
+    setSeedMinutes(overseeding.duration_min || 2);
+    setSeedInterval(overseeding.interval_min || 120);
+    setSeedDays(overseeding.days || 7);
+    setSeedZoneIds(overseeding.zone_ids || []);
+    if (overseeding.program_id) setSeedProgramId(overseeding.program_id);
+  }, [overseeding]);
 
   const updateProgram = (idx: number, patch: Partial<IrrigationProgram>) => {
     setDirty(true);
@@ -155,8 +181,120 @@ function ProgramsSettings({ programs, presets }: { programs: IrrigationProgram[]
     });
   };
 
+  const selectedSeedProgram = draft.find((p) => p.id === seedProgramId) ?? draft[0];
+  const availableSeedZones = selectedSeedProgram?.zones.filter((z) => z.enabled) ?? [];
+  const selectedSeedZones = seedZoneIds.length ? seedZoneIds : availableSeedZones.map((z) => z.id);
+
   return (
     <div className="flex flex-col gap-2">
+      <div className="rounded-card border border-border bg-bg1 p-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.1em] text-tx3">Nachsaat feucht halten</div>
+            <div className="mt-0.5 text-[11px] text-tx3">Wetterunabhaengig, mehrere Zonen laufen nacheinander.</div>
+          </div>
+          <Badge tone={overseeding.enabled ? "ok" : "muted"} pulse={overseeding.enabled}>
+            {overseeding.enabled ? "Aktiv" : "Aus"}
+          </Badge>
+        </div>
+
+        <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-4">
+          <label className="sm:col-span-2 rounded-tile border border-border bg-bg2 px-3 py-2">
+            <span className="mb-1 block text-[9px] font-bold uppercase tracking-[0.1em] text-tx3">Programm</span>
+            <select
+              value={selectedSeedProgram?.id || ""}
+              onChange={(e) => {
+                const id = e.target.value;
+                setSeedProgramId(id);
+                setSeedZoneIds([]);
+              }}
+              className="h-7 w-full bg-transparent text-sm font-semibold text-tx outline-none"
+            >
+              {draft.map((p) => (
+                <option key={p.id} value={p.id}>{p.name || p.id}</option>
+              ))}
+            </select>
+          </label>
+          <MiniNumber label="min" min={0.5} value={seedMinutes} setValue={setSeedMinutes} />
+          <MiniNumber label="alle min" min={15} value={seedInterval} setValue={setSeedInterval} />
+          <MiniNumber label="Tage" min={1} value={seedDays} setValue={setSeedDays} />
+        </div>
+
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          {availableSeedZones.map((z) => {
+            const active = selectedSeedZones.includes(z.id);
+            return (
+              <button
+                key={z.id}
+                type="button"
+                onClick={() => {
+                  setSeedZoneIds((prev) => {
+                    const base = prev.length ? prev : availableSeedZones.map((zone) => zone.id);
+                    return base.includes(z.id) ? base.filter((id) => id !== z.id) : [...base, z.id];
+                  });
+                }}
+                className={cn(
+                  "rounded-tile border px-2.5 py-1.5 text-xs font-bold",
+                  active ? "border-[var(--color-green)]/35 bg-[var(--color-green-dim)] text-ok" : "border-border bg-bg2 text-tx2"
+                )}
+              >
+                {z.name}
+              </button>
+            );
+          })}
+          {!availableSeedZones.length && (
+            <span className="text-[11px] text-tx3">Keine aktive Zone im gewaehlten Programm.</span>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled={!selectedSeedProgram || !selectedSeedZones.length}
+            onClick={async () => {
+              setMessage("");
+              try {
+                await api.setOverseeding({
+                  enabled: true,
+                  program_id: selectedSeedProgram.id,
+                  zone_ids: selectedSeedZones,
+                  duration_min: seedMinutes,
+                  interval_min: seedInterval,
+                  days: seedDays,
+                });
+                setMessage("Nachsaat-Modus aktiviert.");
+              } catch (err) {
+                setMessage(err instanceof Error ? err.message : "Nachsaat-Modus konnte nicht gestartet werden.");
+              }
+            }}
+            className="rounded-tile bg-ok px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
+          >
+            Nachsaat starten
+          </button>
+          <button
+            type="button"
+            disabled={!overseeding.enabled}
+            onClick={async () => {
+              setMessage("");
+              try {
+                await api.setOverseeding({ enabled: false });
+                setMessage("Nachsaat-Modus gestoppt.");
+              } catch (err) {
+                setMessage(err instanceof Error ? err.message : "Nachsaat-Modus konnte nicht gestoppt werden.");
+              }
+            }}
+            className="rounded-tile border border-border bg-bg2 px-3 py-2 text-xs font-bold text-tx2 disabled:opacity-40"
+          >
+            Nachsaat stoppen
+          </button>
+          {overseeding.enabled && overseeding.next_run_at && (
+            <span className="text-[11px] text-tx3">
+              Naechster Zyklus: {new Date(overseeding.next_run_at).toLocaleString("de-DE", { weekday: "short", hour: "2-digit", minute: "2-digit" })}
+            </span>
+          )}
+        </div>
+      </div>
+
       {draft.map((p, i) => (
         <div key={p.id || i} className="overflow-hidden rounded-card border border-border bg-bg1">
           <button type="button" onClick={() => setOpenIdx(openIdx === i ? -1 : i)}
@@ -180,18 +318,62 @@ function ProgramsSettings({ programs, presets }: { programs: IrrigationProgram[]
                 <NumberEdit label="Max/Woche" value={p.max_runs_per_week} step={1} onChange={(max_runs_per_week) => updateProgram(i, { max_runs_per_week })} />
               </div>
 
-              <div className="mb-3 text-[10px] font-bold uppercase tracking-[0.08em] text-tx3">Wochentage</div>
+              <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.08em] text-tx3">Sperrtage</div>
+              <div className="mb-1 text-[10px] text-tx3">Tage an denen NICHT bewässert wird (rot = gesperrt).</div>
               <div className="mb-3 flex gap-1.5">
-                {DAY_NAMES.map((d, idx) => (
-                  <button key={d} type="button" onClick={() => {
-                    const days = [...p.days];
-                    days[idx] = !days[idx];
-                    updateProgram(i, { days });
-                  }} className={cn(
-                    "flex h-8 w-8 items-center justify-center rounded-tile border text-[10px] font-bold",
-                    p.days[idx] ? "border-[var(--color-blue)]/35 bg-[var(--color-blue-dim)] text-primary" : "border-border bg-bg3 text-tx3"
-                  )}>{d}</button>
-                ))}
+                {DAY_NAMES.map((d, idx) => {
+                  const blocked = (p.blocked_days ?? [false, false, false, false, false, false, false])[idx];
+                  return (
+                    <button key={d} type="button" onClick={() => {
+                      const blocked_days = [...(p.blocked_days ?? [false, false, false, false, false, false, false])];
+                      blocked_days[idx] = !blocked_days[idx];
+                      updateProgram(i, { blocked_days });
+                    }} className={cn(
+                      "flex h-8 w-8 items-center justify-center rounded-tile border text-[10px] font-bold",
+                      blocked
+                        ? "border-[var(--color-red)]/35 bg-[var(--color-red-dim)] text-danger"
+                        : "border-border bg-bg3 text-tx3"
+                    )}>{d}</button>
+                  );
+                })}
+              </div>
+
+              <div className="mb-3 rounded-tile border border-border bg-bg2 p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <div>
+                    <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-tx3">Sperrzeit</div>
+                    <div className="text-[10px] text-tx3">Stundenfenster, in dem nicht bewässert wird (z.B. 11:00–18:00).</div>
+                  </div>
+                  <Toggle
+                    checked={p.blocked_window?.enabled ?? false}
+                    onChange={(enabled) => updateProgram(i, {
+                      blocked_window: {
+                        ...(p.blocked_window ?? { start_hour: 11, start_min: 0, end_hour: 18, end_min: 0 }),
+                        enabled,
+                      },
+                    })}
+                  />
+                </div>
+                {(p.blocked_window?.enabled ?? false) && (
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <TimeEdit
+                      label="Sperre ab"
+                      hour={p.blocked_window?.start_hour ?? 11}
+                      minute={p.blocked_window?.start_min ?? 0}
+                      onChange={(h, m) => updateProgram(i, {
+                        blocked_window: { ...(p.blocked_window ?? { enabled: true, end_hour: 18, end_min: 0 }), enabled: true, start_hour: h, start_min: m },
+                      })}
+                    />
+                    <TimeEdit
+                      label="Sperre bis"
+                      hour={p.blocked_window?.end_hour ?? 18}
+                      minute={p.blocked_window?.end_min ?? 0}
+                      onChange={(h, m) => updateProgram(i, {
+                        blocked_window: { ...(p.blocked_window ?? { enabled: true, start_hour: 11, start_min: 0 }), enabled: true, end_hour: h, end_min: m },
+                      })}
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="mb-3 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
@@ -213,24 +395,53 @@ function ProgramsSettings({ programs, presets }: { programs: IrrigationProgram[]
               </div>
 
               <div className="mb-3 text-[10px] font-bold uppercase tracking-[0.08em] text-tx3">Zonen</div>
-              {p.zones.map((z, zIdx) => (
+              {p.zones.map((z, zIdx) => {
+                const isLinear = (z.area_unit === "m") || /hecke|tropf|drip|strauch/i.test(z.plant_type || "");
+                const areaLabel = isLinear ? "Länge m" : "Fläche m²";
+                return (
                 <div key={z.id || zIdx} className="mb-1.5 rounded-tile border border-border bg-bg2 p-3">
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                     <TextEdit label="Zone" value={z.name} onChange={(name) => updateZone(i, zIdx, { name })} />
-                    <TextEdit label="Typ" value={z.plant_type} onChange={(plant_type) => updateZone(i, zIdx, { plant_type })} />
+                    <TextEdit label="Typ" value={z.plant_type} onChange={(plant_type) => {
+                      const linear = /hecke|tropf|drip|strauch/i.test(plant_type);
+                      updateZone(i, zIdx, { plant_type, area_unit: linear ? "m" : "m2" });
+                    }} />
                     <SelectEdit label="Preset" value={z.preset || "Normal"} options={["Normal", ...presetNames].map((name) => [name, name])} onChange={(preset) => updateZone(i, zIdx, { preset })} />
+                    <NumberEdit label={areaLabel} value={z.area_value ?? 0} step={1} onChange={(area_value) => updateZone(i, zIdx, { area_value })} />
+                    <NumberEdit label="Niederschlag mm/h" value={z.precipitation_mm_per_h ?? 0} step={0.5} onChange={(precipitation_mm_per_h) => updateZone(i, zIdx, { precipitation_mm_per_h })} />
                     <NumberEdit label="Dauer min" value={z.duration_min} step={1} onChange={(duration_min) => updateZone(i, zIdx, { duration_min })} />
                     <NumberEdit label="Wasser mm" value={z.water_mm} step={0.5} onChange={(water_mm) => updateZone(i, zIdx, { water_mm })} />
                     <NumberEdit label="Start ab mm" value={z.min_deficit_mm} step={0.5} onChange={(min_deficit_mm) => updateZone(i, zIdx, { min_deficit_mm })} />
+                    <NumberEdit label="Ziel mm" value={z.target_mm} step={0.5} onChange={(target_mm) => updateZone(i, zIdx, { target_mm })} />
                     <NumberEdit label="Zyklus min" value={z.cycle_min} step={1} onChange={(cycle_min) => updateZone(i, zIdx, { cycle_min })} />
                     <NumberEdit label="Sickern min" value={z.soak_min} step={1} onChange={(soak_min) => updateZone(i, zIdx, { soak_min })} />
+                  </div>
+                  <div className="mt-3 rounded-tile border border-border bg-bg1 px-3 py-2">
+                    <div className="mb-1 flex items-center justify-between text-[10px]">
+                      <span className="font-bold uppercase tracking-[0.08em] text-tx3">Frequenz</span>
+                      <span className="text-tx3">{(z.frequency_pref ?? 0.5) < 0.34 ? "kurz & häufig" : (z.frequency_pref ?? 0.5) > 0.66 ? "lang & selten" : "ausgewogen"}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      value={z.frequency_pref ?? 0.5}
+                      onChange={(e) => updateZone(i, zIdx, { frequency_pref: Number(e.target.value) })}
+                      className="w-full"
+                    />
+                    <div className="mt-1 flex justify-between text-[9px] text-tx3">
+                      <span>kurz & häufig</span>
+                      <span>lang & selten</span>
+                    </div>
                   </div>
                   <button type="button" onClick={() => updateProgram(i, { zones: p.zones.filter((_, idx) => idx !== zIdx) })}
                     className="mt-2 rounded-tile border border-danger/25 bg-bg1 px-3 py-1.5 text-[11px] font-semibold text-danger">
                     Zone entfernen
                   </button>
                 </div>
-              ))}
+                );
+              })}
 
               <div className="mt-3 flex flex-wrap gap-2">
                 <button type="button" onClick={() => updateProgram(i, { zones: [...p.zones, { ...EMPTY_ZONE, id: `zone_${Date.now()}`, name: `Zone ${p.zones.length + 1}` }] })}
@@ -260,6 +471,21 @@ function ProgramsSettings({ programs, presets }: { programs: IrrigationProgram[]
         {message && <span className="text-[11px] text-tx3">{message}</span>}
       </div>
     </div>
+  );
+}
+
+function MiniNumber({ label, min, value, setValue }: { label: string; min: number; value: number; setValue: (value: number) => void }) {
+  return (
+    <label className="rounded-tile border border-border bg-bg2 px-3 py-2">
+      <span className="mb-1 block text-[9px] font-bold uppercase tracking-[0.1em] text-tx3">{label}</span>
+      <input
+        type="number"
+        min={min}
+        value={String(value)}
+        onChange={(e) => setValue(Number(e.target.value || 0))}
+        className="h-7 w-full bg-transparent text-sm font-bold text-tx outline-none"
+      />
+    </label>
   );
 }
 
@@ -570,6 +796,7 @@ function SystemSettings({ sys }: { sys: { ip: string; fw: string; uptime: number
 
   return (
     <div className="flex flex-col gap-2">
+      <ThemePanel />
       {/* OTA */}
       <div className="relative overflow-hidden rounded-card border border-border bg-bg1 p-4">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-primary via-cyan-400 to-ok" />
@@ -730,5 +957,34 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
       className={cn("relative h-5 w-9 rounded-full transition", checked ? "bg-ok" : "bg-bg3 border border-border")}>
       <span className={cn("absolute top-0.5 h-4 w-4 rounded-full bg-bg1 shadow transition-all", checked ? "left-[18px]" : "left-0.5")} />
     </button>
+  );
+}
+
+function ThemePanel() {
+  const { mode, setMode } = useTheme();
+  const options: { id: "light" | "dark" | "system"; label: string; icon: React.ReactNode }[] = [
+    { id: "light", label: "Hell", icon: <Sun className="h-3.5 w-3.5" /> },
+    { id: "dark", label: "Dunkel", icon: <Moon className="h-3.5 w-3.5" /> },
+    { id: "system", label: "System", icon: <Smartphone className="h-3.5 w-3.5" /> },
+  ];
+  return (
+    <div className="rounded-card border border-border bg-bg1 p-4">
+      <div className="mb-2 text-sm font-bold text-tx">Erscheinungsbild</div>
+      <div className="mb-3 text-[11px] text-tx3">System folgt der Geräte-Einstellung (Hell/Dunkel).</div>
+      <div className="grid grid-cols-3 gap-1.5">
+        {options.map((o) => (
+          <button key={o.id} type="button" onClick={() => setMode(o.id)}
+            className={cn(
+              "flex items-center justify-center gap-1.5 rounded-tile border px-3 py-2 text-xs font-bold transition",
+              mode === o.id
+                ? "border-[var(--color-blue)]/35 bg-[var(--color-blue-dim)] text-primary"
+                : "border-border bg-bg2 text-tx2"
+            )}>
+            {o.icon}
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }

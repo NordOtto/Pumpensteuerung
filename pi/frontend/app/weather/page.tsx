@@ -21,20 +21,34 @@ function locationLabel(cfg: WeatherConfig | null): string {
   return `${cfg.location.postal_code ? `${cfg.location.postal_code} ` : ""}${cfg.location.name}`;
 }
 
+type WeatherSource = WeatherConfig["source"];
+
+const SOURCE_LABEL: Record<WeatherSource, string> = {
+  manual_ha: "HA / Ecowitt",
+  hybrid: "Hybrid (OWM)",
+  openweathermap: "OpenWeatherMap",
+  hybrid_stormglass: "Hybrid (Stormglass)",
+  stormglass: "Stormglass",
+};
+
+function isOwmSource(s: WeatherSource) { return s === "openweathermap" || s === "hybrid"; }
+function isStormglassSource(s: WeatherSource) { return s === "stormglass" || s === "hybrid_stormglass"; }
+
 function WeatherSourceCard() {
   const [cfg, setCfg] = useState<WeatherConfig | null>(null);
-  const [source, setSource] = useState<WeatherConfig["source"]>("manual_ha");
-  const [locationQuery, setLocationQuery] = useState("");
-  const [refreshMin, setRefreshMin] = useState("60");
-  const [apiKey, setApiKey] = useState("");
+  const [source, setSource] = useState<WeatherSource>("manual_ha");
+  const [owmLocationQuery, setOwmLocationQuery] = useState("");
+  const [owmApiKey, setOwmApiKey] = useState("");
+  const [sgLocationQuery, setSgLocationQuery] = useState("");
+  const [sgApiKey, setSgApiKey] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
 
   const load = () => api.weatherConfig().then((next) => {
     setCfg(next);
     setSource(next.source);
-    setLocationQuery(next.openweathermap.location_query || locationLabel(next));
-    setRefreshMin(String(next.openweathermap.refresh_min || 60));
+    setOwmLocationQuery(next.openweathermap.location_query || locationLabel(next));
+    setSgLocationQuery(next.stormglass?.location_query || locationLabel(next));
   }).catch((err) => setMessage(err instanceof Error ? err.message : "Wetter-Konfiguration konnte nicht geladen werden."));
 
   useEffect(() => { load(); }, []);
@@ -43,15 +57,22 @@ function WeatherSourceCard() {
     setBusy(true);
     setMessage("");
     try {
-      const next = await api.saveWeatherConfig({
-        source,
-        openweathermap: {
-          api_key: apiKey.trim() || undefined,
-          location_query: locationQuery.trim(),
-          refresh_min: Number(refreshMin),
-        },
-      });
-      setApiKey("");
+      const payload: Record<string, unknown> = { source };
+      if (isOwmSource(source)) {
+        payload.openweathermap = {
+          api_key: owmApiKey.trim() || undefined,
+          location_query: owmLocationQuery.trim(),
+        };
+      }
+      if (isStormglassSource(source)) {
+        payload.stormglass = {
+          api_key: sgApiKey.trim() || undefined,
+          location_query: sgLocationQuery.trim(),
+        };
+      }
+      const next = await api.saveWeatherConfig(payload);
+      setOwmApiKey("");
+      setSgApiKey("");
       setCfg(next);
       setMessage("Wetterquelle gespeichert.");
       if (source !== "manual_ha") {
@@ -80,41 +101,61 @@ function WeatherSourceCard() {
     }
   };
 
+  const badgeLabel = cfg ? SOURCE_LABEL[cfg.source] : "Lade...";
+  const keyMissing = cfg && (
+    (cfg.source === "openweathermap" || cfg.source === "hybrid") && !cfg.openweathermap.configured
+    || (cfg.source === "stormglass" || cfg.source === "hybrid_stormglass") && !cfg.stormglass?.configured
+  );
+
+  const sourceButton = (id: WeatherSource, title: string, subtitle: string, tone: "green" | "blue" | "amber") => (
+    <button type="button" onClick={() => setSource(id)}
+      className={cn("rounded-tile border px-3 py-2 text-left text-xs font-bold",
+        source === id
+          ? `border-[var(--color-${tone})]/35 bg-[var(--color-${tone}-dim)] ${tone === "blue" ? "text-primary" : tone === "amber" ? "text-warn" : "text-ok"}`
+          : "border-border bg-bg2 text-tx2"
+      )}>
+      {title}
+      <div className="mt-1 text-[10px] font-medium text-tx3">{subtitle}</div>
+    </button>
+  );
+
   return (
     <Card>
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div>
           <SectionLabel>Wetterquelle</SectionLabel>
-          <div className="mt-1 text-sm text-tx2">Ecowitt/HA fuer Ist-Werte, OpenWeatherMap fuer Forecast und Planung.</div>
+          <div className="mt-1 text-sm text-tx2">Ecowitt/HA fuer Ist-Werte, OpenWeatherMap oder Stormglass fuer Forecast und Planung.</div>
         </div>
-        <Badge tone={cfg?.last_ok ? "ok" : cfg?.source !== "manual_ha" ? "warn" : "muted"}>
-          {cfg?.source === "hybrid" ? "Hybrid" : cfg?.source === "openweathermap" ? (cfg.openweathermap.configured ? "OpenWeatherMap" : "Key fehlt") : "HA / Ecowitt"}
+        <Badge tone={cfg?.last_ok ? "ok" : keyMissing ? "warn" : cfg?.source !== "manual_ha" ? "warn" : "muted"}>
+          {keyMissing ? "Key fehlt" : badgeLabel}
         </Badge>
       </div>
 
       <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
-        <button type="button" onClick={() => setSource("manual_ha")}
-          className={cn("rounded-tile border px-3 py-2 text-left text-xs font-bold", source === "manual_ha" ? "border-[var(--color-green)]/35 bg-[var(--color-green-dim)] text-ok" : "border-border bg-bg2 text-tx2")}>
-          HA / Ecowitt
-          <div className="mt-1 break-all text-[10px] font-medium text-tx3">MQTT: pumpensteuerung/irrigation/weather/input</div>
-        </button>
-        <button type="button" onClick={() => setSource("hybrid")}
-          className={cn("rounded-tile border px-3 py-2 text-left text-xs font-bold", source === "hybrid" ? "border-[var(--color-green)]/35 bg-[var(--color-green-dim)] text-ok" : "border-border bg-bg2 text-tx2")}>
-          Hybrid
-          <div className="mt-1 text-[10px] font-medium text-tx3">Lokal jetzt, OpenWeatherMap fuer Planung</div>
-        </button>
-        <button type="button" onClick={() => setSource("openweathermap")}
-          className={cn("rounded-tile border px-3 py-2 text-left text-xs font-bold", source === "openweathermap" ? "border-[var(--color-blue)]/35 bg-[var(--color-blue-dim)] text-primary" : "border-border bg-bg2 text-tx2")}>
-          OpenWeatherMap
-          <div className="mt-1 text-[10px] font-medium text-tx3">Nur Online-Wetter, automatischer Abruf</div>
-        </button>
+        {sourceButton("manual_ha", "HA / Ecowitt", "MQTT: pumpensteuerung/irrigation/weather/input", "green")}
+        {sourceButton("hybrid", "Hybrid (OWM)", "Lokal jetzt, OpenWeatherMap fuer Planung", "green")}
+        {sourceButton("openweathermap", "OpenWeatherMap", "Nur Online-Wetter, automatischer Abruf", "blue")}
+        {sourceButton("hybrid_stormglass", "Hybrid (Stormglass)", "Lokal jetzt, Stormglass fuer Planung", "green")}
+        {sourceButton("stormglass", "Stormglass", "Free: 10 Abrufe/Tag", "amber")}
       </div>
 
+      {isOwmSource(source) && (
+        <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <WeatherInput label="OpenWeatherMap API-Key" value={owmApiKey} onChange={setOwmApiKey} placeholder={cfg?.openweathermap.configured ? "hinterlegt" : "API-Key"} password />
+          <WeatherInput label="Ort oder PLZ" value={owmLocationQuery} onChange={setOwmLocationQuery} placeholder="z. B. 29229 Celle" />
+        </div>
+      )}
+
+      {isStormglassSource(source) && (
+        <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <WeatherInput label="Stormglass API-Key" value={sgApiKey} onChange={setSgApiKey} placeholder={cfg?.stormglass?.configured ? "hinterlegt" : "API-Key"} password />
+          <WeatherInput label="Ort oder PLZ" value={sgLocationQuery} onChange={setSgLocationQuery} placeholder="z. B. 29229 Celle" />
+        </div>
+      )}
+
       {source !== "manual_ha" && (
-        <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-[1.2fr_1fr_0.7fr]">
-          <WeatherInput label="API-Key" value={apiKey} onChange={setApiKey} placeholder={cfg?.openweathermap.configured ? "hinterlegt" : "API-Key"} password />
-          <WeatherInput label="Ort oder PLZ" value={locationQuery} onChange={setLocationQuery} placeholder="z. B. 29229 Celle" />
-          <WeatherInput label="Intervall min" value={refreshMin} onChange={setRefreshMin} placeholder="60" />
+        <div className="mb-3 rounded-tile border border-border bg-bg2 px-3 py-2 text-[10px] text-tx3">
+          Aktualisierung alle 3 Stunden (fest, wegen API-Limits — Stormglass Free hat nur 10 Abrufe/Tag).
         </div>
       )}
 
@@ -136,6 +177,8 @@ function WeatherSourceCard() {
         </div>
       )}
       {source === "hybrid" && <div className="mt-2 text-[10px] text-tx3">Hybrid nutzt Ecowitt/HA fuer aktuelle Werte und OpenWeatherMap nur fuer Forecast, Regenplanung und ET0-Schaetzung.</div>}
+      {source === "hybrid_stormglass" && <div className="mt-2 text-[10px] text-tx3">Hybrid nutzt Ecowitt/HA fuer aktuelle Werte und Stormglass nur fuer Forecast und ET0-Schaetzung.</div>}
+      {source === "stormglass" && <div className="mt-2 text-[10px] text-tx3">Stormglass Free erlaubt 10 Abrufe/Tag. Bei 3h-Intervall sind das 8/Tag — sicher unter dem Limit.</div>}
       {source === "openweathermap" && <div className="mt-2 text-[10px] text-tx3">Hinweis: ET0 wird aus OpenWeather-Daten geschaetzt. Exakter bleibt ein lokaler Sensor- oder HA-Wetterwert.</div>}
     </Card>
   );
@@ -153,11 +196,14 @@ function WeatherInput({ label, value, onChange, placeholder, password }: { label
 
 function WeatherView({ weather: w }: { weather: WeatherState }) {
   const rec = useMemo(() => {
-    if (w.rain_24h_mm > 6)                   return { action: "Überspringen",    reason: `${w.rain_24h_mm} mm Regen in 24h — ausreichend versorgt.`,          tone: "ok"     as const, score: 0   };
-    if ((w.soil_moisture_pct ?? 50) >= 70)   return { action: "Überspringen",    reason: `Bodenfeuchte ${w.soil_moisture_pct}% — kein Bedarf.`,                 tone: "ok"     as const, score: 5   };
-    if ((w.soil_moisture_pct ?? 50) < 30)    return { action: "Jetzt bewässern", reason: `Kritisch trockener Boden (${w.soil_moisture_pct}%). Sofort.`,         tone: "danger" as const, score: 100 };
-    if ((w.et0_mm ?? 0) > 5)                 return { action: "Bewässern",       reason: `Hohe Verdunstung (ET₀ ${formatFixed(w.et0_mm, 1)} mm) — Bedarf hoch.`,   tone: "warn"   as const, score: 75  };
-    if (w.forecast_rain_mm > 4)              return { action: "Warten",          reason: `Regenvorhersage +${formatFixed(w.forecast_rain_mm, 1)} mm — abwarten.`,   tone: "blue"   as const, score: 20  };
+    const r24 = w.forecast_rain_24h_mm ?? 0;
+    const r48 = w.forecast_rain_48h_mm ?? w.forecast_rain_mm ?? 0;
+    if (w.rain_24h_mm > 6)                   return { action: "Überspringen",    reason: `${w.rain_24h_mm} mm Regen in 24h — ausreichend versorgt.`,           tone: "ok"     as const, score: 0   };
+    if ((w.soil_moisture_pct ?? 50) >= 70)   return { action: "Überspringen",    reason: `Bodenfeuchte ${w.soil_moisture_pct}% — kein Bedarf.`,                  tone: "ok"     as const, score: 5   };
+    if ((w.soil_moisture_pct ?? 50) < 30)    return { action: "Jetzt bewässern", reason: `Kritisch trockener Boden (${w.soil_moisture_pct}%). Sofort.`,          tone: "danger" as const, score: 100 };
+    if (r24 >= 4)                            return { action: "Warten",          reason: `Heute ${formatFixed(r24, 1)} mm Regen erwartet — abwarten.`,            tone: "blue"   as const, score: 15  };
+    if ((w.et0_mm ?? 0) > 5)                 return { action: "Bewässern",       reason: `Hohe Verdunstung (ET₀ ${formatFixed(w.et0_mm, 1)} mm) — Bedarf hoch.`,    tone: "warn"   as const, score: 75  };
+    if (r48 >= 5)                            return { action: "Reduziert",       reason: `In 48h ${formatFixed(r48, 1)} mm Regen — Smart-Lauf läuft reduziert.`,   tone: "blue"   as const, score: 35  };
     return                                          { action: "Normal",           reason: "Bedingungen im Normalbereich. Automatik übernimmt.",                  tone: "muted"  as const, score: 50  };
   }, [w]);
 
@@ -167,7 +213,7 @@ function WeatherView({ weather: w }: { weather: WeatherState }) {
     { ok: w.wind_kmh <= 35,             icon: Wind,        text: w.wind_kmh <= 35       ? `Wind ${w.wind_kmh} km/h — Bewässerung möglich.`                : `Wind ${w.wind_kmh} km/h — zu stark, Driftverluste.` },
     { ok: (w.temp_c ?? 20) <= 28,       icon: Thermometer, text: (w.temp_c ?? 20) <= 28 ? `${w.temp_c}°C — optimale Bewässerungstemperatur.`              : `${w.temp_c}°C — früh morgens bewässern.` },
     { ok: w.rain_24h_mm < 6,            icon: CloudRain,   text: w.rain_24h_mm >= 6     ? `${w.rain_24h_mm} mm Regen — heute aussetzen.`                  : "Kein nennenswerter Regen. ET-Ausgleich nötig." },
-    { ok: w.forecast_rain_mm >= 4,      icon: Cloud,       text: w.forecast_rain_mm >= 4? `Vorhersage +${formatFixed(w.forecast_rain_mm, 1)} mm — Bewässerung verschieben.` : "Kein Regen erwartet — nicht verschieben." },
+    { ok: (w.forecast_rain_24h_mm ?? 0) < 4, icon: Cloud,   text: (w.forecast_rain_24h_mm ?? 0) >= 4 ? `Heute +${formatFixed(w.forecast_rain_24h_mm, 1)} mm — Lauf verschieben.` : `Heute trocken (${formatFixed(w.forecast_rain_24h_mm ?? 0, 1)} mm).` },
   ];
 
   return (
@@ -199,8 +245,8 @@ function WeatherView({ weather: w }: { weather: WeatherState }) {
       <Card>
         <SectionLabel>Aktuelle Bedingungen</SectionLabel>
         <div className="mb-3 flex flex-wrap gap-2 text-[10px] text-tx3">
-          <Badge tone="muted">Ist: {w.current_source === "openweathermap" ? "OpenWeatherMap" : "HA / Ecowitt"}</Badge>
-          <Badge tone={w.forecast_source === "openweathermap" ? "blue" : "muted"}>Forecast: {w.forecast_source === "openweathermap" ? "OpenWeatherMap" : "lokal"}</Badge>
+          <Badge tone="muted">Ist: {w.current_source === "openweathermap" ? "OpenWeatherMap" : w.current_source === "stormglass" ? "Stormglass" : "HA / Ecowitt"}</Badge>
+          <Badge tone={w.forecast_source === "openweathermap" || w.forecast_source === "stormglass" ? "blue" : "muted"}>Forecast: {w.forecast_source === "openweathermap" ? "OpenWeatherMap" : w.forecast_source === "stormglass" ? "Stormglass" : "lokal"}</Badge>
         </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           <WeatherTile icon={Thermometer} label="Temperatur"   value={formatFixed(w.temp_c, 1) ?? "—"}                                            unit="°C"   accent={w.temp_c != null && w.temp_c > 28 ? "warn" : "blue"} />

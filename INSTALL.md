@@ -1,9 +1,13 @@
 # Installation — Pumpensteuerung auf Pi 3B+
 
-Komplette Hardware- und Software-Anleitung für die Migration vom alten
-Stack (ESP32 + Docker + LOGO + HA) auf einen Raspberry Pi 3B+ als
-alleiniges Gehirn. Reihenfolge ist absichtlich konservativ: das alte
-System läuft bis zum letzten Schritt parallel weiter.
+> **Hinweis:** Die Migration vom alten Stack auf den Pi ist abgeschlossen
+> (Stand 2026). Dieses Dokument bleibt als Referenz für einen
+> Hardware-Wiederaufbau bestehen — Migrationsschritte (insbesondere Teil
+> 2.8 und Teil 8) sind nicht mehr relevant. Aktueller Stand & Architektur:
+> siehe [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md) und [DEPLOYMENT.md](DEPLOYMENT.md).
+
+Komplette Hardware- und Software-Anleitung für die Erstinbetriebnahme eines
+Raspberry Pi 3B+ als Steuerungssystem für die Brunnenwasseranlage.
 
 > **Sicherheitshinweis vorab:** alle Arbeiten am V20 nur stromfrei.
 > 230 V Netzteil und 24 V LOGO-Versorgung in der Schaltschranktür sauber

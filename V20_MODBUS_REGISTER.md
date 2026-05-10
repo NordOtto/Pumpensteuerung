@@ -1,7 +1,7 @@
 # SINAMICS V20 – Modbus Register Map
 
 > Quelle: SINAMICS V20 Operating Instructions, 05/2017, A5E34559884-007  
-> Adressierung: **Inverter-Nr. = Modbus 40xxx − 40001** (0-basiert für ESP32)
+> Adressierung: **Inverter-Nr. = Modbus 40xxx − 40001** (0-basiert für die meisten Modbus-Libraries)
 
 ---
 
@@ -223,8 +223,8 @@
 
 ## Hinweis zur Adressierung
 
-Die **Inverter-Nummer** (0-basiert) wird direkt als Holding-Register-Adresse  
-im ESP32 ModbusRTU-Library verwendet:
+Die **Inverter-Nummer** (0-basiert) wird direkt als Holding-Register-Adresse
+in pymodbus (Pi-Backend, `pi/backend/app/modbus_rtu.py`) verwendet:
 
 ```
 Inverter-Nr. = Modbus-Adresse − 40001

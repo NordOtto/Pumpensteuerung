@@ -111,6 +111,9 @@ async def presets_list():
 async def presets_add(body: dict):
     if not deps.preset_mgr.add_or_update(body):
         raise HTTPException(status_code=400, detail="Limit erreicht oder ungültiger Name")
+    # Wenn das gerade gespeicherte Preset aktiv ist, sofort neu anwenden
+    if body.get("name") == app_state.active_preset:
+        deps.preset_mgr.apply(body["name"])
     return {"ok": True}
 
 

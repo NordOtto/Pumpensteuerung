@@ -48,6 +48,10 @@ export interface IrrigationZone {
   enabled: boolean;
   duration_min: number;
   water_mm: number;
+  precipitation_mm_per_h: number;
+  frequency_pref: number;
+  area_value: number;
+  area_unit: "m2" | "m";
   min_deficit_mm: number;
   deficit_mm: number;
   target_mm: number;
@@ -57,6 +61,14 @@ export interface IrrigationZone {
   plant_type: string;
 }
 
+export interface BlockedWindow {
+  enabled: boolean;
+  start_hour: number;
+  start_min: number;
+  end_hour: number;
+  end_min: number;
+}
+
 export interface IrrigationProgram {
   id: string;
   name: string;
@@ -64,7 +76,8 @@ export interface IrrigationProgram {
   mode: "fixed" | "smart_et";
   start_hour: number;
   start_min: number;
-  days: boolean[];
+  blocked_days: boolean[];
+  blocked_window: BlockedWindow;
   seasonal_factor: number;
   weather_enabled: boolean;
   max_runs_per_week: number;
@@ -97,8 +110,10 @@ export interface IrrigationDecision {
   paused: boolean;
   paused_since: string | null;
   started_by: "" | "manual" | "auto" | "nachsaat";
+  started_at: string | null;
   remaining_s: number;
   zone_remaining_s: number;
+  total_planned_s: number;
   ends_at: string | null;
   water_budget_mm: number;
   runtime_factor: number;
@@ -127,13 +142,19 @@ export interface WeatherState {
 }
 
 export interface WeatherConfig {
-  source: "manual_ha" | "openweathermap" | "hybrid";
+  source: "manual_ha" | "openweathermap" | "stormglass" | "hybrid" | "hybrid_stormglass";
+  refresh_min: number;
   openweathermap: {
     configured: boolean;
     location_query: string;
     lat: number;
     lon: number;
-    refresh_min: number;
+  };
+  stormglass: {
+    configured: boolean;
+    location_query: string;
+    lat: number;
+    lon: number;
   };
   location: {
     name: string;

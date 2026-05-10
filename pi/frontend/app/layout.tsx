@@ -31,7 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
           <StatusProvider>
             <TopBar />
-            <main className="mx-auto max-w-7xl px-3 pb-24 pt-20 md:px-5 lg:pl-28 lg:pr-8">
+            <main className="mx-auto max-w-7xl px-3 pb-24 pt-16 md:px-5 lg:pl-28 lg:pr-8">
               {children}
             </main>
             <BottomNav />

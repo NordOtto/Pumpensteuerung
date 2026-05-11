@@ -182,14 +182,13 @@ class WeatherProvider:
 
                 now = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
                 end = now + timedelta(hours=168)
-                params = [
-                    ("lat", str(sg["lat"])),
-                    ("lng", str(sg["lon"])),
-                    ("start", str(int(now.timestamp()))),
-                    ("end", str(int(end.timestamp()))),
-                ]
-                for p in ("airTemperature", "humidity", "windSpeed", "gust", "precipitation", "uvIndex"):
-                    params.append(("params", p))
+                params = {
+                    "lat": str(sg["lat"]),
+                    "lng": str(sg["lon"]),
+                    "start": str(int(now.timestamp())),
+                    "end": str(int(end.timestamp())),
+                    "params": ",".join(("airTemperature", "humidity", "windSpeed", "gust", "precipitation", "uvIndex")),
+                }
                 res = await client.get(
                     "https://api.stormglass.io/v2/weather/point",
                     params=params,

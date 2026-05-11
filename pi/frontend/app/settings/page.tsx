@@ -124,6 +124,7 @@ function ProgramsSettings({ programs, presets, overseeding }: { programs: Irriga
   const [seedInterval, setSeedInterval] = useState(overseeding.interval_min || 120);
   const [seedDays, setSeedDays] = useState(overseeding.days || 7);
   const [seedZoneIds, setSeedZoneIds] = useState<string[]>(overseeding.zone_ids || []);
+  const [seedExpanded, setSeedExpanded] = useState(false);
   const presetNames = Array.from(new Set(presets.map((p) => p.name)));
 
   useEffect(() => {
@@ -190,16 +191,27 @@ function ProgramsSettings({ programs, presets, overseeding }: { programs: Irriga
   return (
     <div className="flex flex-col gap-2">
       <div className="rounded-card border border-border bg-bg1 p-4">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={() => setSeedExpanded((v) => !v)}
+          className={cn(
+            "flex w-full flex-wrap items-center justify-between gap-2 text-left",
+            seedExpanded && "mb-3"
+          )}
+        >
           <div>
             <div className="text-[10px] font-bold uppercase tracking-[0.1em] text-tx3">Nachsaat feucht halten</div>
             <div className="mt-0.5 text-[11px] text-tx3">Wetterunabhaengig, mehrere Zonen laufen nacheinander.</div>
           </div>
-          <Badge tone={overseeding.enabled ? "ok" : "muted"} pulse={overseeding.enabled}>
-            {overseeding.enabled ? "Aktiv" : "Aus"}
-          </Badge>
-        </div>
+          <div className="flex items-center gap-2">
+            <Badge tone={overseeding.enabled ? "ok" : "muted"} pulse={overseeding.enabled}>
+              {overseeding.enabled ? "Aktiv" : "Aus"}
+            </Badge>
+            <span className="text-tx3 text-xs">{seedExpanded ? "▾" : "▸"}</span>
+          </div>
+        </button>
 
+        {seedExpanded && (<>
         <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-4">
           <label className="sm:col-span-2 rounded-tile border border-border bg-bg2 px-3 py-2">
             <span className="mb-1 block text-[9px] font-bold uppercase tracking-[0.1em] text-tx3">Programm</span>
@@ -295,6 +307,7 @@ function ProgramsSettings({ programs, presets, overseeding }: { programs: Irriga
             </span>
           )}
         </div>
+        </>)}
       </div>
 
       {draft.map((p, i) => (
@@ -552,15 +565,15 @@ function PresetsSettings({ active, data, onReload }: {
     <div className="rounded-card border border-border bg-bg1">
       <div className="divide-y divide-border">
         {data.presets.map((p) => (
-          <div key={p.name} className="flex flex-wrap items-center gap-3 px-4 py-3">
-            <div className="min-w-0 flex-1">
+          <div key={p.name} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
+            <div className="min-w-0 flex-1 basis-full sm:basis-auto">
               <span className="text-sm font-semibold text-tx">{p.name}</span>
               <span className="ml-2 text-xs text-tx3">{MODE_LABEL[p.mode]}</span>
               {(data.active === p.name || active === p.name) && (
                 <Badge tone="blue" className="ml-2">Aktiv</Badge>
               )}
             </div>
-            <div className="flex gap-1.5">
+            <div className="flex flex-wrap gap-1.5">
               <button type="button" onClick={() => api.applyPreset(p.name).then(onReload)}
                 className="rounded-tile border border-border bg-bg2 px-3 py-1.5 text-xs font-semibold text-tx2">
                 Anwenden

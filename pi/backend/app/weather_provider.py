@@ -187,14 +187,15 @@ class WeatherProvider:
                     "lng": str(sg["lon"]),
                     "start": str(int(now.timestamp())),
                     "end": str(int(end.timestamp())),
-                    "params": ",".join(("airTemperature", "humidity", "windSpeed", "gust", "precipitation", "uvIndex")),
+                    "params": ",".join(("airTemperature", "humidity", "windSpeed", "gust", "precipitation")),
                 }
                 res = await client.get(
                     "https://api.stormglass.io/v2/weather/point",
                     params=params,
                     headers={"Authorization": sg["api_key"]},
                 )
-                res.raise_for_status()
+                if res.status_code >= 400:
+                    raise RuntimeError(f"HTTP {res.status_code}: {res.text[:300]}")
                 data = res.json()
         except Exception as exc:
             msg = f"Stormglass Fehler: {exc}"

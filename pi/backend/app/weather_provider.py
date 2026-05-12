@@ -2,14 +2,19 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import httpx
 
+from .config import settings
 from .persistence import IRRIGATION_WEATHER_CONFIG_FILE, load_json, save_json
 from .state import web_log
 
 
-REFRESH_MIN_FIXED = 180  # 3h fest fuer alle Anbieter wegen API-Limits (Stormglass Free: 10/Tag)
+# Refresh-Fenster (Lokalzeit): Stormglass Free Tier = 10 Requests/Tag.
+# 9 Slots tagsueber, 1 Token Reserve fuer manuelle Refreshs.
+REFRESH_HOURS_LOCAL = (5, 7, 9, 11, 13, 15, 17, 19, 21)
+REFRESH_MIN_GAP_MIN = 90  # Mindestabstand zwischen erfolgreichen Refreshs
 
 DEFAULT_CONFIG: dict[str, Any] = {
     "source": "manual_ha",
@@ -214,19 +219,25 @@ class WeatherProvider:
         cfg = self._normalized(self.config)
         if cfg["source"] == "manual_ha":
             return False
-        last = cfg.get("last_refresh")
-        if not last:
+        now_local = datetime.now(ZoneInfo(settings.tz))
+        if now_local.hour not in REFRESH_HOURS_LOCAL:
+            return False
+        last_ok = cfg.get("last_refresh_ok")
+        if not last_ok:
             return True
         try:
-            ts = datetime.fromisoformat(str(last).replace("Z", "+00:00")).timestamp()
+            ts = datetime.fromisoformat(str(last_ok).replace("Z", "+00:00")).timestamp()
         except ValueError:
             return True
-        return (datetime.now(timezone.utc).timestamp() - ts) >= REFRESH_MIN_FIXED * 60
+        return (datetime.now(timezone.utc).timestamp() - ts) >= REFRESH_MIN_GAP_MIN * 60
 
     def _mark(self, ok: bool, message: str) -> None:
-        self.config["last_refresh"] = datetime.now(timezone.utc).isoformat()
+        now_iso = datetime.now(timezone.utc).isoformat()
+        self.config["last_refresh"] = now_iso
         self.config["last_ok"] = ok
         self.config["last_message"] = message
+        if ok:
+            self.config["last_refresh_ok"] = now_iso
         self._save()
 
     def _save(self) -> None:

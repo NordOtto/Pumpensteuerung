@@ -216,11 +216,26 @@ function WeatherView({ weather: w }: { weather: WeatherState }) {
 
   const scoreColor = rec.score > 70 ? "var(--color-red)" : rec.score > 40 ? "var(--color-amber)" : "var(--color-green)";
 
+  const fc24 = w.forecast_rain_24h_mm ?? 0;
+  const rainPastEnough = w.rain_24h_mm >= 6;
+  const rainForecastSignificant = fc24 >= 4;
+
+  const pastRainText = rainPastEnough
+    ? `Letzte 24 h: ${w.rain_24h_mm} mm gefallen — heute aussetzen.`
+    : rainForecastSignificant
+      ? `Letzte 24 h: ${formatFixed(w.rain_24h_mm, 1)} mm gefallen — Boden trocken, aber Regen vorhergesagt.`
+      : `Letzte 24 h: ${formatFixed(w.rain_24h_mm, 1)} mm gefallen — ET-Ausgleich nötig.`;
+  const pastRainOk = rainPastEnough || rainForecastSignificant;
+
+  const forecastText = rainForecastSignificant
+    ? `Vorhersage nächste 24 h: +${formatFixed(fc24, 1)} mm erwartet — Lauf verschieben.`
+    : `Vorhersage nächste 24 h: ${formatFixed(fc24, 1)} mm erwartet — trocken.`;
+
   const tips = [
     { ok: w.wind_kmh <= 35,             icon: Wind,        text: w.wind_kmh <= 35       ? `Wind ${w.wind_kmh} km/h — Bewässerung möglich.`                : `Wind ${w.wind_kmh} km/h — zu stark, Driftverluste.` },
     { ok: (w.temp_c ?? 20) <= 28,       icon: Thermometer, text: (w.temp_c ?? 20) <= 28 ? `${w.temp_c}°C — optimale Bewässerungstemperatur.`              : `${w.temp_c}°C — früh morgens bewässern.` },
-    { ok: w.rain_24h_mm < 6,            icon: CloudRain,   text: w.rain_24h_mm >= 6     ? `${w.rain_24h_mm} mm Regen — heute aussetzen.`                  : "Kein nennenswerter Regen. ET-Ausgleich nötig." },
-    { ok: (w.forecast_rain_24h_mm ?? 0) < 4, icon: Cloud,   text: (w.forecast_rain_24h_mm ?? 0) >= 4 ? `Heute +${formatFixed(w.forecast_rain_24h_mm, 1)} mm — Lauf verschieben.` : `Heute trocken (${formatFixed(w.forecast_rain_24h_mm ?? 0, 1)} mm).` },
+    { ok: pastRainOk,                   icon: CloudRain,   text: pastRainText },
+    { ok: !rainForecastSignificant,     icon: Cloud,       text: forecastText },
   ];
 
   return (

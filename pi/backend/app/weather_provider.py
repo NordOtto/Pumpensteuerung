@@ -15,6 +15,7 @@ from .state import web_log
 # 9 Slots tagsueber, 1 Token Reserve fuer manuelle Refreshs.
 REFRESH_HOURS_LOCAL = (5, 7, 9, 11, 13, 15, 17, 19, 21)
 REFRESH_MIN_GAP_MIN = 90  # Mindestabstand zwischen erfolgreichen Refreshs
+COOLDOWN_AFTER_FAILS = 3  # Nach so vielen Fehlversuchen in Folge → Pause bis Tageswechsel
 
 DEFAULT_CONFIG: dict[str, Any] = {
     "source": "manual_ha",
@@ -59,7 +60,7 @@ class WeatherProvider:
         sg = cfg["stormglass"]
         return {
             "source": cfg["source"],
-            "refresh_min": REFRESH_MIN_FIXED,
+            "refresh_hours_local": list(REFRESH_HOURS_LOCAL),
             "openweathermap": {
                 "configured": bool(owm.get("api_key")),
                 "location_query": owm.get("location_query", ""),
@@ -76,6 +77,9 @@ class WeatherProvider:
             "last_refresh": cfg.get("last_refresh"),
             "last_ok": cfg.get("last_ok"),
             "last_message": cfg.get("last_message", ""),
+            "fail_count": int(cfg.get("fail_count", 0) or 0),
+            "in_cooldown": self._in_cooldown(cfg, datetime.now(ZoneInfo(settings.tz))),
+            "cooldown_until_date": cfg.get("cooldown_until_date"),
         }
 
     def update_config(self, body: dict[str, Any]) -> dict[str, Any]:
@@ -222,6 +226,8 @@ class WeatherProvider:
         now_local = datetime.now(ZoneInfo(settings.tz))
         if now_local.hour not in REFRESH_HOURS_LOCAL:
             return False
+        if self._in_cooldown(cfg, now_local):
+            return False
         last_ok = cfg.get("last_refresh_ok")
         if not last_ok:
             return True
@@ -231,6 +237,16 @@ class WeatherProvider:
             return True
         return (datetime.now(timezone.utc).timestamp() - ts) >= REFRESH_MIN_GAP_MIN * 60
 
+    @staticmethod
+    def _in_cooldown(cfg: dict[str, Any], now_local: datetime) -> bool:
+        """Pause bei ≥COOLDOWN_AFTER_FAILS Fehlversuchen in Folge bis zum nächsten Kalendertag (lokal)."""
+        if int(cfg.get("fail_count", 0) or 0) < COOLDOWN_AFTER_FAILS:
+            return False
+        cooldown_until = cfg.get("cooldown_until_date")
+        if not cooldown_until:
+            return False
+        return str(now_local.date()) <= str(cooldown_until)
+
     def _mark(self, ok: bool, message: str) -> None:
         now_iso = datetime.now(timezone.utc).isoformat()
         self.config["last_refresh"] = now_iso
@@ -238,6 +254,14 @@ class WeatherProvider:
         self.config["last_message"] = message
         if ok:
             self.config["last_refresh_ok"] = now_iso
+            self.config["fail_count"] = 0
+            self.config["cooldown_until_date"] = None
+        else:
+            fc = int(self.config.get("fail_count", 0) or 0) + 1
+            self.config["fail_count"] = fc
+            if fc >= COOLDOWN_AFTER_FAILS:
+                today_local = datetime.now(ZoneInfo(settings.tz)).date()
+                self.config["cooldown_until_date"] = str(today_local)
         self._save()
 
     def _save(self) -> None:

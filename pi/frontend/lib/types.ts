@@ -166,6 +166,9 @@ export interface WeatherConfig {
   last_refresh: string | null;
   last_ok: boolean | null;
   last_message: string;
+  fail_count?: number;
+  in_cooldown?: boolean;
+  cooldown_until_date?: string | null;
 }
 
 export interface OverseedingState {

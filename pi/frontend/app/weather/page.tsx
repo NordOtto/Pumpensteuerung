@@ -155,7 +155,14 @@ function WeatherSourceCard() {
 
       {source !== "manual_ha" && (
         <div className="mb-3 rounded-tile border border-border bg-bg2 px-3 py-2 text-[10px] text-tx3">
-          Aktualisierung alle 3 Stunden (fest, wegen API-Limits — Stormglass Free hat nur 10 Abrufe/Tag).
+          Aktualisierung in festen Slots (5, 7, 9, 11, 13, 15, 17, 19, 21 Uhr) — schont Stormglass Free Tier (10 Abrufe/Tag) und lässt 1 Token Reserve für manuelle Refreshs.
+        </div>
+      )}
+
+      {cfg?.in_cooldown && (
+        <div className="mb-3 rounded-tile border border-danger bg-danger/10 px-3 py-2 text-[11px] font-semibold text-danger">
+          Wetter-Abruf pausiert: {cfg.fail_count ?? 0} Fehlversuche in Folge. Pause bis morgen, dann automatischer Retry.
+          {cfg.last_message && <div className="mt-1 font-normal opacity-80">Letzte Meldung: {cfg.last_message}</div>}
         </div>
       )}
 

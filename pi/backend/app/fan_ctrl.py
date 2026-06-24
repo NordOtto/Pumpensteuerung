@@ -27,6 +27,7 @@ FAN_GPIO = 18
 PWM_HZ = 25000                       # Intel/Arctic-Spec
 PWM_CHIP = Path("/sys/class/pwm/pwmchip0")
 PWM_CHANNEL = 0                      # GPIO18 = PWM0 Kanal 0
+PWM_ALT_FUNC = "a5"                  # ALT5 = PWM0-Funktion auf GPIO18 (pinctrl)
 _VALID_MODES = ("auto", "pwm_auto", "aus")
 
 
@@ -73,6 +74,13 @@ class FanController:
             (ch / "period").write_text(str(period_ns))
             (ch / "duty_cycle").write_text("0")
             (ch / "enable").write_text("1")
+            # Das pwm-Overlay aktiviert den PWM-Block, schaltet aber den Pin-Mux
+            # nicht zuverlässig auf die PWM-Alt-Funktion (Pin bleibt sonst Input →
+            # Lüfter sieht kein Signal und läuft auf Failsafe-Vollgas). Daher den
+            # Mux explizit auf ALT5 (= PWM0 auf GPIO18) setzen.
+            import subprocess
+            subprocess.run(["pinctrl", "set", str(self._pin), PWM_ALT_FUNC],
+                           check=False, capture_output=True)
             self._pwm_path = ch
             return True
         except Exception as exc:

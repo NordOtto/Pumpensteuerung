@@ -6,6 +6,27 @@ const withPWA = withPWAInit({
   aggressiveFrontEndNavCaching: true,
   reloadOnOnline: true,
   disable: process.env.NODE_ENV === "development",
+  // Neuer Build soll sofort übernehmen statt erst beim übernächsten Start
+  // (sonst zeigt App/PWA nach einem Deploy weiter die alte UI).
+  register: true,
+  skipWaiting: true,
+  workboxOptions: {
+    clientsClaim: true,
+    skipWaiting: true,
+    // HTML-Navigationen zuerst aus dem Netz — Cache nur als Offline-Fallback.
+    // Verhindert, dass nach einem Deploy alte Seiten ausgeliefert werden.
+    runtimeCaching: [
+      {
+        urlPattern: ({ request }) => request.mode === "navigate",
+        handler: "NetworkFirst",
+        options: {
+          cacheName: "pages",
+          networkTimeoutSeconds: 5,
+          expiration: { maxEntries: 50 },
+        },
+      },
+    ],
+  },
 });
 
 /** @type {import('next').NextConfig} */

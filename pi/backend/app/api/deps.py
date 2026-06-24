@@ -7,6 +7,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from ..fan_ctrl import FanController
     from ..irrigation import IrrigationManager
     from ..modbus_rtu import V20RtuClient
     from ..presets import PresetManager
@@ -20,6 +21,7 @@ class Deps:
     irrigation: "IrrigationManager" = None  # type: ignore[assignment]
     weather_provider: "WeatherProvider" = None  # type: ignore[assignment]
     rtu: "V20RtuClient" = None            # type: ignore[assignment]
+    fan_ctrl: "FanController" = None      # type: ignore[assignment]
 
 
 deps = Deps()

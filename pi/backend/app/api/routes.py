@@ -90,6 +90,13 @@ async def pressure_reset_dryrun():
     return {"ok": True}
 
 
+# ── /fan ──────────────────────────────────────────────────────
+@router.post("/fan")
+async def fan_set(body: dict):
+    deps.fan_ctrl.set_config(body)
+    return {"ok": True}
+
+
 # ── /timeguard ────────────────────────────────────────────────
 @router.get("/timeguard")
 async def timeguard_get():

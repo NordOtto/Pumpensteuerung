@@ -223,6 +223,17 @@ export interface OtaStatus {
   token_message: string;
 }
 
+export interface FanState {
+  mode: "auto" | "pwm_auto" | "aus";
+  postrun_s: number;
+  running: boolean;
+  current_pwm: number;
+  pwm_min: number;
+  pwm_max: number;
+  src_min: number;
+  src_max: number;
+}
+
 export interface AppStatus {
   v20: V20State;
   pressure_bar: number;
@@ -230,6 +241,7 @@ export interface AppStatus {
   flow_estimated: boolean;
   water_temp: number | null;
   temperature: number | null;
+  fan: FanState;
   pi: PIState;
   timeguard: TimeguardState;
   active_preset: string;

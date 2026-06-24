@@ -37,6 +37,7 @@ def save_json(name: str, data: dict[str, Any]) -> None:
 # ── Topic-Bindings: hier zentral, damit beim Migrieren vom alten /data
 #    nur die Dateinamen identisch sein müssen ──
 PRESSURE_FILE = "pressure_ctrl.json"
+FAN_FILE = "fan.json"
 TIMEGUARD_FILE = "timeguard.json"
 PRESETS_FILE = "presets.json"
 IRRIGATION_PROGRAMS_FILE = "irrigation_programs.json"

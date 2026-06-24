@@ -36,6 +36,7 @@ from .timeguard import is_allowed as tg_is_allowed
 _TZ = ZoneInfo(settings.tz)
 HISTORY_LIMIT = 250
 TICK_S = 30
+SCHEDULE_CATCHUP_MIN = 10   # Nachhol-Fenster für verpasste Auto-Starts (Neustart etc.)
 BASE = settings.mqtt_topic_prefix
 
 DEFAULT_THRESHOLDS = {
@@ -163,6 +164,7 @@ def _normalize_program(input_: dict[str, Any], idx: int = 0) -> dict[str, Any]:
         "zones": [_normalize_zone(z, zi) for zi, z in enumerate(zones_in)],
         "last_balance_date": input_.get("last_balance_date"),
         "last_run_at": input_.get("last_run_at"),
+        "last_auto_attempt_date": input_.get("last_auto_attempt_date"),
         "last_skip_reason": input_.get("last_skip_reason") or "",
     }
 
@@ -1133,13 +1135,32 @@ class IrrigationManager:
             return
         self._last_schedule_minute = minute_key
 
+        # Wasserbilanz täglich für ALLE smart_et-Programme fortschreiben — nicht nur
+        # fürs nächste (recompute_decision evaluiert nur eins). Guard last_balance_date
+        # macht das idempotent (max. 1× pro Tag und Programm).
+        for program in app_state.irrigation.programs:
+            if program.get("enabled") and program.get("mode") == "smart_et":
+                self._update_water_balance(program)
+
         for program in app_state.irrigation.programs:
             if not program["enabled"]:
                 continue
             blocked_days = program.get("blocked_days") or [False] * 7
             if blocked_days[d.weekday()]:
                 continue
-            if program["start_hour"] == d.hour and program["start_min"] == d.minute:
+            # Catch-up-Fenster statt exakter Minute: löst aus, wenn die heutige
+            # Startzeit in den letzten SCHEDULE_CATCHUP_MIN lag — übersteht
+            # Backend-Neustarts/verpasste Ticks. last_run_at (heute) verhindert
+            # Doppel-Auslösung.
+            start_today = d.replace(hour=program["start_hour"], minute=program["start_min"],
+                                    second=0, microsecond=0)
+            elapsed_min = (d - start_today).total_seconds() / 60.0
+            # Pro Tag nur EIN Auto-Versuch (Lauf oder Skip) — sonst würde das
+            # Catch-up-Fenster bei jedem Tick erneut auslösen und die History fluten.
+            attempted_today = program.get("last_auto_attempt_date") == _local_date_key()
+            if 0 <= elapsed_min < SCHEDULE_CATCHUP_MIN and not attempted_today:
+                program["last_auto_attempt_date"] = _local_date_key()
+                self._save_programs()
                 res = self.run_program(program["id"], manual=False, force_weather=False)
                 if not res["ok"]:
                     web_log(f"[IRR] Programm {program['name']} uebersprungen: {res['error']}")

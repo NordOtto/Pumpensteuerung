@@ -36,9 +36,15 @@ class V20State(BaseModel):
 
 
 class FanState(BaseModel):
-    rpm: int = 0
-    pwm: int = 0
-    mode: str = "Auto"
+    mode: str = "auto"            # "auto" | "pwm_auto" | "aus"
+    postrun_s: int = 120          # Nachlaufzeit
+    running: bool = False         # läuft der Lüfter gerade? (Anzeige)
+    current_pwm: int = 0          # 0..100 aktuelles Tastverhältnis (Anzeige)
+    # PWM-Auto-Regelung auf FU-Ausgangsstrom (app_state.v20.current):
+    pwm_min: int = 30             # % bei/unter src_min
+    pwm_max: int = 100            # % bei/über src_max
+    src_min: float = 0.5          # A: ab hier hochregeln
+    src_max: float = 4.0          # A: ab hier volle Drehzahl
 
 
 class PIState(BaseModel):

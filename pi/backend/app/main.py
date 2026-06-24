@@ -233,6 +233,7 @@ async def lifespan(app: FastAPI):
     deps.irrigation = irrigation
     deps.weather_provider = weather_provider
     deps.rtu = modbus_rtu.client
+    deps.fan_ctrl = fan_ctrl.controller
 
     # SQLite-Schema sicherstellen
     storage.init_schema()
@@ -243,6 +244,7 @@ async def lifespan(app: FastAPI):
     preset_mgr.load()
     irrigation.load()
     weather_provider.load()
+    fan_ctrl.controller.load()
 
     # Preset-CRUD soll HA-Select aktualisieren
     preset_mgr.on_changed = ha_discovery.refresh_preset_select

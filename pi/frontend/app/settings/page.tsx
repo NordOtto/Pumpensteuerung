@@ -14,6 +14,7 @@ const SECTIONS = [
   { id: "programs",  label: "Programme" },
   { id: "presets",   label: "Presets" },
   { id: "pi",        label: "PI-Regler" },
+  { id: "fan",       label: "Lüfter" },
   { id: "timeguard", label: "Zeitfenster" },
   { id: "valves",    label: "Ventile" },
   { id: "system",    label: "System" },
@@ -49,6 +50,7 @@ export default function SettingsPage() {
       {active === "programs"  && <ProgramsSettings programs={status.irrigation.programs} presets={presetData?.presets ?? []} overseeding={status.irrigation.overseeding} />}
       {active === "presets"   && <PresetsSettings active={status.active_preset} data={presetData} onReload={loadPresets} />}
       {active === "pi"        && <PiSettings pi={status.pi} />}
+      {active === "fan"       && <FanSettings fan={status.fan} />}
       {active === "timeguard" && <TimeguardSettings tg={status.timeguard} />}
       {active === "valves"    && <ValvesSettings valves={status.valves} valvesOnline={status.valves_online} irrigationRunning={status.irrigation.decision.running} />}
       {active === "system"    && <SystemSettings sys={status.sys} />}
@@ -450,6 +452,7 @@ function ProgramsSettings({ programs, presets, overseeding }: { programs: Irriga
                       <span>lang & selten</span>
                     </div>
                   </div>
+                  <DeficitBar deficit={z.deficit_mm ?? 0} minDeficit={z.min_deficit_mm} freqPref={z.frequency_pref ?? 0.5} />
                   <button type="button" onClick={() => updateProgram(i, { zones: p.zones.filter((_, idx) => idx !== zIdx) })}
                     className="mt-2 rounded-tile border border-danger/25 bg-bg1 px-3 py-1.5 text-[11px] font-semibold text-danger">
                     Zone entfernen
@@ -664,6 +667,49 @@ function PiSettings({ pi }: { pi: { enabled: boolean; setpoint: number; p_on: nu
           Trockenlauf Reset
         </button>
         <button type="button" onClick={() => api.setPressure(draft)}
+          className="rounded-tile bg-primary px-4 py-2 text-xs font-bold text-white">
+          Speichern
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Lüfter ────────────────────────────────────────────────────────────────────
+function FanSettings({ fan }: { fan: import("@/lib/types").FanState }) {
+  const [d, setD] = useState({
+    mode: fan.mode, postrun_s: fan.postrun_s,
+    pwm_min: fan.pwm_min, pwm_max: fan.pwm_max, src_min: fan.src_min, src_max: fan.src_max,
+  });
+
+  return (
+    <div className="rounded-card border border-border bg-bg1 p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-tx3">Lüfter (FU-Kühlung)</div>
+        <Badge tone={fan.running ? "ok" : "muted"}>
+          {fan.running ? (fan.mode === "pwm_auto" ? `läuft · ${fan.current_pwm}%` : "läuft") : "aus"}
+        </Badge>
+      </div>
+      <div className="mb-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+        <SelectEdit label="Modus" value={d.mode}
+          options={[["auto", "Auto (An/Aus)"], ["pwm_auto", "PWM-Auto (Strom)"], ["aus", "Aus"]]}
+          onChange={(v) => setD({ ...d, mode: v as typeof d.mode })} />
+        <NumberEdit label="Nachlauf (s)" value={d.postrun_s} step={10}
+          onChange={(v) => setD({ ...d, postrun_s: v })} />
+      </div>
+      {d.mode === "pwm_auto" && (
+        <>
+          <div className="mb-2 text-[10px] text-tx3">Drehzahl folgt dem FU-Ausgangsstrom.</div>
+          <div className="mb-3 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+            <NumberEdit label="PWM min (%)" value={d.pwm_min} step={5} onChange={(v) => setD({ ...d, pwm_min: v })} />
+            <NumberEdit label="PWM max (%)" value={d.pwm_max} step={5} onChange={(v) => setD({ ...d, pwm_max: v })} />
+            <NumberEdit label="Strom min (A)" value={d.src_min} step={0.1} onChange={(v) => setD({ ...d, src_min: v })} />
+            <NumberEdit label="Strom max (A)" value={d.src_max} step={0.1} onChange={(v) => setD({ ...d, src_max: v })} />
+          </div>
+        </>
+      )}
+      <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={() => api.setFan(d)}
           className="rounded-tile bg-primary px-4 py-2 text-xs font-bold text-white">
           Speichern
         </button>
@@ -1051,6 +1097,29 @@ function TimeEdit({ label, hour, minute, onChange }: { label: string; hour: numb
         if (Number.isFinite(h) && Number.isFinite(m)) onChange(h, m);
       }} className="h-7 w-full bg-transparent text-sm font-semibold text-tx outline-none" />
     </label>
+  );
+}
+
+function DeficitBar({ deficit, minDeficit, freqPref }: { deficit: number; minDeficit: number; freqPref: number }) {
+  // Effektive Auslöse-Schwelle exakt wie im Backend: min_deficit_mm × (0.4 + 1.6×slider)
+  const threshold = minDeficit * (0.4 + 1.6 * Math.min(1, Math.max(0, freqPref)));
+  const pct = threshold > 0 ? Math.min(100, (deficit / threshold) * 100) : 0;
+  const due = deficit >= threshold && threshold > 0;
+  return (
+    <div className="mt-2 rounded-tile border border-border bg-bg1 px-3 py-2">
+      <div className="mb-1 flex items-center justify-between text-[10px]">
+        <span className="font-bold uppercase tracking-[0.08em] text-tx3">Wasserdefizit</span>
+        <span className={cn("num font-semibold", due ? "text-ok" : "text-tx2")}>
+          {deficit.toFixed(1)} / {threshold.toFixed(1)} mm
+        </span>
+      </div>
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-bg3">
+        <div className={cn("h-full rounded-full transition-all", due ? "bg-ok" : "bg-primary")} style={{ width: `${pct}%` }} />
+      </div>
+      <div className="mt-1 text-[9px] text-tx3">
+        {due ? "Auto-Bewässerung würde auslösen" : "Bewässert automatisch ab Schwelle"}
+      </div>
+    </div>
   );
 }
 

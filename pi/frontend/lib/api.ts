@@ -30,6 +30,9 @@ export const api = {
   setVacation: (enabled: boolean) =>
     request("/api/vacation/set", { method: "POST", body: JSON.stringify({ enabled }) }),
 
+  setFan: (cfg: Record<string, unknown>) =>
+    request("/api/fan", { method: "POST", body: JSON.stringify(cfg) }),
+
   // ── Presets ────────────────────────────────────────────
   fetchPresets: () =>
     request<{ active: string; presets: Preset[] }>("/api/presets"),

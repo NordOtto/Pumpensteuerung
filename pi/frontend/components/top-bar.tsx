@@ -1,6 +1,6 @@
 "use client";
 
-import { Gauge, Activity, Zap } from "lucide-react";
+import { Gauge, Activity, Zap, Fan } from "lucide-react";
 import { useStatus } from "@/lib/ws";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +17,12 @@ export function TopBar() {
             <LiveMetric icon={<Activity className="h-3.5 w-3.5" />} value={status.flow_rate.toFixed(1)} unit="L/min" colorClass="text-ok" />
             <div className="h-4 w-px bg-border" />
             <LiveMetric icon={<Zap className="h-3.5 w-3.5" />} value={status.v20.frequency.toFixed(1)} unit="Hz" colorClass="text-warn" />
+            {status.fan && (
+              <>
+                <div className="h-4 w-px bg-border" />
+                <FanIndicator running={status.fan.running} pwm={status.fan.mode === "pwm_auto" ? status.fan.current_pwm : null} />
+              </>
+            )}
             {status.active_preset && (
               <span className="ml-auto truncate rounded-tile border border-border bg-bg2 px-2 py-0.5 text-[10px] font-semibold text-tx3">
                 {status.active_preset}
@@ -28,6 +34,19 @@ export function TopBar() {
         )}
       </div>
     </header>
+  );
+}
+
+function FanIndicator({ running, pwm }: { running: boolean; pwm: number | null }) {
+  return (
+    <div className="flex items-center gap-1 px-1.5 py-1">
+      <Fan
+        className={cn("h-3.5 w-3.5", running ? "animate-spin text-ok [animation-duration:1.5s]" : "text-tx3 opacity-50")}
+      />
+      {running && pwm !== null && (
+        <span className="num text-xs font-bold text-ok">{pwm}<span className="text-[9px] text-tx3">%</span></span>
+      )}
+    </div>
   );
 }
 

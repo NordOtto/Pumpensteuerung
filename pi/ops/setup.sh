@@ -34,6 +34,7 @@ apt-get install -y --no-install-recommends \
 echo "[2/9] User '$PI_USER' anlegen"
 id -u "$PI_USER" >/dev/null 2>&1 || useradd -r -s /usr/sbin/nologin -m -d /home/"$PI_USER" "$PI_USER"
 usermod -aG dialout "$PI_USER"
+usermod -aG gpio "$PI_USER"   # Lüfter-GPIO/PWM-Zugriff
 
 echo "[3/9] Verzeichnisstruktur"
 mkdir -p "$INSTALL_DIR"/{releases,ota} "$DATA_DIR"/data "$SSL_DIR"
@@ -45,6 +46,18 @@ CONFIG_TXT=/boot/firmware/config.txt
 grep -q "^enable_uart=1" "$CONFIG_TXT" || echo "enable_uart=1" >> "$CONFIG_TXT"
 grep -q "^dtoverlay=disable-bt" "$CONFIG_TXT" || echo "dtoverlay=disable-bt" >> "$CONFIG_TXT"
 systemctl disable hciuart 2>/dev/null || true
+
+echo "[4b/9] Lüfter-Hardware-PWM (GPIO18/PWM0) aktivieren"
+# Onboard-Audio teilt sich die PWM-Hardware → abschalten, sonst bleibt GPIO18 Input
+grep -q "^dtparam=audio=off" "$CONFIG_TXT" || sed -i 's/^dtparam=audio=on/dtparam=audio=off/' "$CONFIG_TXT"
+grep -q "^dtparam=audio" "$CONFIG_TXT" || echo "dtparam=audio=off" >> "$CONFIG_TXT"
+grep -q "^dtoverlay=pwm,pin=18" "$CONFIG_TXT" || echo "dtoverlay=pwm,pin=18,func=5" >> "$CONFIG_TXT"
+# udev: exportierte PWM-Kanäle der gpio-Gruppe mit Schreibrecht geben
+cat > /etc/udev/rules.d/99-pwm.rules <<'PWMUDEV'
+SUBSYSTEM=="pwm", ACTION=="add",    RUN+="/bin/chgrp -R gpio /sys%p", RUN+="/bin/chmod -R g+rw /sys%p"
+SUBSYSTEM=="pwm", ACTION=="change", RUN+="/bin/chgrp -R gpio /sys%p", RUN+="/bin/chmod -R g+rw /sys%p"
+PWMUDEV
+udevadm control --reload-rules 2>/dev/null || true
 # Serial-Console abschalten (sonst belegt sie den UART)
 sed -i 's/console=serial0,[0-9]\+ //g' /boot/firmware/cmdline.txt 2>/dev/null || \
 sed -i 's/console=serial0,[0-9]\+ //g' /boot/cmdline.txt 2>/dev/null || true

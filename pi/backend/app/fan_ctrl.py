@@ -42,6 +42,9 @@ class FanController:
         self._pwm_path: Path | None = None  # sysfs-Kanal, wenn Hardware-PWM aktiv
         self._duty = -1              # zuletzt gesetztes Tastverhältnis (0..100), -1 = unbekannt
         self._off_at: float | None = None   # monotone Deadline für Nachlauf
+        # Beim Boot ist pwm0 evtl. noch nicht exportiert/berechtigt, wenn das Backend
+        # startet → HW-PWM scheitert und tick() versucht es eine Weile erneut.
+        self._hw_pwm_retries = 30
         self._init_gpio()
 
     # ── Hardware-Init ─────────────────────────────────────────
@@ -83,8 +86,9 @@ class FanController:
                            check=False, capture_output=True)
             self._pwm_path = ch
             return True
-        except Exception as exc:
-            web_log(f"[FAN] Hardware-PWM nicht verfügbar ({exc}) — Fallback HIGH/LOW")
+        except Exception:
+            # Beim Boot oft "Permission denied", weil pwm0 noch nicht via udev
+            # berechtigt ist. Nicht laut loggen — tick() probiert es erneut.
             return False
 
     # ── Ausgabe ───────────────────────────────────────────────
@@ -119,6 +123,13 @@ class FanController:
 
     # ── Tick (1 Hz aus main._fan_loop) ────────────────────────
     def tick(self) -> None:
+        # HW-PWM beim Boot nachholen, falls pwm0 zum Start noch nicht bereit war.
+        if self._pwm_path is None and self._hw_pwm_retries > 0:
+            self._hw_pwm_retries -= 1
+            if self._init_hw_pwm():
+                self._duty = -1  # erzwingt Neuausgabe des aktuellen Soll-Werts
+                web_log(f"[FAN] Hardware-PWM auf GPIO {self._pin} (25 kHz) aktiv (nachträglich)")
+
         f = app_state.fan
         running = app_state.v20.running
         now = time.monotonic()

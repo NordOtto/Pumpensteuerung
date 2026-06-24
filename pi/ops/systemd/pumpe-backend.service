@@ -13,6 +13,11 @@ ExecStart=/opt/pumpe/current/backend/.venv/bin/uvicorn app.main:app --host 127.0
 Restart=always
 RestartSec=3
 
+# Lüfter-Hardware-PWM (GPIO18/PWM0) vor dem Start bereitstellen: Kanal exportieren,
+# Pin-Mux auf ALT5 (PWM0) setzen, Rechte für gpio-Gruppe. '+' = als root ausgeführt.
+# Vermeidet das Boot-Race (pwm0 noch nicht berechtigt, wenn das Backend startet).
+ExecStartPre=+/bin/sh -c 'test -e /sys/class/pwm/pwmchip0/pwm0 || echo 0 > /sys/class/pwm/pwmchip0/export; pinctrl set 18 a5 || true; chgrp -R gpio /sys/class/pwm/pwmchip0/pwm0 2>/dev/null || true; chmod -R g+rw /sys/class/pwm/pwmchip0/pwm0 2>/dev/null || true'
+
 # Modbus-TCP-Server bindet :502 — privilegierter Port
 AmbientCapabilities=CAP_NET_BIND_SERVICE
 
@@ -23,8 +28,9 @@ ProtectHome=true
 PrivateTmp=true
 ReadWritePaths=/var/lib/pumpe /opt/pumpe
 
-# RTU braucht Zugriff auf /dev/ttyAMA0 oder /dev/ttyUSB0 (User pumpe muss in dialout sein)
-SupplementaryGroups=dialout
+# RTU braucht Zugriff auf /dev/ttyAMA0 oder /dev/ttyUSB0 (dialout);
+# gpio für Lüfter-GPIO/PWM-sysfs-Zugriff
+SupplementaryGroups=dialout gpio
 
 [Install]
 WantedBy=multi-user.target

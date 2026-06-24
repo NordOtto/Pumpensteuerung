@@ -159,7 +159,7 @@ openssl s_client -connect pumpe.local:443 -showcerts </dev/null 2>NUL | `
 | `curl https://pumpe.local/dashboard` zeigt alten Inhalt trotz Deploy | Standalone-Dir wurde nur überschrieben statt geleert | `sudo rm -rf .../.next/standalone` vor `tar xzf` |
 | `pumpe-frontend` startet, lädt aber alten Build | Mehrere `BUILD_ID`s in `.next/static`, alte Chunks blockieren | `rm -rf .next/standalone` UND beide Tars frisch entpacken |
 | Backend startet nicht nach Schema-Migration | `KeyError: 'days'` o.ä. weil alte JSON-Datei | Migration in `_normalize_program()` ergänzen, dann Service neu starten |
-| App auf Handy zeigt alte UI obwohl Pi neue liefert | Service-Worker-Cache | App komplett aus Switcher wegwischen + neu öffnen |
+| App auf Handy zeigt alte UI obwohl Pi neue liefert | Service-Worker-Cache | App aus Switcher wegwischen + neu öffnen (ggf. 2×). Seit SW-Fix (`skipWaiting`+`NetworkFirst` in `next.config.mjs`) zieht die App neue Builds automatisch. **Einmaliger** Altlast-SW: Android → Apps → App/Chrome → Speicher → Cache leeren. Fully Kiosk: Menü (7-Finger-Tipp) → Advanced Web Settings → Clear Cache, oder Android → Apps → Fully Kiosk → Speicher → Cache leeren |
 | `Host key verification failed` beim ersten SSH | `~/.ssh/known_hosts` kennt Pi noch nicht | `ssh-keyscan -H pumpe.local >> ~/.ssh/known_hosts` |
 
 ---

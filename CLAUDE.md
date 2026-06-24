@@ -77,6 +77,7 @@ FastAPI ──RTU──→ V20 Frequenzumrichter (500ms Takt)
 | `modbus_tcp.py` | TCP-Server ← LOGO (Port 502) |
 | `pressure_ctrl.py` | PI-Druckregelung (500ms Takt, Anti-Windup) |
 | `irrigation.py` | Bewässerungsprogramme + Wetter-ET0-Logik |
+| `fan_ctrl.py` | Gehäuselüfter-PWM (kühlt V20-Kühlkörper, GPIO 18) |
 | `presets.py` | Preset-Verwaltung |
 | `mqtt_client.py` | MQTT subscribe/publish, HA-Integration |
 | `timeguard.py` | Wochenschaltuhr (Europe/Berlin) |
@@ -138,7 +139,20 @@ Aktuelles Verhalten (seit Mai 2026):
   - `Regen-Credit = rain_24h_mm + 0.7 × forecast_48h_mm` wird vom Defizit abgezogen
   - Skip nur bei akutem Regen heute (`forecast_24h_mm ≥ skip_rain_mm`)
   - Sonst reduzierte Laufzeit statt komplett aussetzen
-- **Frequenz-Slider** pro Zone skaliert effektives `min_deficit_mm` mit Faktor 0.4 (häufig) bis 2.0 (selten).
+- **Frequenz-Slider** pro Zone skaliert effektives `min_deficit_mm` mit Faktor 0.4 (häufig) bis 2.0 (selten). Effektive Auslöse-Schwelle = `min_deficit_mm × (0.4 + 1.6 × frequency_pref)`. Wird in den Zonen-Settings als Defizit-Balken angezeigt.
+- **Täglicher Defizit-Aufbau**: `_update_water_balance()` addiert `et0 × seasonal_factor − rain` einmal pro Tag (`last_balance_date`-Guard). Wird im `tick()` für **alle** aktiven `smart_et`-Programme aufgerufen (nicht nur fürs nächste) — sonst bleibt das Defizit bei 0 und es wird nie automatisch bewässert.
+- **Scheduler-Catch-up**: Auto-Start triggert in einem `SCHEDULE_CATCHUP_MIN`-Fenster (10 min) ab der Startzeit, nicht nur in der exakten Minute → übersteht Backend-Neustarts. `last_auto_attempt_date` verhindert Mehrfach-Versuche/History-Flut pro Tag.
+
+## Gehäuselüfter (V20-Kühlung)
+
+Ein 4-Pin-PWM-Lüfter (Arctic P9 MAX, an 12V) kühlt den Alu-Kühlkörper des V20. Steuerung in `fan_ctrl.py`, Loop in `main.py:_fan_loop` (1s).
+
+- **Pin:** GPIO 18 (physisch Pin 12) = **PWM0**. Hardware-PWM 25 kHz über sysfs (`/sys/class/pwm/pwmchip0`), Fallback auf HIGH/LOW über rpi-lgpio.
+- **Modi** (`app_state.fan.mode`, Settings → Lüfter): `auto` (an wenn `v20.running`, sonst Nachlauf→aus), `pwm_auto` (Drehzahl linear nach `v20.current` zwischen `src_min..src_max` → `pwm_min..pwm_max`), `aus`.
+- **Nachlaufzeit** (`postrun_s`) konfigurierbar; Config in `fan.json`, API `POST /api/fan`.
+- **Hardware-Voraussetzungen** (in `setup.sh` + `config.txt`): `dtparam=audio=off` (Audio teilt PWM-HW), `dtoverlay=pwm,pin=18,func=5`, udev-Regel `99-pwm.rules` (gpio-Gruppe darf PWM-sysfs), User `pumpe` in `gpio`-Gruppe.
+- **Boot-Race**: pwm0 ist beim Backend-Start evtl. noch nicht berechtigt → `pumpe-backend.service` hat `ExecStartPre` (Export + `pinctrl set 18 a5` + Rechte als root), zusätzlich Retry in `fan_ctrl.tick()`. Das pwm-Overlay setzt den Pin-Mux **nicht** selbst auf ALT5 — `fan_ctrl` macht das per `pinctrl`.
+- **Anzeige**: TopBar zeigt drehendes Lüfter-Icon (+ PWM% bei `pwm_auto`).
 
 ## Ventile (ESPHome direkt per MQTT)
 
@@ -180,8 +194,10 @@ panel_iframe:
 
 - **`days`** im Programm-Schema gibt es **nicht mehr** — verwende `blocked_days` (true = nicht bewässern).
 - **Bei Schema-Änderungen in `irrigation.py`** immer auch `_normalize_program()` und `_normalize_zone()` mit Defaults erweitern, sonst crash beim Laden alter JSON.
-- **TopBar-Layout** ist bewusst minimalistisch (Druck/L-min/Hz + Preset). Theme-Toggle ist in Settings → System.
+- **TopBar-Layout** ist bewusst minimalistisch (Druck/L-min/Hz + Lüfter + Preset). Theme-Toggle ist in Settings → System.
 - **ESP32-Code wurde aus dem Repo entfernt.** Frühere `src/`, `platformio.ini`, `partitions.csv` etc. existieren nicht mehr.
+- **Bei Schema-Änderungen in `fan_ctrl.py`**: `FanState`-Defaults in `state.py` + `load()/save()`-Keys konsistent halten.
+- **CI baut bei jedem Push auf `main`** automatisch ein Release (nächste Patch-Version), nicht nur bei Tags — siehe `pi-release.yml`.
 
 ## Bekannte Fehler & Lösungen
 
@@ -193,6 +209,12 @@ panel_iframe:
 | RTU "No response" | A/B-Leitungen vertauscht + kein separates GND | TX/RX tauschen + dediziertes GND-Kabel |
 | Durchfluss zeigt 2 L/min bei Stillstand | Sensor-Rauschen unterhalb Messbereich | Threshold 5 L/min in `modbus_tcp.py` |
 | LOGO schreibt Sensordaten nicht | Register 0+1 (STW/HSW) werden vom Pi nicht verarbeitet | V20-Steuerung über MQTT/RTU — LOGO nur für Sensor-Register 2–4 |
+| Lüfter läuft trotz GPIO LOW / dreht immer 100% | 4-Pin-PWM-Lüfter ignoriert kein/zu schwaches Signal (Failsafe-Vollgas) | GPIO 18/PWM0 nutzen, Pin-Mux auf ALT5 (`pinctrl set 18 a5`), 25 kHz; 12V statt 5V |
+| RPi.GPIO `pip install` scheitert (Python.h) | C-Extension braucht python3-dev | `rpi-lgpio` (pure-Python Drop-in) statt `RPi.GPIO` |
+| `lgpio.error: can not open gpiochip` / PWM Permission denied | Service-User `pumpe` nicht in `gpio`-Gruppe bzw. pwm0 nicht berechtigt | `usermod -aG gpio pumpe`, udev `99-pwm.rules`, `ExecStartPre` in der Service-Unit |
+| Auto-Bewässerung löst nie aus ("Regen kompensiert Defizit" trotz 0 Regen) | Defizit blieb 0: Bilanz wurde nur fürs nächste Programm aufgebaut | `_update_water_balance` für **alle** smart_et-Programme im `tick()` |
+| App zeigt nach Deploy alte UI (fehlender Tab) | Service-Worker cachte Seiten via CacheFirst | `next.config.mjs`: `skipWaiting`+`NetworkFirst` für Navigation; einmalig App-Cache leeren |
+| V20-Kühlkörpertemperatur per Modbus | r0037 ist in der Register-Map nicht erreichbar (Test → nur 0/1) | Lüfter-PWM regelt stattdessen auf `v20.current` (Ausgangsstrom) |
 
 ## Modbus
 
@@ -201,3 +223,12 @@ panel_iframe:
 - V20 Steuerwort: `0x047F` = Start, `0x047E` = Stop, `0x04FE` = Fault Reset
 
 Vollständige Registertabelle: `V20_MODBUS_REGISTER.md`
+
+## GPIO-Belegung (Pi 3B+)
+
+| GPIO (BCM) | Pin | Funktion |
+|------------|-----|----------|
+| 14 / 15 | 8 / 10 | UART `/dev/ttyAMA0` → V20 RS-485 |
+| 18 | 12 | PWM0 → Gehäuselüfter (`fan_ctrl.py`) |
+
+Magnetventile sitzen **nicht** am Pi, sondern am ESP32 (siehe Ventile-Abschnitt).

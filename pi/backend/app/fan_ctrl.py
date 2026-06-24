@@ -30,14 +30,18 @@ class FanController:
         self._init_gpio()
 
     def _init_gpio(self) -> None:
+        # Import UND Hardware-Init gekapselt: fehlt RPi.GPIO (Dev) oder darf der
+        # Service-User gpiochip nicht öffnen, läuft der Lüfter als No-Op — das
+        # Backend darf daran nie sterben.
         try:
             import RPi.GPIO as GPIO  # type: ignore
+
+            GPIO.setmode(GPIO.BCM)
+            GPIO.setwarnings(False)
+            GPIO.setup(self._pin, GPIO.OUT, initial=GPIO.LOW)
         except Exception as exc:
-            web_log(f"[FAN] RPi.GPIO nicht verfügbar ({exc}) — Lüfter-GPIO deaktiviert")
+            web_log(f"[FAN] GPIO-Init fehlgeschlagen ({exc}) — Lüfter-GPIO deaktiviert")
             return
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setwarnings(False)
-        GPIO.setup(self._pin, GPIO.OUT, initial=GPIO.LOW)
         self._gpio = GPIO
         web_log(f"[FAN] GPIO {self._pin} initialisiert (Nachlauf {self._postrun_s:.0f}s)")
 

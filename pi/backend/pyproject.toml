@@ -15,7 +15,7 @@ dependencies = [
     "python-jose[cryptography]>=3.3",
     "pyserial>=3.5",
     "pyserial-asyncio>=0.6",
-    "RPi.GPIO>=0.7; platform_machine == 'armv7l' or platform_machine == 'aarch64'",
+    "rpi-lgpio>=0.6; platform_machine == 'armv7l' or platform_machine == 'aarch64'",
 ]
 
 [project.optional-dependencies]

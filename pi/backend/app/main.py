@@ -16,7 +16,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from . import ha_discovery, modbus_rtu, modbus_tcp, storage, timeguard, ws
+from . import fan_ctrl, ha_discovery, modbus_rtu, modbus_tcp, storage, timeguard, ws
 from .api.deps import deps
 from .api.routes import router as api_router
 from .config import settings
@@ -133,6 +133,16 @@ async def _mqtt_publish_loop():
 async def _uptime_loop():
     while True:
         app_state.sys.uptime += 1
+        await asyncio.sleep(1.0)
+
+
+async def _fan_loop():
+    """Schaltet den Gehäuselüfter (GPIO 17) anhand v20.running, mit Nachlauf."""
+    while True:
+        try:
+            fan_ctrl.controller.tick()
+        except Exception as exc:
+            web_log(f"[LOOP] Fan-Tick Fehler: {exc}")
         await asyncio.sleep(1.0)
 
 
@@ -255,6 +265,7 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(_weather_loop()),
         asyncio.create_task(_mqtt_publish_loop()),
         asyncio.create_task(_uptime_loop()),
+        asyncio.create_task(_fan_loop()),
         asyncio.create_task(_pressure_log_loop()),
         asyncio.create_task(ws.broadcast_loop()),
     ]
@@ -267,6 +278,7 @@ async def lifespan(app: FastAPI):
         await asyncio.gather(*tasks, return_exceptions=True)
         await modbus_tcp.stop()
         await modbus_rtu.client.close()
+        fan_ctrl.controller.cleanup()
         bridge.stop()
 
 

@@ -678,8 +678,9 @@ function PiSettings({ pi }: { pi: { enabled: boolean; setpoint: number; p_on: nu
 // ── Lüfter ────────────────────────────────────────────────────────────────────
 function FanSettings({ fan }: { fan: import("@/lib/types").FanState }) {
   const [d, setD] = useState({
-    mode: fan.mode, postrun_s: fan.postrun_s,
-    pwm_min: fan.pwm_min, pwm_max: fan.pwm_max, src_min: fan.src_min, src_max: fan.src_max,
+    mode: fan.mode, postrun_s: fan.postrun_s, fixed_pwm: fan.fixed_pwm,
+    pwm_min: fan.pwm_min, pwm_max: fan.pwm_max,
+    heat_rise_min: fan.heat_rise_min, heat_fall_min: fan.heat_fall_min,
   });
 
   return (
@@ -687,24 +688,32 @@ function FanSettings({ fan }: { fan: import("@/lib/types").FanState }) {
       <div className="mb-3 flex items-center justify-between">
         <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-tx3">Lüfter (FU-Kühlung)</div>
         <Badge tone={fan.running ? "ok" : "muted"}>
-          {fan.running ? (fan.mode === "pwm_auto" ? `läuft · ${fan.current_pwm}%` : "läuft") : "aus"}
+          {fan.running ? `läuft · ${fan.current_pwm}%` : "aus"}
         </Badge>
       </div>
       <div className="mb-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
         <SelectEdit label="Modus" value={d.mode}
-          options={[["auto", "Auto (An/Aus)"], ["pwm_auto", "PWM-Auto (Strom)"], ["aus", "Aus"]]}
+          options={[["auto", "Fest (An/Aus)"], ["thermal", "Thermisch (Laufzeit)"], ["aus", "Aus"]]}
           onChange={(v) => setD({ ...d, mode: v as typeof d.mode })} />
         <NumberEdit label="Nachlauf (s)" value={d.postrun_s} step={10}
           onChange={(v) => setD({ ...d, postrun_s: v })} />
       </div>
-      {d.mode === "pwm_auto" && (
+      {d.mode === "auto" && (
+        <div className="mb-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+          <NumberEdit label="Drehzahl (%)" value={d.fixed_pwm} step={5} onChange={(v) => setD({ ...d, fixed_pwm: v })} />
+        </div>
+      )}
+      {d.mode === "thermal" && (
         <>
-          <div className="mb-2 text-[10px] text-tx3">Drehzahl folgt dem FU-Ausgangsstrom.</div>
+          <div className="mb-2 text-[10px] text-tx3">
+            Drehzahl steigt mit der Laufzeit (Kühlkörper-Wärme): {d.pwm_min}% bei kalt → {d.pwm_max}% bei heiß.
+            Aktuell: Wärme {Math.round((fan.heat_index ?? 0) * 100)}%.
+          </div>
           <div className="mb-3 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-            <NumberEdit label="PWM min (%)" value={d.pwm_min} step={5} onChange={(v) => setD({ ...d, pwm_min: v })} />
-            <NumberEdit label="PWM max (%)" value={d.pwm_max} step={5} onChange={(v) => setD({ ...d, pwm_max: v })} />
-            <NumberEdit label="Strom min (A)" value={d.src_min} step={0.1} onChange={(v) => setD({ ...d, src_min: v })} />
-            <NumberEdit label="Strom max (A)" value={d.src_max} step={0.1} onChange={(v) => setD({ ...d, src_max: v })} />
+            <NumberEdit label="Sockel (%)" value={d.pwm_min} step={5} onChange={(v) => setD({ ...d, pwm_min: v })} />
+            <NumberEdit label="Voll (%)" value={d.pwm_max} step={5} onChange={(v) => setD({ ...d, pwm_max: v })} />
+            <NumberEdit label="Aufheizen (min)" value={d.heat_rise_min} step={1} onChange={(v) => setD({ ...d, heat_rise_min: v })} />
+            <NumberEdit label="Auskühlen (min)" value={d.heat_fall_min} step={1} onChange={(v) => setD({ ...d, heat_fall_min: v })} />
           </div>
         </>
       )}

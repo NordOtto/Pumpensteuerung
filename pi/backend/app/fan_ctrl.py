@@ -28,7 +28,7 @@ PWM_HZ = 25000                       # Intel/Arctic-Spec
 PWM_CHIP = Path("/sys/class/pwm/pwmchip0")
 PWM_CHANNEL = 0                      # GPIO18 = PWM0 Kanal 0
 PWM_ALT_FUNC = "a5"                  # ALT5 = PWM0-Funktion auf GPIO18 (pinctrl)
-_VALID_MODES = ("auto", "pwm_auto", "aus")
+_VALID_MODES = ("auto", "thermal", "aus")
 
 
 def _clamp(v: float, lo: float, hi: float) -> float:
@@ -42,6 +42,7 @@ class FanController:
         self._pwm_path: Path | None = None  # sysfs-Kanal, wenn Hardware-PWM aktiv
         self._duty = -1              # zuletzt gesetztes Tastverhältnis (0..100), -1 = unbekannt
         self._off_at: float | None = None   # monotone Deadline für Nachlauf
+        self._last_tick = 0.0        # monotone Zeit des letzten tick() (für Heat-dt)
         # Beim Boot ist pwm0 evtl. noch nicht exportiert/berechtigt, wenn das Backend
         # startet → HW-PWM scheitert und tick() versucht es eine Weile erneut.
         self._hw_pwm_retries = 30
@@ -112,14 +113,22 @@ class FanController:
         app_state.fan.current_pwm = duty
         app_state.fan.running = duty > 0
 
-    def _pwm_for_current(self) -> int:
-        """PWM 0..100 linear aus dem FU-Strom zwischen src_min..src_max."""
+    def _update_heat(self, running: bool, dt_s: float) -> None:
+        """Thermischer Akku 0..1: steigt bei Lauf (heat_rise_min bis voll),
+        fällt bei Stillstand (heat_fall_min bis kalt). Modelliert die
+        Kühlkörper-Temperatur ohne echten Sensor."""
         f = app_state.fan
-        cur = app_state.v20.current
-        if f.src_max <= f.src_min:
-            return f.pwm_max
-        frac = _clamp((cur - f.src_min) / (f.src_max - f.src_min), 0.0, 1.0)
-        return int(round(f.pwm_min + frac * (f.pwm_max - f.pwm_min)))
+        if running:
+            rise = dt_s / max(1.0, f.heat_rise_min * 60.0)
+            f.heat_index = _clamp(f.heat_index + rise, 0.0, 1.0)
+        else:
+            fall = dt_s / max(1.0, f.heat_fall_min * 60.0)
+            f.heat_index = _clamp(f.heat_index - fall, 0.0, 1.0)
+
+    def _pwm_thermal(self) -> int:
+        """PWM 0..100 linear aus dem Heat-Index zwischen pwm_min..pwm_max."""
+        f = app_state.fan
+        return int(round(f.pwm_min + f.heat_index * (f.pwm_max - f.pwm_min)))
 
     # ── Tick (1 Hz aus main._fan_loop) ────────────────────────
     def tick(self) -> None:
@@ -133,13 +142,19 @@ class FanController:
         f = app_state.fan
         running = app_state.v20.running
         now = time.monotonic()
+        dt = now - self._last_tick if self._last_tick else 1.0
+        self._last_tick = now
+
+        # Heat-Index immer fortschreiben (auch im aus-Modus, damit thermal beim
+        # Umschalten sofort plausibel ist).
+        self._update_heat(running, dt)
 
         if f.mode == "aus":
             self._off_at = None
             self._set_pwm(0)
             return
 
-        target = 100 if f.mode == "auto" else self._pwm_for_current()
+        target = f.fixed_pwm if f.mode == "auto" else self._pwm_thermal()
 
         if running:
             self._off_at = None
@@ -166,25 +181,21 @@ class FanController:
             self._gpio.cleanup(self._pin)
 
     # ── Persistenz / Config ───────────────────────────────────
+    _CFG_KEYS = ("mode", "postrun_s", "fixed_pwm", "pwm_min", "pwm_max",
+                 "heat_rise_min", "heat_fall_min")
+
     def load(self) -> None:
         cfg = load_json(FAN_FILE)
         if cfg is None:
             return
         f = app_state.fan
-        for key in ("mode", "postrun_s", "pwm_min", "pwm_max", "src_min", "src_max"):
+        for key in self._CFG_KEYS:
             if key in cfg:
                 setattr(f, key, cfg[key])
 
     def save(self) -> None:
         f = app_state.fan
-        save_json(FAN_FILE, {
-            "mode": f.mode,
-            "postrun_s": f.postrun_s,
-            "pwm_min": f.pwm_min,
-            "pwm_max": f.pwm_max,
-            "src_min": f.src_min,
-            "src_max": f.src_max,
-        })
+        save_json(FAN_FILE, {k: getattr(f, k) for k in self._CFG_KEYS})
 
     def set_config(self, cfg: dict[str, Any]) -> None:
         f = app_state.fan
@@ -192,21 +203,21 @@ class FanController:
             f.mode = cfg["mode"]
         if "postrun_s" in cfg:
             f.postrun_s = int(_clamp(float(cfg["postrun_s"]), 0, 3600))
+        if "fixed_pwm" in cfg:
+            f.fixed_pwm = int(_clamp(float(cfg["fixed_pwm"]), 0, 100))
         if "pwm_min" in cfg:
             f.pwm_min = int(_clamp(float(cfg["pwm_min"]), 0, 100))
         if "pwm_max" in cfg:
             f.pwm_max = int(_clamp(float(cfg["pwm_max"]), 0, 100))
         if f.pwm_min > f.pwm_max:
             f.pwm_min = f.pwm_max
-        if "src_min" in cfg:
-            f.src_min = _clamp(float(cfg["src_min"]), 0.0, 200.0)
-        if "src_max" in cfg:
-            f.src_max = _clamp(float(cfg["src_max"]), 0.0, 200.0)
-        if f.src_max <= f.src_min:
-            f.src_max = f.src_min + 0.1
+        if "heat_rise_min" in cfg:
+            f.heat_rise_min = _clamp(float(cfg["heat_rise_min"]), 0.5, 120.0)
+        if "heat_fall_min" in cfg:
+            f.heat_fall_min = _clamp(float(cfg["heat_fall_min"]), 0.5, 240.0)
         web_log(
-            f"[FAN] Config: mode={f.mode} postrun={f.postrun_s}s "
-            f"pwm={f.pwm_min}-{f.pwm_max}% src={f.src_min}-{f.src_max}A"
+            f"[FAN] Config: mode={f.mode} postrun={f.postrun_s}s fixed={f.fixed_pwm}% "
+            f"thermal={f.pwm_min}-{f.pwm_max}% rise={f.heat_rise_min}min fall={f.heat_fall_min}min"
         )
         self.save()
 

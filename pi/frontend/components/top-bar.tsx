@@ -20,7 +20,7 @@ export function TopBar() {
             {status.fan && (
               <>
                 <div className="h-4 w-px bg-border" />
-                <FanIndicator running={status.fan.running} pwm={status.fan.mode === "pwm_auto" ? status.fan.current_pwm : null} />
+                <FanIndicator running={status.fan.running} pwm={status.fan.running ? status.fan.current_pwm : null} />
               </>
             )}
             {status.active_preset && (

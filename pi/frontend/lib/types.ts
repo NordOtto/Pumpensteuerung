@@ -224,14 +224,16 @@ export interface OtaStatus {
 }
 
 export interface FanState {
-  mode: "auto" | "pwm_auto" | "aus";
+  mode: "auto" | "thermal" | "aus";
   postrun_s: number;
   running: boolean;
   current_pwm: number;
+  fixed_pwm: number;
   pwm_min: number;
   pwm_max: number;
-  src_min: number;
-  src_max: number;
+  heat_rise_min: number;
+  heat_fall_min: number;
+  heat_index: number;
 }
 
 export interface AppStatus {

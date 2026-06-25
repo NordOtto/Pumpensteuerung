@@ -192,6 +192,9 @@ class FanController:
         for key in self._CFG_KEYS:
             if key in cfg:
                 setattr(f, key, cfg[key])
+        # Migration: alter Strom-Modus "pwm_auto" → "thermal"
+        if f.mode not in _VALID_MODES:
+            f.mode = "thermal"
 
     def save(self) -> None:
         f = app_state.fan

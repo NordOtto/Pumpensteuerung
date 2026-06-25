@@ -15,7 +15,7 @@ function mapBackendError(detail: string, prog?: IrrigationProgram): string {
   if (detail.includes("Automatik läuft")) return "Automatik läuft gerade — bitte erst stoppen";
   if (detail.includes("läuft bereits")) return "Programm läuft bereits";
   if (detail.includes("Sperrtag")) return "Heute ist Sperrtag";
-  if (detail.includes("Sperrzeit")) return "Aktuell Sperrzeit aktiv";
+  if (detail.includes("Sperrzeit")) return `Sperrzeit dieses Programms aktiv${prog?.name ? ` (${prog.name})` : ""}`;
   if (detail.includes("Wochenlimit")) return `Wochenlimit erreicht — max. ${prog?.max_runs_per_week ?? "?"} Starts/Woche`;
   if (detail.includes("Wind")) return "Zu windig für Bewässerung";
   if (detail.includes("Bodenfeuchte")) return "Boden ist noch feucht genug";
@@ -51,6 +51,15 @@ export default function DashboardPage() {
   const v = status.v20;
   const programs = status.irrigation.programs;
   const decision = status.irrigation.decision;
+
+  // Echter aktueller Wasserbedarf = größtes Zonen-Defizit über alle aktiven Zonen.
+  // decision.water_budget_mm ist 0, wenn das angezeigte Programm gerade gesperrt
+  // ist (Sperrzeit) — dann trotzdem den realen Bedarf zeigen, nicht 0,0.
+  const maxDeficitMm = Math.max(
+    0,
+    ...programs.flatMap((p) => p.zones.filter((z) => z.enabled).map((z) => z.deficit_mm ?? 0)),
+  );
+  const wasserbedarfMm = decision.water_budget_mm > 0 ? decision.water_budget_mm : maxDeficitMm;
 
   const selectedProg: IrrigationProgram =
     programs.find((p) => p.id === selectedProgId) ??
@@ -208,8 +217,8 @@ export default function DashboardPage() {
               <span className="min-w-0 break-words text-xs font-semibold text-tx">{nextRunLabel}</span>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Chip label="Grund" value={decision.reason || "Bereit"} />
-              <Chip label="Wasserbedarf" value={`${formatFixed(decision.water_budget_mm, 1)} mm`} />
+              <Chip label="Grund" value={decision.reason ? mapBackendError(decision.reason, selectedProg) : "Bereit"} />
+              <Chip label="Wasserbedarf" value={`${formatFixed(wasserbedarfMm, 1)} mm`} />
               <Chip label="Faktor" value={`×${formatSmart(decision.runtime_factor, 2)}`} />
               <Chip
                 label="Regen 24h"

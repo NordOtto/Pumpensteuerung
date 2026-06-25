@@ -426,10 +426,18 @@ class WeatherProvider:
         if t_min is None or t_max is None:
             return None
         t_avg = (float(t_min) + float(t_max)) / 2
+        t_range = max(0.0, float(t_max) - float(t_min))
         wind = float(wind_ms) * 3.6
         h = float(humidity) if humidity is not None else 60
         u = float(uvi) if uvi is not None else 3
-        raw = 0.11 * max(t_avg, 0) + 0.12 * u + 0.012 * wind - 0.01 * max(h - 55, 0)
+        # Hargreaves-näher: Temperatur dominiert, Tagesspanne als Einstrahlungs-Proxy
+        # (robust auch nachts, da nicht von uvi abhängig). Kalibriert auf ~4-5 mm an
+        # einem Sommertag (t_avg≈22), ~2 mm an kühlen Tagen.
+        raw = (0.17 * max(t_avg, 0)
+               + 0.10 * t_range
+               + 0.06 * u
+               + 0.010 * wind
+               - 0.010 * max(h - 55, 0))
         return round(max(0.2, min(8.0, raw)), 1)
 
     @staticmethod

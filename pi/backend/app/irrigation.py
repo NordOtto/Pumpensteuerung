@@ -37,6 +37,7 @@ _TZ = ZoneInfo(settings.tz)
 HISTORY_LIMIT = 250
 TICK_S = 30
 SCHEDULE_CATCHUP_MIN = 10   # Nachhol-Fenster für verpasste Auto-Starts (Neustart etc.)
+BALANCE_HOUR = 9            # ab dieser Stunde (lokal) die tägliche Wasserbilanz ziehen
 BASE = settings.mqtt_topic_prefix
 
 DEFAULT_THRESHOLDS = {
@@ -513,6 +514,10 @@ class IrrigationManager:
             return False
         today = _local_date_key()
         if program.get("last_balance_date") == today:
+            return False
+        # Erst ab BALANCE_HOUR ziehen: nachts beruht die ET0-Tagesschätzung auf
+        # nächtlichen Temperaturen → viel zu niedrig. Vormittags ist sie belastbar.
+        if datetime.now(_TZ).hour < BALANCE_HOUR:
             return False
         w = app_state.irrigation.weather
         et0 = w.et0_mm if w.et0_mm is not None else program["thresholds"]["et0_default_mm"]

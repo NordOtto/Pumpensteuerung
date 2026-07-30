@@ -392,7 +392,7 @@ class IrrigationManager:
             "overseeding": irr.overseeding.model_dump(),
             "sequential": irr.sequential.model_dump(),
             "zones": irr.zones,
-            "history": irr.history[-25:],
+            "history": irr.history[:25],  # Liste ist absteigend — die neuesten 25
         }
 
     def set_overseeding(self, body: Any) -> dict[str, Any]:
@@ -578,6 +578,82 @@ class IrrigationManager:
         self._save_programs()
         return True
 
+    def forecast(self, days: int = 14) -> list[dict[str, Any]]:
+        """Schaetzt je Zone, an welchem Tag das Defizit die Startschwelle erreicht.
+
+        Rechnet die taegliche Bilanz (ET0 - Regen) in die Zukunft fort und nutzt
+        dieselbe Schwelle wie evaluate_program(). Bewusst eine Schaetzung: das
+        kuenftige Wetter ist nur grob bekannt, die Regenprognose wird ueber die
+        naechsten Tage verteilt.
+        """
+        w = app_state.irrigation.weather
+        today = datetime.now(_TZ).date()
+        out: list[dict[str, Any]] = []
+
+        # Regenprognose auf Tage verteilen: 24h/48h sind kumulativ, der Rest der
+        # 7-Tage-Summe wird gleichmaessig auf Tag 3-7 gelegt.
+        fc24 = float(w.forecast_rain_24h_mm or 0)
+        fc48 = float(w.forecast_rain_48h_mm or 0)
+        fc7d = float(w.forecast_rain_7d_mm or 0)
+        rain_day2 = max(0.0, fc48 - fc24)
+        rest = max(0.0, fc7d - fc48)
+        rain_by_day = [fc24, rain_day2] + [rest / 5.0] * 5
+
+        def rain_on(day_index: int) -> float:
+            return rain_by_day[day_index] if day_index < len(rain_by_day) else 0.0
+
+        for program in app_state.irrigation.programs:
+            if not program.get("enabled") or program.get("mode") != "smart_et":
+                continue
+            et0 = w.et0_mm if w.et0_mm is not None else program["thresholds"]["et0_default_mm"]
+            seasonal = float(program.get("seasonal_factor", 1))
+            skip_rain = program["thresholds"]["skip_rain_mm"]
+
+            for zone in program["zones"]:
+                if not zone.get("enabled"):
+                    continue
+                slider = _clamp(float(zone.get("frequency_pref", 0.5)), 0.0, 1.0)
+                threshold = float(zone.get("min_deficit_mm", 0)) * (
+                    FREQ_SLIDER_MIN + FREQ_SLIDER_SPAN * slider)
+                deficit = float(zone.get("deficit_mm", 0))
+                # Die Bilanz fuer heute laeuft erst nach Mitternacht. Bereits
+                # gefallener Regen steckt also noch nicht im Defizit — ohne diesen
+                # Vorgriff waere die Prognose direkt nach einem Regen zu optimistisch.
+                if program.get("last_balance_date") == _local_date_key():
+                    deficit = _clamp(deficit + et0 * seasonal - float(w.rain_24h_mm or 0), 0, 200)
+
+                eta_date: str | None = None
+                eta_days: int | None = None
+                for i in range(days):
+                    # Bilanz der Folgetage: Verdunstung minus erwarteter Regen.
+                    if i > 0:
+                        deficit = _clamp(deficit + et0 * seasonal - rain_on(i - 1), 0, 200)
+                    day = today + timedelta(days=i)
+                    if (program.get("blocked_days") or [False] * 7)[day.weekday()]:
+                        continue
+                    # Starker Regen an dem Tag verhindert den Start
+                    if rain_on(i) >= skip_rain:
+                        continue
+                    credit = 0.5 * (rain_on(i) + rain_on(i + 1))
+                    if deficit - credit >= threshold:
+                        eta_date = day.isoformat()
+                        eta_days = i
+                        break
+
+                out.append({
+                    "program_id": program["id"],
+                    "program_name": program["name"],
+                    "zone_id": zone["id"],
+                    "zone_name": zone.get("name") or zone["id"],
+                    "deficit_mm": round(float(zone.get("deficit_mm", 0)), 1),
+                    "threshold_mm": round(threshold, 1),
+                    "eta_date": eta_date,
+                    "eta_days": eta_days,
+                    "start_hour": program["start_hour"],
+                    "start_min": program["start_min"],
+                })
+        return out
+
     @staticmethod
     def _smart_zone_runtime(zone: dict[str, Any], rain_credit_mm: float = 0.0) -> dict[str, float]:
         deficit = max(0.0, float(zone.get("deficit_mm", 0)) - max(0.0, rain_credit_mm))
@@ -713,6 +789,10 @@ class IrrigationManager:
         return None
 
     def recompute_decision(self, program_id: str = "") -> None:
+        try:
+            app_state.irrigation.forecast = self.forecast()
+        except Exception as exc:  # Prognose ist Beiwerk — darf die Regelung nie stoeren
+            print(f"[IRR] forecast error: {exc}", flush=True)
         programs = app_state.irrigation.programs
         if program_id:
             program = next((p for p in programs if p["id"] == program_id), None)

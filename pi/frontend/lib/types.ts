@@ -265,6 +265,7 @@ export interface AppStatus {
     sequential: SequentialIrrigationState;
     zones: Record<string, { state?: string; ends_at?: string | null }>;
     history: Array<Record<string, unknown>>;
+    forecast?: IrrigationForecast[];
   };
   sys: SysState;
   valves: Record<string, { state: string; updated_at: string; online: boolean }>;
@@ -290,4 +291,18 @@ export interface AssistantIntent {
   enabled?: boolean;
   duration_min?: number | null;
   zone_ids?: string[] | null;
+}
+
+/** Schätzung je Zone, wann die Startschwelle erreicht wird. */
+export interface IrrigationForecast {
+  program_id: string;
+  program_name: string;
+  zone_id: string;
+  zone_name: string;
+  deficit_mm: number;
+  threshold_mm: number;
+  eta_date: string | null;
+  eta_days: number | null;
+  start_hour: number;
+  start_min: number;
 }

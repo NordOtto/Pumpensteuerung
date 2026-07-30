@@ -267,6 +267,12 @@ async def assistant_apply(body: dict):
     return assistant.apply(body or {}, deps.irrigation)
 
 
+@router.get("/irrigation/forecast")
+async def irrigation_forecast():
+    """Schaetzung je Zone, wann das Defizit die Startschwelle erreicht."""
+    return {"forecast": deps.irrigation.forecast()}
+
+
 @router.get("/irrigation/sequential")
 async def irrigation_sequential_get():
     return deps.irrigation.get_sequential()

@@ -7,7 +7,7 @@ import { useStatus } from "@/lib/ws";
 import { api } from "@/lib/api";
 import { cn, formatFixed, formatSmart } from "@/lib/utils";
 import { DurationPicker } from "@/components/duration-picker";
-import type { IrrigationProgram } from "@/lib/types";
+import type { IrrigationForecast, IrrigationProgram } from "@/lib/types";
 
 const QUICK_MINUTES = [10, 20, 30, 45, 60];
 const DETAIL_KEY = "pumpe.dashboard.details";
@@ -68,6 +68,7 @@ export default function DashboardPage() {
   const programs = status.irrigation.programs;
   const decision = status.irrigation.decision;
   const w = status.irrigation.weather;
+  const forecast = status.irrigation.forecast ?? [];
 
   const maxDeficitMm = Math.max(
     0,
@@ -94,11 +95,19 @@ export default function DashboardPage() {
   const progressPct = totalPlannedS > 0 ? Math.min(100, Math.max(0, (elapsedS / totalPlannedS) * 100)) : 0;
 
   // Ein Satz, der alles Wichtige sagt — ersetzt die Chip-Wand.
+  // Bei Smart-ET zaehlt der frueheste Bedarf aus der Prognose, nicht die
+  // kalendarische Startzeit: das Programm laeuft taeglich, giesst aber nur,
+  // wenn das Defizit reicht.
+  const soonest = forecast
+    .filter((f) => f.eta_days !== null)
+    .sort((a, b) => (a.eta_days ?? 99) - (b.eta_days ?? 99))[0];
   const statusLine = decision.running
     ? `${decision.active_program_name || "Bewässerung"} läuft — noch ${formatDurationCompact(liveRemainingS)}`
-    : nextStartShort
-      ? `Nächste Bewässerung ${nextStartShort}`
-      : "Keine Bewässerung geplant";
+    : soonest
+      ? `Nächste Bewässerung ${etaShort(soonest)}`
+      : nextStartShort
+        ? `Nächste Prüfung ${nextStartShort}`
+        : "Keine Bewässerung geplant";
   const statusHint = decision.running
     ? decision.active_zone_name ? `Zone ${decision.active_zone_name}` : ""
     : mapBackendError(decision.reason || "", selectedProg);
@@ -145,6 +154,37 @@ export default function DashboardPage() {
           {decision.running && (
             <div className="mt-3 h-2 overflow-hidden rounded-full bg-bg3">
               <div className="h-full rounded-full bg-ok transition-all" style={{ width: `${progressPct}%` }} />
+            </div>
+          )}
+
+          {/* Wann kommt das nächste Mal Wasser? Nur wenn gerade nichts läuft. */}
+          {!decision.running && forecast.length > 0 && (
+            <div className="mt-4 flex flex-col gap-2.5">
+              {forecast.map((f) => {
+                const pct = f.threshold_mm > 0
+                  ? Math.min(100, Math.max(0, (f.deficit_mm / f.threshold_mm) * 100))
+                  : 0;
+                return (
+                  <div key={`${f.program_id}-${f.zone_id}`}>
+                    <div className="mb-1 flex items-baseline justify-between gap-2">
+                      <span className="truncate text-[12px] font-semibold text-tx">{f.zone_name}</span>
+                      <span className="num shrink-0 text-[11px] text-tx3">
+                        {f.deficit_mm.toFixed(1)} / {f.threshold_mm.toFixed(1)} mm
+                      </span>
+                    </div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-bg3">
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{
+                          width: `${pct}%`,
+                          background: pct >= 100 ? "var(--color-green)" : "var(--color-blue)",
+                        }}
+                      />
+                    </div>
+                    <div className="mt-1 text-[11px] text-tx3">{etaLabel(f)}</div>
+                  </div>
+                );
+              })}
             </div>
           )}
 
@@ -371,6 +411,27 @@ function Chip({ label, value, valueClass }: { label: string; value: string; valu
       <span className={cn("break-words text-[13px] font-semibold text-tx", valueClass)}>{value}</span>
     </div>
   );
+}
+
+/** Kurzform für den Status-Satz: "morgen", "Mo, 04.08." */
+function etaShort(f: IrrigationForecast): string {
+  if (f.eta_days === 0) return "heute";
+  if (f.eta_days === 1) return "morgen";
+  const d = new Date((f.eta_date ?? "") + "T00:00:00");
+  return d.toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit" });
+}
+
+/** "voraussichtlich Mo, 04.08. um 06:00" — oder ein ehrliches "noch nicht absehbar". */
+function etaLabel(f: IrrigationForecast): string {
+  if (f.eta_date === null || f.eta_days === null) {
+    return "in den nächsten 2 Wochen kein Bedarf absehbar";
+  }
+  const uhr = `${String(f.start_hour).padStart(2, "0")}:${String(f.start_min).padStart(2, "0")}`;
+  if (f.eta_days === 0) return `heute um ${uhr} — Bedarf erreicht`;
+  if (f.eta_days === 1) return `voraussichtlich morgen um ${uhr}`;
+  const d = new Date(f.eta_date + "T00:00:00");
+  const datum = d.toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit" });
+  return `voraussichtlich ${datum} um ${uhr} (in ${f.eta_days} Tagen)`;
 }
 
 function formatDurationCompact(totalSeconds: number) {

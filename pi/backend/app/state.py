@@ -176,6 +176,8 @@ class IrrigationState(BaseModel):
     sequential: SequentialIrrigationState = Field(default_factory=SequentialIrrigationState)
     zones: dict = Field(default_factory=dict)
     history: list[dict] = Field(default_factory=list)
+    # Schaetzung je Zone, wann die Startschwelle erreicht wird (irrigation.forecast())
+    forecast: list[dict] = Field(default_factory=list)
 
 
 class OtaState(BaseModel):

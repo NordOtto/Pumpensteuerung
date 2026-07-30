@@ -22,6 +22,7 @@ function mapBackendError(detail: string, prog?: IrrigationProgram): string {
   if (detail.includes("Bodenfeuchte")) return "Boden ist noch feucht genug";
   if (detail.includes("Regen kommt heute")) return "Regen heute vorhergesagt — Bewässerung wartet";
   if (detail.includes("Regen kompensiert")) return "Vorhergesagter Regen deckt das Defizit";
+  if (detail.includes("Boden noch feucht")) return "Boden ist noch feucht genug — Bedarf noch nicht erreicht";
   if (detail.includes("Regen deckt")) return "Regen deckt den Wasserbedarf";
   if (detail.includes("Regenprognose")) return "Regen vorhergesagt — Bewässerung übersprungen";
   if (detail.includes("Defizit")) return "Kein Wasserbedarf — Defizit zu klein";

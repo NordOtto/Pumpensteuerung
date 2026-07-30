@@ -598,7 +598,7 @@ class IrrigationManager:
         if prev_seen is None:
             baseline = counter                      # erster Lauf: nichts nachbuchen
         elif resets_at_midnight and program.get("last_balance_date") != today:
-            baseline = 0.0                          # Zaehler startet mittags neu bei 0
+            baseline = 0.0                          # neuer Tag: Zaehler beginnt bei 0
         elif counter < float(prev_seen):
             baseline = counter                      # Ruecksetzer/Fenster laeuft ab
         else:
@@ -800,8 +800,15 @@ class IrrigationManager:
                         due.append(z)
                 budget = max((float(z.get("deficit_mm", 0)) - rain_credit for z in due), default=0.0)
                 if not due:
-                    return {"allowed": False, "reason": "Regen kompensiert Defizit",
-                            "runtime_factor": 0, "water_budget_mm": max(budget, 0.0)}
+                    # Ehrlich unterscheiden: liegt es wirklich am Regen, oder ist
+                    # das Defizit schlicht noch nicht hoch genug? Frueher stand
+                    # immer "Regen kompensiert Defizit" — auch bei 0 mm Regen.
+                    best = max((float(z.get("deficit_mm", 0)) for z in program["zones"]
+                                if z.get("enabled")), default=0.0)
+                    reason = ("Regen kompensiert Defizit" if rain_credit >= 1.0
+                              else "Boden noch feucht genug")
+                    return {"allowed": False, "reason": reason,
+                            "runtime_factor": 0, "water_budget_mm": max(best, 0.0)}
                 runtimes = {}
                 max_factor = 0.0
                 for z in due:

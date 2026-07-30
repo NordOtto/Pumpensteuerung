@@ -159,19 +159,24 @@ export async function speechDiagnose(): Promise<string> {
  * Nimmt einen gesprochenen Satz auf und liefert ihn als Text.
  * Gibt null zurueck, wenn nichts erkannt wurde oder der Nutzer abbricht.
  */
-export async function listenOnce(): Promise<string | null> {
+export async function listenOnce(onStep: (s: string) => void = () => {}): Promise<string | null> {
   const native = await withTimeout(loadNative(), 30000, "Plugin-Suche");
+  onStep(native ? "Schritt 2: Plugin da, prüfe Freigabe…" : "Schritt 2: KEIN natives Plugin");
 
   if (native) {
     // Fehler hier NICHT schlucken — sonst sieht ein abgelehntes oder gar nicht
     // erschienenes Berechtigungsfenster wie "nichts verstanden" aus.
-    const perm = await withTimeout(native.checkPermissions(), 5000, "Freigabe prüfen");
+    const perm = await withTimeout(native.checkPermissions(), 8000, "Freigabe prüfen");
+    onStep(`Schritt 3: Freigabe ist "${perm.speechRecognition}"`);
     if (perm.speechRecognition !== "granted") {
+      onStep("Schritt 4: frage Android nach Mikrofon-Freigabe…");
       const asked = await withTimeout(native.requestPermissions(), 60000, "Freigabe anfragen");
+      onStep(`Schritt 5: Antwort "${asked.speechRecognition}"`);
       if (asked.speechRecognition !== "granted") {
         throw new Error(`Mikrofon-Freigabe verweigert (${asked.speechRecognition})`);
       }
     }
+    onStep("Schritt 6: Aufnahme startet — jetzt sprechen");
     const res = await withTimeout(
       native.start({ language: "de-DE", maxResults: 1, partialResults: false, popup: false }),
       60000,

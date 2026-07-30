@@ -10,7 +10,7 @@ import type { AssistantIntent } from "@/lib/types";
 type Msg = { role: "user" | "bot"; text: string; intent?: AssistantIntent };
 
 /** Beim Deploy hochzählen — macht am Gerät sichtbar, welcher Stand geladen ist. */
-const BUILD_TAG = "v6";
+const BUILD_TAG = "v7";
 
 const BEISPIELE = [
   "Garten 20 Minuten bewässern",
@@ -93,8 +93,18 @@ export function AssistantFab() {
   const listen = async () => {
     if (listening || busy) return;
     setListening(true);
+    // Jeden Schritt sofort sichtbar machen. Bleibt etwas stehen, zeigt die
+    // letzte Zeile genau, wo — statt dass gar nichts erscheint.
+    push({ role: "bot", text: `[${BUILD_TAG}] Schritt 1: Plugin wird gesucht…` });
     try {
-      const said = await listenOnce();
+      // Harte Gesamtgrenze: selbst wenn innen etwas ohne Zeitlimit haengt,
+      // bekommt der Nutzer nach 90s eine Antwort statt ewigem "Ich höre zu…".
+      const said = await Promise.race([
+        listenOnce((s) => push({ role: "bot", text: `[${BUILD_TAG}] ${s}` })),
+        new Promise<never>((_, rej) =>
+          setTimeout(() => rej(new Error("Gesamtablauf: keine Antwort nach 90s")), 90000),
+        ),
+      ]);
       if (said) {
         await ask(said);
       } else {

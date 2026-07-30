@@ -36,17 +36,32 @@ function webCtor(): (new () => SpeechRec) | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
-function isNativeApp(): boolean {
-  if (typeof window === "undefined") return false;
-  const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
-  return Boolean(cap?.isNativePlatform?.());
+interface CapacitorGlobal {
+  isNativePlatform?: () => boolean;
+  isPluginAvailable?: (name: string) => boolean;
+}
+
+function capacitor(): CapacitorGlobal | undefined {
+  if (typeof window === "undefined") return undefined;
+  return (window as unknown as { Capacitor?: CapacitorGlobal }).Capacitor;
+}
+
+/**
+ * Ist das native Plugin wirklich da? isPluginAvailable() fragt die Bridge und
+ * ist die verlaessliche Pruefung — faellt der Plugin-Proxy auf seine
+ * Web-Implementierung zurueck, wirft available() naemlich nur "unimplemented".
+ */
+function hasNativePlugin(): boolean {
+  const cap = capacitor();
+  if (!cap?.isNativePlatform?.()) return false;
+  return cap.isPluginAvailable?.("SpeechRecognition") ?? true;
 }
 
 let nativeCache: NativePlugin | null | undefined;
 
 async function loadNative(): Promise<NativePlugin | null> {
   if (nativeCache !== undefined) return nativeCache;
-  if (!isNativeApp()) {
+  if (!hasNativePlugin()) {
     nativeCache = null;
     return null;
   }
@@ -65,6 +80,44 @@ async function loadNative(): Promise<NativePlugin | null> {
 export async function speechAvailable(): Promise<boolean> {
   if (await loadNative()) return true;
   return webCtor() !== null;
+}
+
+/**
+ * Klartext-Bericht, warum Diktieren geht oder nicht — im Assistenten ueber
+ * "diagnose" abrufbar. Die App hat keine Adresszeile, ueber die man eine
+ * Debug-Seite aufrufen koennte.
+ */
+export async function speechDiagnose(): Promise<string> {
+  const cap = capacitor();
+  const out: string[] = [];
+  out.push(`App-Modus: ${cap?.isNativePlatform?.() ? "Android-App" : "Browser"}`);
+  out.push(`Capacitor-Bridge: ${cap ? "vorhanden" : "fehlt"}`);
+  if (cap) {
+    const known = cap.isPluginAvailable?.("SpeechRecognition");
+    out.push(`Plugin registriert: ${known === undefined ? "unbekannt" : known ? "ja" : "nein"}`);
+  }
+  out.push(`Browser-Spracherkennung: ${webCtor() ? "vorhanden" : "fehlt"}`);
+
+  if (cap?.isNativePlatform?.()) {
+    try {
+      const mod = await import("@capacitor-community/speech-recognition");
+      const res = await mod.SpeechRecognition.available();
+      out.push(`Geräte-Spracherkennung: ${res.available ? "verfügbar" : "nicht verfügbar"}`);
+      try {
+        const p = await mod.SpeechRecognition.checkPermissions();
+        out.push(`Mikrofon-Freigabe: ${p.speechRecognition}`);
+      } catch {
+        out.push("Mikrofon-Freigabe: nicht abfragbar");
+      }
+    } catch (e) {
+      out.push(`Plugin-Fehler: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  const ok = await speechAvailable();
+  out.push("");
+  out.push(ok ? "→ Diktieren sollte funktionieren." : "→ Diktieren ist hier nicht möglich.");
+  return out.join("\n");
 }
 
 /**

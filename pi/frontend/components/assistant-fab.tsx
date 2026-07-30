@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Sparkles, Send, X, Mic } from "lucide-react";
 import { api } from "@/lib/api";
-import { listenOnce, speechAvailable } from "@/lib/speech";
+import { listenOnce, speechAvailable, speechDiagnose } from "@/lib/speech";
 import { cn } from "@/lib/utils";
 import type { AssistantIntent } from "@/lib/types";
 
@@ -43,6 +43,11 @@ export function AssistantFab() {
     push({ role: "user", text: q });
     setBusy(true);
     try {
+      // Lokaler Servicebefehl — die App hat keine Adresszeile für eine Debug-Seite.
+      if (/^\s*(diagnose|mikro(fon)?|sprache)\s*$/i.test(q)) {
+        push({ role: "bot", text: await speechDiagnose() });
+        return;
+      }
       const intent = await api.assistantAsk(q);
       if (intent.confirm && intent.preview) {
         push({ role: "bot", text: intent.preview, intent });

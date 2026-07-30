@@ -3,11 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { Sparkles, Send, X, Mic } from "lucide-react";
 import { api } from "@/lib/api";
-import { listenOnce, speechAvailable, speechDiagnose } from "@/lib/speech";
+import { listenOnce, speechDiagnose } from "@/lib/speech";
 import { cn } from "@/lib/utils";
 import type { AssistantIntent } from "@/lib/types";
 
 type Msg = { role: "user" | "bot"; text: string; intent?: AssistantIntent };
+
+/** Beim Deploy hochzählen — macht am Gerät sichtbar, welcher Stand geladen ist. */
+const BUILD_TAG = "v3";
 
 const BEISPIELE = [
   "Garten 20 Minuten bewässern",
@@ -80,21 +83,25 @@ export function AssistantFab() {
     push({ role: "bot", text: "Abgebrochen." });
   };
 
-  // Mikrofon nur zeigen, wenn Diktieren hier wirklich geht (native App oder
-  // Safari/Chrome). Sonst bliebe ein toter Knopf zurück.
-  const [speechSupported, setSpeechSupported] = useState(false);
-  useEffect(() => {
-    void speechAvailable().then(setSpeechSupported);
-  }, []);
-
+  // Mikrofon immer anzeigen. Früher wurde es bei fehlender Erkennung versteckt —
+  // dann ist aber nicht unterscheidbar, ob die Funktion fehlt oder die App
+  // schlicht alten Code geladen hat. Ein Knopf, der seinen Grund nennt, ist
+  // ehrlicher als gar kein Knopf.
   const listen = async () => {
     if (listening || busy) return;
     setListening(true);
     try {
       const said = await listenOnce();
-      if (said) await ask(said);
-    } catch {
-      push({ role: "bot", text: "Spracheingabe hat nicht geklappt — bitte tippen." });
+      if (said) {
+        await ask(said);
+      } else {
+        push({ role: "bot", text: `Nichts verstanden.\n\n${await speechDiagnose()}` });
+      }
+    } catch (e) {
+      push({
+        role: "bot",
+        text: `Spracheingabe fehlgeschlagen: ${e instanceof Error ? e.message : String(e)}\n\n${await speechDiagnose()}`,
+      });
     } finally {
       setListening(false);
     }
@@ -133,7 +140,8 @@ export function AssistantFab() {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="text-[13px] font-bold text-tx">Assistent</div>
-                <div className="text-[10px] text-tx3">Sag oder schreib, was passieren soll</div>
+                {/* Bau-Kennung: zeigt sofort, ob die App wirklich neuen Code geladen hat */}
+                <div className="text-[10px] text-tx3">Sag oder schreib, was passieren soll · {BUILD_TAG}</div>
               </div>
               <button
                 onClick={() => setOpen(false)}
@@ -214,22 +222,20 @@ export function AssistantFab() {
                 placeholder="Was soll ich tun?"
                 className="h-11 flex-1 rounded-tile border border-border bg-bg2 px-3 text-[14px] text-tx outline-none ring-purple/20 placeholder:text-tx3 focus:ring-2"
               />
-              {speechSupported && (
-                <button
-                  onClick={() => void listen()}
-                  disabled={busy}
-                  aria-label={listening ? "Höre zu…" : "Diktieren"}
-                  className={cn(
-                    "flex h-11 w-11 shrink-0 items-center justify-center rounded-tile border transition",
-                    listening
-                      ? "animate-pulse border-[var(--color-purple)]/40 bg-[var(--color-purple-dim)] text-purple"
-                      : "border-border bg-bg2 text-tx3",
-                    "disabled:opacity-40",
-                  )}
-                >
-                  <Mic className="h-4 w-4" />
-                </button>
-              )}
+              <button
+                onClick={() => void listen()}
+                disabled={busy}
+                aria-label={listening ? "Höre zu…" : "Diktieren"}
+                className={cn(
+                  "flex h-11 w-11 shrink-0 items-center justify-center rounded-tile border transition",
+                  listening
+                    ? "animate-pulse border-[var(--color-purple)]/40 bg-[var(--color-purple-dim)] text-purple"
+                    : "border-border bg-bg2 text-tx3",
+                  "disabled:opacity-40",
+                )}
+              >
+                <Mic className="h-4 w-4" />
+              </button>
               <button
                 onClick={() => void ask(input)}
                 disabled={!input.trim() || busy}

@@ -7,7 +7,7 @@ import { useStatus } from "@/lib/ws";
 import { useTheme } from "@/components/theme-provider";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import type { IrrigationProgram, IrrigationZone, OtaStatus, OverseedingState, Preset } from "@/lib/types";
+import type { IrrigationProgram, IrrigationZone, OtaStatus, OverseedingState, Preset, SequentialIrrigationState } from "@/lib/types";
 
 const DAY_NAMES = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 const SECTIONS = [
@@ -47,7 +47,7 @@ export default function SettingsPage() {
         ))}
       </div>
 
-      {active === "programs"  && <ProgramsSettings programs={status.irrigation.programs} presets={presetData?.presets ?? []} overseeding={status.irrigation.overseeding} />}
+      {active === "programs"  && <ProgramsSettings programs={status.irrigation.programs} presets={presetData?.presets ?? []} overseeding={status.irrigation.overseeding} sequential={status.irrigation.sequential} />}
       {active === "presets"   && <PresetsSettings active={status.active_preset} data={presetData} onReload={loadPresets} />}
       {active === "pi"        && <PiSettings pi={status.pi} />}
       {active === "fan"       && <FanSettings fan={status.fan} />}
@@ -115,7 +115,7 @@ function clonePrograms(programs: IrrigationProgram[]) {
   })) as IrrigationProgram[];
 }
 
-function ProgramsSettings({ programs, presets, overseeding }: { programs: IrrigationProgram[]; presets: Preset[]; overseeding: OverseedingState }) {
+function ProgramsSettings({ programs, presets, overseeding, sequential }: { programs: IrrigationProgram[]; presets: Preset[]; overseeding: OverseedingState; sequential: SequentialIrrigationState }) {
   const [openIdx, setOpenIdx] = useState(-1);
   const [draft, setDraft] = useState<IrrigationProgram[]>(() => clonePrograms(programs));
   const [dirty, setDirty] = useState(false);
@@ -192,6 +192,8 @@ function ProgramsSettings({ programs, presets, overseeding }: { programs: Irriga
 
   return (
     <div className="flex flex-col gap-2">
+      <SequentialSettings sequential={sequential} />
+
       <div className="rounded-card border border-border bg-bg1 p-4">
         <button
           type="button"
@@ -1093,6 +1095,70 @@ function SelectEdit({ label, value, options, onChange }: { label: string; value:
         {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
       </select>
     </label>
+  );
+}
+
+function SequentialSettings({ sequential }: { sequential: SequentialIrrigationState }) {
+  const [enabled, setEnabled] = useState(sequential.enabled);
+  const [hour, setHour] = useState(sequential.start_hour);
+  const [minute, setMinute] = useState(sequential.start_min);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    setEnabled(sequential.enabled);
+    setHour(sequential.start_hour);
+    setMinute(sequential.start_min);
+  }, [sequential]);
+
+  const save = async (patch: Partial<{ enabled: boolean; start_hour: number; start_min: number }>) => {
+    setSaving(true);
+    setMessage("");
+    try {
+      const next = await api.setSequential({ enabled, start_hour: hour, start_min: minute, ...patch });
+      setEnabled(next.enabled);
+      setHour(next.start_hour);
+      setMinute(next.start_min);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Konnte nicht gespeichert werden.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="rounded-card border border-border bg-bg1 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <div className="text-[10px] font-bold uppercase tracking-[0.1em] text-tx3">Sequenziell bewässern</div>
+          <div className="mt-0.5 text-[11px] text-tx3">
+            Alle fälligen Programme starten direkt hintereinander ab einer gemeinsamen Startzeit,
+            statt einzeln zu ihrer eigenen Uhrzeit.
+          </div>
+        </div>
+        <button
+          type="button"
+          disabled={saving}
+          onClick={() => { const next = !enabled; setEnabled(next); save({ enabled: next }); }}
+          className={cn(
+            "rounded-tile border px-3 py-1.5 text-xs font-bold disabled:opacity-40",
+            enabled ? "border-[var(--color-green)]/35 bg-[var(--color-green-dim)] text-ok" : "border-border bg-bg2 text-tx2"
+          )}
+        >
+          {enabled ? "Aktiv" : "Aus"}
+        </button>
+      </div>
+
+      {enabled && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <TimeEdit label="Start ab" hour={hour} minute={minute} onChange={(h, m) => { setHour(h); setMinute(m); save({ start_hour: h, start_min: m }); }} />
+          {sequential.active_program_id && sequential.active_date && (
+            <span className="text-[11px] text-tx3">Heute zuletzt gestartet: {sequential.active_program_id}</span>
+          )}
+        </div>
+      )}
+      {message && <div className="mt-2 text-[11px] text-warn">{message}</div>}
+    </div>
   );
 }
 

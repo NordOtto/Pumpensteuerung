@@ -111,6 +111,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  setSequential: (payload: Record<string, unknown>) =>
+    request<import("./types").SequentialIrrigationState>("/api/irrigation/sequential", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 
   // ── OTA ─────────────────────────────────────────────────
   otaStatus: () => request<OtaStatus>("/api/ota/status"),

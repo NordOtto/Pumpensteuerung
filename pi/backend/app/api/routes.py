@@ -254,6 +254,16 @@ async def irrigation_overseeding_set(body: dict):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+@router.get("/irrigation/sequential")
+async def irrigation_sequential_get():
+    return deps.irrigation.get_sequential()
+
+
+@router.post("/irrigation/sequential")
+async def irrigation_sequential_set(body: dict):
+    return deps.irrigation.set_sequential(body or {})
+
+
 # ── /history ──────────────────────────────────────────────────
 @router.get("/history/pressure")
 async def history_pressure(seconds: int = 3600, max_points: int = 360):

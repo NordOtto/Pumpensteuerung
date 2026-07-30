@@ -160,11 +160,20 @@ class OverseedingState(BaseModel):
     last_message: str = ""
 
 
+class SequentialIrrigationState(BaseModel):
+    enabled: bool = False
+    start_hour: int = 6
+    start_min: int = 0
+    active_program_id: str = ""
+    active_date: str = ""
+
+
 class IrrigationState(BaseModel):
     programs: list[dict] = Field(default_factory=list)
     weather: WeatherState = Field(default_factory=WeatherState)
     decision: IrrigationDecision = Field(default_factory=IrrigationDecision)
     overseeding: OverseedingState = Field(default_factory=OverseedingState)
+    sequential: SequentialIrrigationState = Field(default_factory=SequentialIrrigationState)
     zones: dict = Field(default_factory=dict)
     history: list[dict] = Field(default_factory=list)
 

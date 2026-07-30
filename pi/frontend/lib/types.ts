@@ -185,6 +185,14 @@ export interface OverseedingState {
   last_message: string;
 }
 
+export interface SequentialIrrigationState {
+  enabled: boolean;
+  start_hour: number;
+  start_min: number;
+  active_program_id: string;
+  active_date: string;
+}
+
 export interface SysState {
   uptime: number;
   mqtt: boolean;
@@ -254,6 +262,7 @@ export interface AppStatus {
     weather: WeatherState;
     decision: IrrigationDecision;
     overseeding: OverseedingState;
+    sequential: SequentialIrrigationState;
     zones: Record<string, { state?: string; ends_at?: string | null }>;
     history: Array<Record<string, unknown>>;
   };

@@ -1010,6 +1010,8 @@ class IrrigationManager:
             "runtime_factor": self._active.runtime_factor,
             "runtime_s": self._active.total_runtime_s,
             "water_budget_mm": round((self._active.water_budget_mm or 0) * 10) / 10,
+            # auto | manual | nachsaat — landet im payload-JSON der History
+            "started_by": self._active.started_by or "auto",
         })
         web_log(f"[IRR] Programm {program['name']} beendet: {result}{f' ({reason})' if reason else ''}")
         self._active = None
@@ -1043,6 +1045,7 @@ class IrrigationManager:
                 "program_name": (program or {}).get("name", program_id),
                 "reason": ev["reason"],
                 "water_budget_mm": ev.get("water_budget_mm", 0),
+                "started_by": started_by or ("manual" if manual else "auto"),
             })
             self.recompute_decision(program_id)
             self.publish_decision()

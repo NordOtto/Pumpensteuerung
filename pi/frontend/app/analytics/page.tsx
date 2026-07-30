@@ -15,6 +15,13 @@ const RANGES: Range[] = [
   { label: "7 T",  seconds: 604800 },
 ];
 
+/** Wer hat den Lauf ausgelöst? (started_by aus der History) */
+const SOURCE: Record<string, { label: string; color: string }> = {
+  auto:     { label: "Automatik", color: "var(--color-green)" },
+  manual:   { label: "Manuell",   color: "var(--color-amber)" },
+  nachsaat: { label: "Nachsaat",  color: "var(--color-purple)" },
+};
+
 export default function AnalyticsPage() {
   const { status } = useStatus();
   const [range, setRange] = useState<Range>(RANGES[0]);
@@ -99,11 +106,12 @@ export default function AnalyticsPage() {
           <div className="flex flex-col gap-0">
             {history.slice(0, 30).map((h, i) => {
               const reason = String(h.reason ?? h.result ?? "");
-              const accentColor = reason === "Regen-Skip" || reason === "Regen Skip"
+              const isSkip = h.type === "skip";
+              const src = SOURCE[String(h.started_by ?? "")] ?? null;
+              // Übersprungen = blau, sonst nach Auslöser einfärben
+              const accentColor = isSkip
                 ? "var(--color-blue)"
-                : reason === "Manuell"
-                  ? "var(--color-amber)"
-                  : "var(--color-green)";
+                : src?.color ?? "var(--color-green)";
               return (
                 <div key={i} className={cn(
                   "flex items-center gap-3 py-2",
@@ -111,7 +119,24 @@ export default function AnalyticsPage() {
                 )}>
                   <div className="h-8 w-0.5 shrink-0 rounded-full" style={{ background: accentColor }} />
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-xs font-semibold text-tx">{String(h.program_name ?? h.program_id ?? "-")}</div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="truncate text-xs font-semibold text-tx">
+                        {String(h.program_name ?? h.program_id ?? "-")}
+                      </span>
+                      {src && (
+                        <span
+                          className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide"
+                          style={{ background: `${src.color}1a`, color: src.color }}
+                        >
+                          {src.label}
+                        </span>
+                      )}
+                      {isSkip && (
+                        <span className="shrink-0 text-[9px] font-bold uppercase tracking-wide text-tx3">
+                          übersprungen
+                        </span>
+                      )}
+                    </div>
                     <div className="text-[10px] text-tx3">{reason}</div>
                   </div>
                   <span className="num shrink-0 text-xs text-tx2">

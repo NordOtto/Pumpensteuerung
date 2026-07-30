@@ -53,6 +53,28 @@ ssh pi@pumpe.local "
 
 Erwartete Ausgabe: `active`
 
+### Danach immer prüfen: liefert der Pi den Service Worker?
+
+```bash
+curl -sk -o /dev/null -w "%{http_code}\n" https://pumpe.local/sw.js   # muss 200 sein
+```
+
+**404 heißt: `public/` wurde nicht mitdeployt.** Der Service Worker liegt in
+`public/`, und `npm run build` kopiert dieses Verzeichnis **nicht** in
+`.next/standalone`. Fehlt es, behalten installierte Apps ihren alten
+Service Worker — sie laden dann zwar die neue HTML-Seite, aber weiter die
+**alten JS-Chunks** aus dessen Precache. Symptom: Änderungen erscheinen auf
+dem Handy nicht, obwohl der Pi sie korrekt ausliefert.
+
+Gegenprobe, ob der ausgelieferte SW zum aktuellen Build passt:
+
+```bash
+curl -sk https://pumpe.local/sw.js | grep -o 'layout-[a-f0-9]*\.js' | sort -u
+curl -sk https://pumpe.local/dashboard | grep -o 'layout-[a-f0-9]*\.js' | sort -u
+```
+
+Beide Hashes müssen identisch sein.
+
 ### Verifikation
 
 ```powershell

@@ -344,8 +344,12 @@ class IrrigationManager:
 
     def _add_history(self, entry: dict[str, Any]) -> None:
         entry = {"at": _now_iso(), **entry}
-        app_state.irrigation.history.append(entry)
-        app_state.irrigation.history = app_state.irrigation.history[-HISTORY_LIMIT:]
+        # Vorne einfügen: list_irrigation_events() liefert absteigend (neueste
+        # zuerst). Frueher wurde hinten angehaengt — neue Laeufe landeten damit
+        # am Listenende und waren in der Oberflaeche (zeigt die ersten 30) nicht
+        # zu sehen.
+        app_state.irrigation.history.insert(0, entry)
+        del app_state.irrigation.history[HISTORY_LIMIT:]
         try:
             insert_irrigation_event(entry)
         except Exception as exc:

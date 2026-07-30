@@ -57,6 +57,20 @@ function hasNativePlugin(): boolean {
   return cap.isPluginAvailable?.("SpeechRecognition") ?? true;
 }
 
+/**
+ * Bricht ab, wenn ein Aufruf nicht antwortet. Geht ein Capacitor-Bridge-Aufruf
+ * ins Leere, bleibt seine Promise fuer immer offen — der Aufrufer haengt dann
+ * stumm fest ("Ich hoere zu…" ohne Ergebnis und ohne Fehler).
+ */
+function withTimeout<T>(p: Promise<T>, ms: number, was: string): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`${was}: keine Antwort nach ${ms / 1000}s`)), ms),
+    ),
+  ]);
+}
+
 let nativeCache: NativePlugin | null | undefined;
 
 async function loadNative(): Promise<NativePlugin | null> {
@@ -66,9 +80,10 @@ async function loadNative(): Promise<NativePlugin | null> {
     return null;
   }
   try {
-    const mod = await import("@capacitor-community/speech-recognition");
+    const mod = await withTimeout(
+      import("@capacitor-community/speech-recognition"), 4000, "Plugin laden");
     const plugin = mod.SpeechRecognition as unknown as NativePlugin;
-    const { available } = await plugin.available();
+    const { available } = await withTimeout(plugin.available(), 4000, "available()");
     nativeCache = available ? plugin : null;
   } catch {
     nativeCache = null;
@@ -106,11 +121,13 @@ export async function speechDiagnose(): Promise<string> {
     out.push(`Bridge kennt: ${plugins ? Object.keys(plugins).join(", ") || "(keine)" : "—"}`);
 
     try {
-      const mod = await import("@capacitor-community/speech-recognition");
-      const res = await mod.SpeechRecognition.available();
+      const mod = await withTimeout(
+        import("@capacitor-community/speech-recognition"), 4000, "Plugin laden");
+      const res = await withTimeout(mod.SpeechRecognition.available(), 4000, "available()");
       out.push(`Geräte-Spracherkennung: ${res.available ? "verfügbar" : "nicht verfügbar"}`);
       try {
-        const p = await mod.SpeechRecognition.checkPermissions();
+        const p = await withTimeout(
+          mod.SpeechRecognition.checkPermissions(), 4000, "checkPermissions()");
         out.push(`Mikrofon-Freigabe: ${p.speechRecognition}`);
       } catch (e) {
         out.push(`Freigabe nicht abfragbar: ${e instanceof Error ? e.message : String(e)}`);
@@ -120,7 +137,8 @@ export async function speechDiagnose(): Promise<string> {
     }
   }
 
-  const ok = await speechAvailable();
+  const ok = await withTimeout(speechAvailable(), 5000, "Verfügbarkeit")
+    .catch(() => false);
   out.push("");
   out.push(ok ? "→ Diktieren sollte funktionieren." : "→ Diktieren ist hier nicht möglich.");
   return out.join("\n");
@@ -131,24 +149,23 @@ export async function speechDiagnose(): Promise<string> {
  * Gibt null zurueck, wenn nichts erkannt wurde oder der Nutzer abbricht.
  */
 export async function listenOnce(): Promise<string | null> {
-  const native = await loadNative();
+  const native = await withTimeout(loadNative(), 4000, "Plugin-Suche");
 
   if (native) {
     // Fehler hier NICHT schlucken — sonst sieht ein abgelehntes oder gar nicht
     // erschienenes Berechtigungsfenster wie "nichts verstanden" aus.
-    const perm = await native.checkPermissions();
+    const perm = await withTimeout(native.checkPermissions(), 5000, "Freigabe prüfen");
     if (perm.speechRecognition !== "granted") {
-      const asked = await native.requestPermissions();
+      const asked = await withTimeout(native.requestPermissions(), 60000, "Freigabe anfragen");
       if (asked.speechRecognition !== "granted") {
         throw new Error(`Mikrofon-Freigabe verweigert (${asked.speechRecognition})`);
       }
     }
-    const res = await native.start({
-      language: "de-DE",
-      maxResults: 1,
-      partialResults: false,
-      popup: false,
-    });
+    const res = await withTimeout(
+      native.start({ language: "de-DE", maxResults: 1, partialResults: false, popup: false }),
+      60000,
+      "Aufnahme",
+    );
     return res.matches?.[0]?.trim() || null;
   }
 

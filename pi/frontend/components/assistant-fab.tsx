@@ -10,7 +10,7 @@ import type { AssistantIntent } from "@/lib/types";
 type Msg = { role: "user" | "bot"; text: string; intent?: AssistantIntent };
 
 /** Beim Deploy hochzählen — macht am Gerät sichtbar, welcher Stand geladen ist. */
-const BUILD_TAG = "v4";
+const BUILD_TAG = "v5";
 
 const BEISPIELE = [
   "Garten 20 Minuten bewässern",
@@ -95,12 +95,15 @@ export function AssistantFab() {
       if (said) {
         await ask(said);
       } else {
-        push({ role: "bot", text: `Nichts verstanden.\n\n${await speechDiagnose()}` });
+        const detail = await speechDiagnose().catch(() => "(Diagnose nicht möglich)");
+        push({ role: "bot", text: `Nichts verstanden.\n\n${detail}` });
       }
     } catch (e) {
+      // Diagnose selbst absichern — sonst bliebe auch die Fehlermeldung aus.
+      const detail = await speechDiagnose().catch(() => "(Diagnose nicht möglich)");
       push({
         role: "bot",
-        text: `Spracheingabe fehlgeschlagen: ${e instanceof Error ? e.message : String(e)}\n\n${await speechDiagnose()}`,
+        text: `Spracheingabe fehlgeschlagen: ${e instanceof Error ? e.message : String(e)}\n\n${detail}`,
       });
     } finally {
       setListening(false);

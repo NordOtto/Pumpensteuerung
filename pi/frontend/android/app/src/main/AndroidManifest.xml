@@ -39,4 +39,15 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Spracheingabe im Assistenten (@capacitor-community/speech-recognition) -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- Android 11+: ohne diese Abfrage meldet das Plugin die Spracherkennung
+         faelschlich als nicht verfuegbar, weil es die App dahinter nicht sieht. -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
 </manifest>

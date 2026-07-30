@@ -3,29 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Sparkles, Send, X, Mic } from "lucide-react";
 import { api } from "@/lib/api";
+import { listenOnce, speechAvailable } from "@/lib/speech";
 import { cn } from "@/lib/utils";
 import type { AssistantIntent } from "@/lib/types";
 
 type Msg = { role: "user" | "bot"; text: string; intent?: AssistantIntent };
-
-/** Minimal-Typ der Web Speech API — steht nicht in den DOM-Typen von TypeScript. */
-interface SpeechRec {
-  lang: string;
-  interimResults: boolean;
-  onresult: (e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void;
-  onend: () => void;
-  onerror: () => void;
-  start: () => void;
-}
-
-function getSpeechCtor(): (new () => SpeechRec) | null {
-  if (typeof window === "undefined") return null;
-  const w = window as unknown as {
-    SpeechRecognition?: new () => SpeechRec;
-    webkitSpeechRecognition?: new () => SpeechRec;
-  };
-  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
-}
 
 const BEISPIELE = [
   "Garten 20 Minuten bewässern",
@@ -93,27 +75,24 @@ export function AssistantFab() {
     push({ role: "bot", text: "Abgebrochen." });
   };
 
-  // Spracheingabe über die Web Speech API (Chrome/Android). Ohne Support
-  // bleibt das Mikrofon-Symbol einfach ausgeblendet.
+  // Mikrofon nur zeigen, wenn Diktieren hier wirklich geht (native App oder
+  // Safari/Chrome). Sonst bliebe ein toter Knopf zurück.
   const [speechSupported, setSpeechSupported] = useState(false);
   useEffect(() => {
-    setSpeechSupported(Boolean(getSpeechCtor()));
+    void speechAvailable().then(setSpeechSupported);
   }, []);
 
-  const listen = () => {
-    const Ctor = getSpeechCtor();
-    if (!Ctor) return;
-    const rec = new Ctor();
-    rec.lang = "de-DE";
-    rec.interimResults = false;
-    rec.onresult = (e) => {
-      const said = e.results[0]?.[0]?.transcript ?? "";
-      if (said) void ask(said);
-    };
-    rec.onend = () => setListening(false);
-    rec.onerror = () => setListening(false);
+  const listen = async () => {
+    if (listening || busy) return;
     setListening(true);
-    rec.start();
+    try {
+      const said = await listenOnce();
+      if (said) await ask(said);
+    } catch {
+      push({ role: "bot", text: "Spracheingabe hat nicht geklappt — bitte tippen." });
+    } finally {
+      setListening(false);
+    }
   };
 
   return (
@@ -209,6 +188,15 @@ export function AssistantFab() {
                   </div>
                 </div>
               ))}
+
+              {listening && (
+                <div className="flex justify-end">
+                  <div className="flex items-center gap-2 rounded-card rounded-br-sm border border-[var(--color-purple)]/25 bg-[var(--color-purple-dim)] px-3.5 py-2.5">
+                    <Mic className="h-3.5 w-3.5 shrink-0 animate-pulse text-purple" />
+                    <span className="text-[13px] text-tx2">Ich höre zu…</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Eingabe */}
@@ -223,11 +211,15 @@ export function AssistantFab() {
               />
               {speechSupported && (
                 <button
-                  onClick={listen}
-                  aria-label="Diktieren"
+                  onClick={() => void listen()}
+                  disabled={busy}
+                  aria-label={listening ? "Höre zu…" : "Diktieren"}
                   className={cn(
-                    "flex h-11 w-11 shrink-0 items-center justify-center rounded-tile border border-border",
-                    listening ? "bg-[var(--color-purple-dim)] text-purple" : "bg-bg2 text-tx3",
+                    "flex h-11 w-11 shrink-0 items-center justify-center rounded-tile border transition",
+                    listening
+                      ? "animate-pulse border-[var(--color-purple)]/40 bg-[var(--color-purple-dim)] text-purple"
+                      : "border-border bg-bg2 text-tx3",
+                    "disabled:opacity-40",
                   )}
                 >
                   <Mic className="h-4 w-4" />

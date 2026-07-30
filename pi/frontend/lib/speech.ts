@@ -99,6 +99,12 @@ export async function speechDiagnose(): Promise<string> {
   out.push(`Browser-Spracherkennung: ${webCtor() ? "vorhanden" : "fehlt"}`);
 
   if (cap?.isNativePlatform?.()) {
+    // Welche Plugins kennt die Bridge überhaupt? Verrät, ob die Registrierung
+    // im Remote-URL-Modus ankommt.
+    const plugins = (window as unknown as { Capacitor?: { Plugins?: Record<string, unknown> } })
+      .Capacitor?.Plugins;
+    out.push(`Bridge kennt: ${plugins ? Object.keys(plugins).join(", ") || "(keine)" : "—"}`);
+
     try {
       const mod = await import("@capacitor-community/speech-recognition");
       const res = await mod.SpeechRecognition.available();
@@ -106,8 +112,8 @@ export async function speechDiagnose(): Promise<string> {
       try {
         const p = await mod.SpeechRecognition.checkPermissions();
         out.push(`Mikrofon-Freigabe: ${p.speechRecognition}`);
-      } catch {
-        out.push("Mikrofon-Freigabe: nicht abfragbar");
+      } catch (e) {
+        out.push(`Freigabe nicht abfragbar: ${e instanceof Error ? e.message : String(e)}`);
       }
     } catch (e) {
       out.push(`Plugin-Fehler: ${e instanceof Error ? e.message : String(e)}`);
@@ -128,10 +134,14 @@ export async function listenOnce(): Promise<string | null> {
   const native = await loadNative();
 
   if (native) {
-    const perm = await native.checkPermissions().catch(() => ({ speechRecognition: "prompt" }));
+    // Fehler hier NICHT schlucken — sonst sieht ein abgelehntes oder gar nicht
+    // erschienenes Berechtigungsfenster wie "nichts verstanden" aus.
+    const perm = await native.checkPermissions();
     if (perm.speechRecognition !== "granted") {
-      const asked = await native.requestPermissions().catch(() => ({ speechRecognition: "denied" }));
-      if (asked.speechRecognition !== "granted") return null;
+      const asked = await native.requestPermissions();
+      if (asked.speechRecognition !== "granted") {
+        throw new Error(`Mikrofon-Freigabe verweigert (${asked.speechRecognition})`);
+      }
     }
     const res = await native.start({
       language: "de-DE",
@@ -140,6 +150,15 @@ export async function listenOnce(): Promise<string | null> {
       popup: false,
     });
     return res.matches?.[0]?.trim() || null;
+  }
+
+  // Kein natives Plugin: in der Android-App ist die Browser-Erkennung eine
+  // Attrappe — start() wirft nicht, onend feuert sofort, und es erscheint nie
+  // eine Berechtigungsabfrage. Lieber klar sagen, dass die Bruecke fehlt.
+  if (capacitor()?.isNativePlatform?.()) {
+    throw new Error(
+      "Das native Sprach-Plugin antwortet nicht. Die App muss mit dem aktuellen APK neu installiert werden.",
+    );
   }
 
   const Ctor = webCtor();

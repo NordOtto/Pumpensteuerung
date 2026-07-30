@@ -10,7 +10,7 @@ import type { AssistantIntent } from "@/lib/types";
 type Msg = { role: "user" | "bot"; text: string; intent?: AssistantIntent };
 
 /** Beim Deploy hochzählen — macht am Gerät sichtbar, welcher Stand geladen ist. */
-const BUILD_TAG = "v3";
+const BUILD_TAG = "v4";
 
 const BEISPIELE = [
   "Garten 20 Minuten bewässern",

@@ -81,7 +81,7 @@ nginx stellt die Datei unter `https://pumpe.local/pumpe.apk` bereit.
 | `capacitor.config.ts` geändert | Server-URL oder App-ID geändert |
 | Capacitor-Major-Update | Native Schicht muss neu gebaut werden |
 | Neue Android-Permissions | Manifest-Änderungen erfordern Neubau |
-| Neues natives Plugin | z.B. Spracheingabe — Plugin-Code liegt im APK, nicht im Web-Build |
+| Neues natives Plugin | Plugin-Code liegt im APK, nicht im Web-Build |
 
 Reine UI-/Backend-Änderungen brauchen **keine** neue APK.
 
@@ -103,24 +103,15 @@ Die Datei nach `pi/frontend/android/app/src/main/res/raw/pumpe.crt` kopieren, da
 - Der Keystore (`pumpe-release.keystore`) und die Credentials (`keystore.properties`) liegen im Repo unter `pi/frontend/android/`.
 - Die Network-Security-Config (`res/xml/network_security_config.xml`) pinnt das Pi-Zertifikat für `pumpe.local`.
 
-## Spracheingabe im Assistenten
+## Spracheingabe
 
-Der Assistent kann diktiert werden. In der Android-App läuft das über
-`@capacitor-community/speech-recognition` (Androids eigene Spracherkennung) —
-die Web Speech API des Browsers ist im Android-WebView meist gar nicht vorhanden.
+Der Assistent wird **getippt** — es gibt bewusst kein Mikrofon-Symbol.
 
-Voraussetzungen im Manifest (bereits eingetragen):
+Ein Versuch mit `@capacitor-community/speech-recognition` wurde wieder
+entfernt: Die Bridge meldete das Plugin zwar als vorhanden und die
+Geraete-Erkennung als verfuegbar, der Aufruf kam aber nie zurueck und
+Android zeigte nie den Berechtigungsdialog.
 
-- `android.permission.RECORD_AUDIO`
-- `<queries><intent><action android:name="android.speech.RecognitionService" />`
-  — ohne diese Abfrage meldet Android 11+ die Erkennung fälschlich als nicht verfügbar.
-
-Beim ersten Antippen des Mikrofons fragt Android einmalig nach der Freigabe.
-
-**Erscheint das Mikrofon-Symbol gar nicht**, meldet das Gerät keine Spracherkennung:
-prüfen, ob die Google-App installiert und ein deutsches Sprachpaket vorhanden ist
-(Einstellungen → System → Sprachen → Spracherkennung).
-
-Auf **iOS/Safari** (und Desktop-Chrome) greift automatisch die Web Speech API —
-dort ist keine APK nötig, das Diktat funktioniert über die Weboberfläche.
-Die Aufnahme geht dabei zur Verarbeitung an Apple bzw. Google, braucht also Internet.
+Es braucht dafuer auch nichts: Die Android-Tastatur hat ein eigenes
+Mikrofon, mit dem sich in jedes Textfeld diktieren laesst — inklusive der
+Eingabezeile des Assistenten. Auf dem iPhone gilt dasselbe.

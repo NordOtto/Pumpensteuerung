@@ -1,16 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Sparkles, Send, X, Mic } from "lucide-react";
+import { Sparkles, Send, X } from "lucide-react";
 import { api } from "@/lib/api";
-import { listenOnce, speechDiagnose, warmUpSpeech } from "@/lib/speech";
 import { cn } from "@/lib/utils";
 import type { AssistantIntent } from "@/lib/types";
 
 type Msg = { role: "user" | "bot"; text: string; intent?: AssistantIntent };
-
-/** Beim Deploy hochzählen — macht am Gerät sichtbar, welcher Stand geladen ist. */
-const BUILD_TAG = "v7";
 
 const BEISPIELE = [
   "Garten 20 Minuten bewässern",
@@ -19,12 +15,11 @@ const BEISPIELE = [
   "Warum wird gerade nicht bewässert?",
 ];
 
-/** Schwebender Assistent-Knopf: tippen oder diktieren, was passieren soll. */
+/** Schwebender Assistent-Knopf: tippen, was passieren soll. */
 export function AssistantFab() {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
-  const [listening, setListening] = useState(false);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -34,10 +29,7 @@ export function AssistantFab() {
   }, [msgs, open]);
 
   useEffect(() => {
-    if (open) {
-      setTimeout(() => inputRef.current?.focus(), 80);
-      warmUpSpeech(); // Plugin-Chunk laden, solange der Nutzer noch tippt
-    }
+    if (open) setTimeout(() => inputRef.current?.focus(), 80);
   }, [open]);
 
   const push = (m: Msg) => setMsgs((c) => [...c, m]);
@@ -49,11 +41,6 @@ export function AssistantFab() {
     push({ role: "user", text: q });
     setBusy(true);
     try {
-      // Lokaler Servicebefehl — die App hat keine Adresszeile für eine Debug-Seite.
-      if (/^\s*(diagnose|mikro(fon)?|sprache)\s*$/i.test(q)) {
-        push({ role: "bot", text: await speechDiagnose() });
-        return;
-      }
       const intent = await api.assistantAsk(q);
       if (intent.confirm && intent.preview) {
         push({ role: "bot", text: intent.preview, intent });
@@ -84,43 +71,6 @@ export function AssistantFab() {
   const cancel = (idx: number) => {
     setMsgs((c) => c.map((m, i) => (i === idx ? { ...m, intent: undefined } : m)));
     push({ role: "bot", text: "Abgebrochen." });
-  };
-
-  // Mikrofon immer anzeigen. Früher wurde es bei fehlender Erkennung versteckt —
-  // dann ist aber nicht unterscheidbar, ob die Funktion fehlt oder die App
-  // schlicht alten Code geladen hat. Ein Knopf, der seinen Grund nennt, ist
-  // ehrlicher als gar kein Knopf.
-  const listen = async () => {
-    if (listening || busy) return;
-    setListening(true);
-    // Jeden Schritt sofort sichtbar machen. Bleibt etwas stehen, zeigt die
-    // letzte Zeile genau, wo — statt dass gar nichts erscheint.
-    push({ role: "bot", text: `[${BUILD_TAG}] Schritt 1: Plugin wird gesucht…` });
-    try {
-      // Harte Gesamtgrenze: selbst wenn innen etwas ohne Zeitlimit haengt,
-      // bekommt der Nutzer nach 90s eine Antwort statt ewigem "Ich höre zu…".
-      const said = await Promise.race([
-        listenOnce((s) => push({ role: "bot", text: `[${BUILD_TAG}] ${s}` })),
-        new Promise<never>((_, rej) =>
-          setTimeout(() => rej(new Error("Gesamtablauf: keine Antwort nach 90s")), 90000),
-        ),
-      ]);
-      if (said) {
-        await ask(said);
-      } else {
-        const detail = await speechDiagnose().catch(() => "(Diagnose nicht möglich)");
-        push({ role: "bot", text: `Nichts verstanden.\n\n${detail}` });
-      }
-    } catch (e) {
-      // Diagnose selbst absichern — sonst bliebe auch die Fehlermeldung aus.
-      const detail = await speechDiagnose().catch(() => "(Diagnose nicht möglich)");
-      push({
-        role: "bot",
-        text: `Spracheingabe fehlgeschlagen: ${e instanceof Error ? e.message : String(e)}\n\n${detail}`,
-      });
-    } finally {
-      setListening(false);
-    }
   };
 
   return (
@@ -156,8 +106,7 @@ export function AssistantFab() {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="text-[13px] font-bold text-tx">Assistent</div>
-                {/* Bau-Kennung: zeigt sofort, ob die App wirklich neuen Code geladen hat */}
-                <div className="text-[10px] text-tx3">Sag oder schreib, was passieren soll · {BUILD_TAG}</div>
+                <div className="text-[10px] text-tx3">Schreib, was passieren soll</div>
               </div>
               <button
                 onClick={() => setOpen(false)}
@@ -217,15 +166,6 @@ export function AssistantFab() {
                   </div>
                 </div>
               ))}
-
-              {listening && (
-                <div className="flex justify-end">
-                  <div className="flex items-center gap-2 rounded-card rounded-br-sm border border-[var(--color-purple)]/25 bg-[var(--color-purple-dim)] px-3.5 py-2.5">
-                    <Mic className="h-3.5 w-3.5 shrink-0 animate-pulse text-purple" />
-                    <span className="text-[13px] text-tx2">Ich höre zu…</span>
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Eingabe */}
@@ -238,20 +178,6 @@ export function AssistantFab() {
                 placeholder="Was soll ich tun?"
                 className="h-11 flex-1 rounded-tile border border-border bg-bg2 px-3 text-[14px] text-tx outline-none ring-purple/20 placeholder:text-tx3 focus:ring-2"
               />
-              <button
-                onClick={() => void listen()}
-                disabled={busy}
-                aria-label={listening ? "Höre zu…" : "Diktieren"}
-                className={cn(
-                  "flex h-11 w-11 shrink-0 items-center justify-center rounded-tile border transition",
-                  listening
-                    ? "animate-pulse border-[var(--color-purple)]/40 bg-[var(--color-purple-dim)] text-purple"
-                    : "border-border bg-bg2 text-tx3",
-                  "disabled:opacity-40",
-                )}
-              >
-                <Mic className="h-4 w-4" />
-              </button>
               <button
                 onClick={() => void ask(input)}
                 disabled={!input.trim() || busy}

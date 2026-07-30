@@ -106,7 +106,8 @@ class WeatherState(BaseModel):
     forecast_rain_24h_mm: float | None = None
     forecast_rain_48h_mm: float | None = None
     forecast_rain_7d_mm: float | None = None
-    rain_24h_mm: float = 0.0
+    rain_24h_mm: float = 0.0          # rollierendes 24h-Fenster (faellt wieder!)
+    rain_today_mm: float | None = None  # kumulativ ab Mitternacht, steigt nur
     temp_c: float | None = None
     humidity_pct: float | None = None
     wind_kmh: float = 0.0

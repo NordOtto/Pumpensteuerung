@@ -39,6 +39,7 @@ HISTORY_LIMIT = 250
 TICK_S = 30
 SCHEDULE_CATCHUP_MIN = 10   # Nachhol-Fenster für verpasste Auto-Starts (Neustart etc.)
 TRANSIENT_RETRY_MIN = 180   # Nachfass-Fenster, solange nur ein temporärer Blocker im Weg stand
+BALANCE_MIN_STEP_H = 0.25   # Wasserbilanz höchstens alle 15 min fortschreiben
 FREQ_SLIDER_MIN = 0.7       # Frequenz-Slider "häufig" → min_deficit × 0.7
 FREQ_SLIDER_SPAN = 0.6      # "selten" → × (0.7 + 0.6) = 1.3
 BASE = settings.mqtt_topic_prefix
@@ -172,6 +173,8 @@ def _normalize_program(input_: dict[str, Any], idx: int = 0) -> dict[str, Any]:
         },
         "zones": [_normalize_zone(z, zi) for zi, z in enumerate(zones_in)],
         "last_balance_date": input_.get("last_balance_date"),
+        "last_balance_ts": input_.get("last_balance_ts"),
+        "rain_seen_mm": input_.get("rain_seen_mm"),
         "last_run_at": input_.get("last_run_at"),
         "last_auto_attempt_date": input_.get("last_auto_attempt_date"),
         "last_skip_reason": input_.get("last_skip_reason") or "",
@@ -465,7 +468,11 @@ class IrrigationManager:
             "forecast_rain_24h_mm": ("forecast_rain_24h_mm", "forecastRain24hMm"),
             "forecast_rain_48h_mm": ("forecast_rain_48h_mm", "forecastRain48hMm"),
             "forecast_rain_7d_mm": ("forecast_rain_7d_mm", "forecastRain7dMm"),
-            "rain_24h_mm": ("rain_24h_mm", "rain24hMm", "rain_today_mm"),
+            "rain_24h_mm": ("rain_24h_mm", "rain24hMm"),
+            # Tageskumulativ (Ecowitt "Rain Daily"): zaehlt ab Mitternacht und
+            # steigt nur — daraus laesst sich der stuendliche Zuwachs bilden.
+            # rain_24h_mm ist dagegen ein rollierendes Fenster und faellt wieder.
+            "rain_today_mm": ("rain_today_mm", "rainTodayMm", "rain_daily_mm", "daily_rain_mm"),
             "temp_c": ("temp_c", "tempC", "temperature"),
             "humidity_pct": ("humidity_pct", "humidityPct", "humidity"),
             "wind_kmh": ("wind_kmh", "windKmh", "wind_speed"),
@@ -557,24 +564,78 @@ class IrrigationManager:
         return count
 
     def _update_water_balance(self, program: dict[str, Any]) -> bool:
+        """Schreibt die Wasserbilanz laufend fort — anteilig nach vergangener Zeit.
+
+        Frueher lief das einmal taeglich. Damit war das Defizit zwischen zwei
+        Buchungen eingefroren: Regen am Nachmittag wirkte erst am naechsten
+        Morgen, und die 6:00-Entscheidung rechnete mit Zahlen von gestern.
+
+        Jetzt wird bei jedem Tick der seit der letzten Buchung verstrichene
+        Anteil der Tagesverdunstung addiert und der seither neu gefallene Regen
+        abgezogen. Alles aus lokalen Sensordaten — kostet keine API-Abfrage.
+        """
         if program.get("mode") != "smart_et":
             return False
-        today = _local_date_key()
-        if program.get("last_balance_date") == today:
-            return False
-        # Rückwirkend für den ABGELAUFENEN Tag buchen: dessen ET0 steht morgens fest.
-        # Früher wurde erst ab 9 Uhr der laufende Tag gebucht — Programme mit Start um
-        # 6:00/7:30 sahen dadurch nie ein aufgebautes Defizit und wurden jeden Tag
-        # mit "Regen kompensiert Defizit" übersprungen.
         w = app_state.irrigation.weather
+        now = datetime.now(_TZ)
+        today = _local_date_key(now)
+
+        last_ts = program.get("last_balance_ts")
+        prev_seen = program.get("rain_seen_mm")
+
+        # Neu gefallenen Regen als Zuwachs eines Zaehlers bestimmen.
+        #   rain_today_mm — kumulativ ab Mitternacht, steigt nur: exakt.
+        #   rain_24h_mm   — rollierendes Fenster, faellt auch wieder: nur der
+        #                   Anstieg zaehlt, der fallende Ast wird ignoriert
+        #                   (konservativ, bucht nie Regen als Verdunstung).
+        if w.rain_today_mm is not None:
+            counter = float(w.rain_today_mm)
+            resets_at_midnight = True
+        else:
+            counter = float(w.rain_24h_mm or 0)
+            resets_at_midnight = False
+
+        if prev_seen is None:
+            baseline = counter                      # erster Lauf: nichts nachbuchen
+        elif resets_at_midnight and program.get("last_balance_date") != today:
+            baseline = 0.0                          # Zaehler startet mittags neu bei 0
+        elif counter < float(prev_seen):
+            baseline = counter                      # Ruecksetzer/Fenster laeuft ab
+        else:
+            baseline = float(prev_seen)
+        rain_delta = max(0.0, counter - baseline)
+
+        # Erster Lauf oder Datumswechsel ohne brauchbaren Zeitstempel:
+        # nur den Zaehlerstand merken, noch nichts buchen.
+        if not last_ts:
+            program["last_balance_ts"] = now.isoformat()
+            program["last_balance_date"] = today
+            program["rain_seen_mm"] = counter
+            self._save_programs()
+            return False
+
+        try:
+            elapsed_h = (now - datetime.fromisoformat(str(last_ts))).total_seconds() / 3600.0
+        except ValueError:
+            elapsed_h = 0.0
+        if elapsed_h <= 0:
+            return False
+        elapsed_h = min(elapsed_h, 48.0)   # nach langem Stillstand nicht endlos nachbuchen
+        if elapsed_h < BALANCE_MIN_STEP_H and rain_delta <= 0:
+            return False                    # zu kurz her und kein neuer Regen
+
         et0 = w.et0_mm if w.et0_mm is not None else program["thresholds"]["et0_default_mm"]
-        rain = float(w.rain_24h_mm or 0)
-        delta = (et0 * program["seasonal_factor"]) - rain
+        et0_share = float(et0) * program["seasonal_factor"] * (elapsed_h / 24.0)
+        delta = et0_share - rain_delta
+
         for zone in program["zones"]:
             if not zone["enabled"]:
                 continue
             zone["deficit_mm"] = _clamp(zone.get("deficit_mm", 0) + delta, 0, 200)
+
+        program["last_balance_ts"] = now.isoformat()
         program["last_balance_date"] = today
+        program["rain_seen_mm"] = counter
         self._save_programs()
         return True
 
@@ -615,12 +676,9 @@ class IrrigationManager:
                 slider = _clamp(float(zone.get("frequency_pref", 0.5)), 0.0, 1.0)
                 threshold = float(zone.get("min_deficit_mm", 0)) * (
                     FREQ_SLIDER_MIN + FREQ_SLIDER_SPAN * slider)
+                # Das Defizit ist laufend fortgeschrieben (_update_water_balance
+                # bucht anteilig), also direkt verwendbar — kein Vorgriff noetig.
                 deficit = float(zone.get("deficit_mm", 0))
-                # Die Bilanz fuer heute laeuft erst nach Mitternacht. Bereits
-                # gefallener Regen steckt also noch nicht im Defizit — ohne diesen
-                # Vorgriff waere die Prognose direkt nach einem Regen zu optimistisch.
-                if program.get("last_balance_date") == _local_date_key():
-                    deficit = _clamp(deficit + et0 * seasonal - float(w.rain_24h_mm or 0), 0, 200)
 
                 eta_date: str | None = None
                 eta_days: int | None = None

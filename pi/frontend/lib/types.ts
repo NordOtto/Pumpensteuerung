@@ -278,3 +278,16 @@ export interface Warning {
   level: "warn" | "danger";
   message: string;
 }
+
+export interface AssistantIntent {
+  action: "none" | "answer" | "set_start_time" | "set_enabled" | "run_program" | "stop";
+  reply?: string;
+  preview?: string;
+  confirm?: boolean;
+  program_id?: string;
+  hour?: number;
+  minute?: number;
+  enabled?: boolean;
+  duration_min?: number | null;
+  zone_ids?: string[] | null;
+}

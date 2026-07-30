@@ -2,16 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Gauge, Leaf, CloudRain, Bot, BarChart3, Settings } from "lucide-react";
+import { Gauge, Leaf, CloudRain, BarChart3, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+// Der Assistent hat keinen eigenen Tab mehr — er ist als schwebender Knopf
+// auf jeder Seite erreichbar (components/assistant-fab.tsx).
 const ITEMS = [
-  { href: "/dashboard", label: "Dashboard", icon: Gauge },
-  { href: "/zones",     label: "Zonen",     icon: Leaf },
-  { href: "/weather",   label: "Wetter",    icon: CloudRain },
-  { href: "/assistant", label: "Assistent", icon: Bot },
-  { href: "/analytics", label: "Verlauf",   icon: BarChart3 },
-  { href: "/settings",  label: "Einst.",    icon: Settings },
+  { href: "/dashboard", label: "Start",    icon: Gauge },
+  { href: "/zones",     label: "Zonen",    icon: Leaf },
+  { href: "/weather",   label: "Wetter",   icon: CloudRain },
+  { href: "/analytics", label: "Verlauf",  icon: BarChart3 },
+  { href: "/settings",  label: "Einst.",   icon: Settings },
 ] as const;
 
 export function BottomNav() {

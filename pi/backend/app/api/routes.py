@@ -15,6 +15,7 @@ from pydantic import BaseModel
 from ..state import app_state, log_buffer, log_seq, web_log
 from ..storage import get_pressure_history
 from ..irrigation_wizard import recommend_smart_et
+from .. import assistant
 from ..mqtt_client import bridge
 from ..config import settings
 from .deps import deps
@@ -252,6 +253,18 @@ async def irrigation_overseeding_set(body: dict):
         return deps.irrigation.set_overseeding(body or {})
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/assistant/ask")
+async def assistant_ask(body: dict):
+    """Erkennt die Absicht eines Freitext-Befehls und liefert eine Vorschau."""
+    return assistant.parse(str((body or {}).get("text") or ""))
+
+
+@router.post("/assistant/apply")
+async def assistant_apply(body: dict):
+    """Fuehrt eine zuvor bestaetigte Assistenten-Aktion aus."""
+    return assistant.apply(body or {}, deps.irrigation)
 
 
 @router.get("/irrigation/sequential")

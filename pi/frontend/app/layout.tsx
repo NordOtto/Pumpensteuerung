@@ -4,6 +4,7 @@ import { StatusProvider } from "@/lib/ws";
 import { ThemeProvider } from "@/components/theme-provider";
 import { TopBar } from "@/components/top-bar";
 import { BottomNav } from "@/components/bottom-nav";
+import { AssistantFab } from "@/components/assistant-fab";
 
 export const metadata: Metadata = {
   title: "Pumpensteuerung",
@@ -35,6 +36,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               {children}
             </main>
             <BottomNav />
+            <AssistantFab />
           </StatusProvider>
         </ThemeProvider>
       </body>

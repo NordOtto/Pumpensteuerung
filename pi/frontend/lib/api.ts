@@ -1,5 +1,5 @@
 /** Minimaler REST-Client zum Backend. */
-import type { IrrigationProgram, OtaStatus, Preset, WeatherConfig } from "./types";
+import type { AssistantIntent, IrrigationProgram, OtaStatus, Preset, WeatherConfig } from "./types";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
@@ -97,6 +97,18 @@ export const api = {
 
   setValve: (zone: string, action: "open" | "close") =>
     request<{ ok: boolean; zone: string; state: string }>(`/api/valve/${zone}/${action}`, { method: "POST" }),
+
+  // ── Assistent ──────────────────────────────────────────
+  assistantAsk: (text: string) =>
+    request<AssistantIntent>("/api/assistant/ask", {
+      method: "POST",
+      body: JSON.stringify({ text }),
+    }),
+  assistantApply: (intent: AssistantIntent) =>
+    request<{ ok: boolean; reply: string }>("/api/assistant/apply", {
+      method: "POST",
+      body: JSON.stringify(intent),
+    }),
 
   weatherConfig: () => request<WeatherConfig>("/api/irrigation/weather/config"),
   saveWeatherConfig: (payload: Record<string, unknown>) =>

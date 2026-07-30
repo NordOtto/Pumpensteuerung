@@ -71,30 +71,41 @@ function withTimeout<T>(p: Promise<T>, ms: number, was: string): Promise<T> {
   ]);
 }
 
-let nativeCache: NativePlugin | null | undefined;
+// Nur ERFOLGE zwischenspeichern. Frueher wurde auch ein Fehlschlag als null
+// gemerkt — lief der erste Versuch in den Timeout (Plugin-Chunk wird ueber
+// WLAN vom Pi nachgeladen), galt das Plugin fuer den Rest der Sitzung als
+// nicht vorhanden und wurde nie wieder probiert.
+let nativeCache: NativePlugin | null = null;
 
 async function loadNative(): Promise<NativePlugin | null> {
-  if (nativeCache !== undefined) return nativeCache;
-  if (!hasNativePlugin()) {
-    nativeCache = null;
+  if (nativeCache) return nativeCache;
+  if (!hasNativePlugin()) return null;
+  try {
+    // Grosszuegig: der Chunk kommt ueber WLAN, das dauert beim ersten Mal.
+    const mod = await withTimeout(
+      import("@capacitor-community/speech-recognition"), 20000, "Plugin laden");
+    const plugin = mod.SpeechRecognition as unknown as NativePlugin;
+    const { available } = await withTimeout(plugin.available(), 8000, "available()");
+    if (available) nativeCache = plugin;
+    return nativeCache;
+  } catch {
     return null;
   }
-  try {
-    const mod = await withTimeout(
-      import("@capacitor-community/speech-recognition"), 4000, "Plugin laden");
-    const plugin = mod.SpeechRecognition as unknown as NativePlugin;
-    const { available } = await withTimeout(plugin.available(), 4000, "available()");
-    nativeCache = available ? plugin : null;
-  } catch {
-    nativeCache = null;
-  }
-  return nativeCache;
 }
 
 /** Ist Diktieren hier ueberhaupt moeglich? Steuert die Sichtbarkeit des Mikrofons. */
 export async function speechAvailable(): Promise<boolean> {
   if (await loadNative()) return true;
   return webCtor() !== null;
+}
+
+/**
+ * Plugin-Chunk im Hintergrund holen, sobald der Assistent geoeffnet wird.
+ * Beim Antippen des Mikrofons liegt er dann bereit, statt erst ueber WLAN
+ * nachgeladen zu werden.
+ */
+export function warmUpSpeech(): void {
+  void loadNative().catch(() => undefined);
 }
 
 /**
@@ -149,7 +160,7 @@ export async function speechDiagnose(): Promise<string> {
  * Gibt null zurueck, wenn nichts erkannt wurde oder der Nutzer abbricht.
  */
 export async function listenOnce(): Promise<string | null> {
-  const native = await withTimeout(loadNative(), 4000, "Plugin-Suche");
+  const native = await withTimeout(loadNative(), 30000, "Plugin-Suche");
 
   if (native) {
     // Fehler hier NICHT schlucken — sonst sieht ein abgelehntes oder gar nicht

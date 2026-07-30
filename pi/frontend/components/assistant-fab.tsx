@@ -3,14 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { Sparkles, Send, X, Mic } from "lucide-react";
 import { api } from "@/lib/api";
-import { listenOnce, speechDiagnose } from "@/lib/speech";
+import { listenOnce, speechDiagnose, warmUpSpeech } from "@/lib/speech";
 import { cn } from "@/lib/utils";
 import type { AssistantIntent } from "@/lib/types";
 
 type Msg = { role: "user" | "bot"; text: string; intent?: AssistantIntent };
 
 /** Beim Deploy hochzählen — macht am Gerät sichtbar, welcher Stand geladen ist. */
-const BUILD_TAG = "v5";
+const BUILD_TAG = "v6";
 
 const BEISPIELE = [
   "Garten 20 Minuten bewässern",
@@ -34,7 +34,10 @@ export function AssistantFab() {
   }, [msgs, open]);
 
   useEffect(() => {
-    if (open) setTimeout(() => inputRef.current?.focus(), 80);
+    if (open) {
+      setTimeout(() => inputRef.current?.focus(), 80);
+      warmUpSpeech(); // Plugin-Chunk laden, solange der Nutzer noch tippt
+    }
   }, [open]);
 
   const push = (m: Msg) => setMsgs((c) => [...c, m]);

@@ -21,6 +21,7 @@ from .persistence import (
     IRRIGATION_HISTORY_FILE,
     IRRIGATION_OVERSEEDING_FILE,
     IRRIGATION_PROGRAMS_FILE,
+    IRRIGATION_SEQUENTIAL_FILE,
     IRRIGATION_WEATHER_FILE,
     load_json,
     save_json,
@@ -37,8 +38,15 @@ _TZ = ZoneInfo(settings.tz)
 HISTORY_LIMIT = 250
 TICK_S = 30
 SCHEDULE_CATCHUP_MIN = 10   # Nachhol-Fenster für verpasste Auto-Starts (Neustart etc.)
-BALANCE_HOUR = 9            # ab dieser Stunde (lokal) die tägliche Wasserbilanz ziehen
+TRANSIENT_RETRY_MIN = 180   # Nachfass-Fenster, solange nur ein temporärer Blocker im Weg stand
+FREQ_SLIDER_MIN = 0.7       # Frequenz-Slider "häufig" → min_deficit × 0.7
+FREQ_SLIDER_SPAN = 0.6      # "selten" → × (0.7 + 0.6) = 1.3
 BASE = settings.mqtt_topic_prefix
+
+# Blocker, die sich im Lauf des Tages von selbst erledigen können. Ein daran
+# gescheiterter Auto-Start darf den Tagesversuch nicht verbrauchen, sonst fällt
+# die Bewässerung wegen einer kurzen MQTT-Störung für den ganzen Tag aus.
+TRANSIENT_BLOCKERS = {"MQTT getrennt", "V20-Stoerung", "Trockenlauf-Sperre", "Zeitfenster gesperrt"}
 
 DEFAULT_THRESHOLDS = {
     "skip_rain_mm": 6.0,
@@ -276,6 +284,7 @@ class IrrigationManager:
     def load(self) -> None:
         programs = load_json(IRRIGATION_PROGRAMS_FILE)
         overseeding = load_json(IRRIGATION_OVERSEEDING_FILE)
+        sequential = load_json(IRRIGATION_SEQUENTIAL_FILE)
         weather = load_json(IRRIGATION_WEATHER_FILE)
 
         if isinstance(programs, list) and programs:
@@ -291,6 +300,10 @@ class IrrigationManager:
             for k, v in overseeding.items():
                 if hasattr(app_state.irrigation.overseeding, k):
                     setattr(app_state.irrigation.overseeding, k, v)
+        if isinstance(sequential, dict):
+            for k, v in sequential.items():
+                if hasattr(app_state.irrigation.sequential, k):
+                    setattr(app_state.irrigation.sequential, k, v)
 
         # Einmalige Migration JSON → SQLite (No-op nach erstem Lauf)
         legacy = load_json(IRRIGATION_HISTORY_FILE)
@@ -322,6 +335,12 @@ class IrrigationManager:
             save_json(IRRIGATION_OVERSEEDING_FILE, app_state.irrigation.overseeding.model_dump())
         except OSError as exc:
             print(f"[IRR] overseeding save error: {exc}", flush=True)
+
+    def _save_sequential(self) -> None:
+        try:
+            save_json(IRRIGATION_SEQUENTIAL_FILE, app_state.irrigation.sequential.model_dump())
+        except OSError as exc:
+            print(f"[IRR] sequential save error: {exc}", flush=True)
 
     def _add_history(self, entry: dict[str, Any]) -> None:
         entry = {"at": _now_iso(), **entry}
@@ -367,6 +386,7 @@ class IrrigationManager:
             "weather": irr.weather.model_dump(),
             "decision": irr.decision.model_dump(),
             "overseeding": irr.overseeding.model_dump(),
+            "sequential": irr.sequential.model_dump(),
             "zones": irr.zones,
             "history": irr.history[-25:],
         }
@@ -406,6 +426,20 @@ class IrrigationManager:
 
     def get_overseeding(self) -> dict[str, Any]:
         return app_state.irrigation.overseeding.model_dump()
+
+    def set_sequential(self, body: Any) -> dict[str, Any]:
+        data = body or {}
+        s = app_state.irrigation.sequential
+        s.enabled = bool(data.get("enabled", s.enabled))
+        s.start_hour = int(_clamp(data.get("start_hour", s.start_hour), 0, 23))
+        s.start_min = int(_clamp(data.get("start_min", s.start_min), 0, 59))
+        self._save_sequential()
+        self.recompute_decision()
+        self.publish_decision()
+        return s.model_dump()
+
+    def get_sequential(self) -> dict[str, Any]:
+        return app_state.irrigation.sequential.model_dump()
 
     def ingest_weather(self, payload: Any) -> bool:
         data = payload
@@ -454,6 +488,15 @@ class IrrigationManager:
         else:
             # Ecowitt/HA: Forecast-Felder immer schreibgeschützt
             mapping = {k: v for k, v in mapping.items() if k not in _FORECAST_KEYS}
+            # Lokale et0_mm-Pushes unter 0.3mm sind fast immer ein defekter/nicht
+            # konfigurierter Sensor (Stormglass liefert min. 0.2mm) — würde sonst
+            # die Wasserbilanz tagelang bei ~0 halten und Automatik-Bewässerung blockieren.
+            if "et0_mm" in data:
+                try:
+                    if float(data["et0_mm"]) < 0.3:
+                        data = {k: v for k, v in data.items() if k != "et0_mm"}
+                except (TypeError, ValueError):
+                    pass
         for target, keys in mapping.items():
             for k in keys:
                 if k in data and data[k] not in (None, ""):
@@ -515,10 +558,10 @@ class IrrigationManager:
         today = _local_date_key()
         if program.get("last_balance_date") == today:
             return False
-        # Erst ab BALANCE_HOUR ziehen: nachts beruht die ET0-Tagesschätzung auf
-        # nächtlichen Temperaturen → viel zu niedrig. Vormittags ist sie belastbar.
-        if datetime.now(_TZ).hour < BALANCE_HOUR:
-            return False
+        # Rückwirkend für den ABGELAUFENEN Tag buchen: dessen ET0 steht morgens fest.
+        # Früher wurde erst ab 9 Uhr der laufende Tag gebucht — Programme mit Start um
+        # 6:00/7:30 sahen dadurch nie ein aufgebautes Defizit und wurden jeden Tag
+        # mit "Regen kompensiert Defizit" übersprungen.
         w = app_state.irrigation.weather
         et0 = w.et0_mm if w.et0_mm is not None else program["thresholds"]["et0_default_mm"]
         rain = float(w.rain_24h_mm or 0)
@@ -583,8 +626,15 @@ class IrrigationManager:
             # 70% weil nicht der ganze Regen im Wurzelraum ankommt (Verdunstung, Abfluss).
             rain_past = float(w.rain_24h_mm or 0)
             rain_forecast_48h = float(w.forecast_rain_48h_mm if w.forecast_rain_48h_mm is not None else (w.forecast_rain_mm or 0))
-            rain_credit = rain_past + 0.7 * rain_forecast_48h
             rain_imminent = float(w.forecast_rain_24h_mm if w.forecast_rain_24h_mm is not None else 0)
+            # Gefallener Regen wirkt im smart_et-Modus ausschliesslich über die
+            # Wasserbilanz (_update_water_balance zieht ihn dort bereits ab). Ihn hier
+            # nochmal als Credit abzuziehen wäre Doppelzählung und hat die Automatik
+            # dauerhaft blockiert. Im fixed-Modus gibt es keine Bilanz → dort zählt er.
+            if program["mode"] == "smart_et":
+                rain_credit = 0.5 * rain_forecast_48h
+            else:
+                rain_credit = rain_past + 0.7 * rain_forecast_48h
 
             if float(w.wind_kmh or 0) > t["wind_max_kmh"]:
                 return {"allowed": False, "reason": "Wind zu hoch", "runtime_factor": 0, "water_budget_mm": 0}
@@ -598,14 +648,16 @@ class IrrigationManager:
 
             if program["mode"] == "smart_et":
                 # Pro Zone Defizit nach Regen-Credit prüfen
-                # frequency_pref skaliert die Startschwelle: 0=häufig (×0.4), 1=selten (×2.0)
+                # frequency_pref skaliert die Startschwelle: 0=häufig (×0.7), 1=selten (×1.3).
+                # Früher 0.4–2.0 — bei "selten" verdoppelte das die Schwelle und schaltete
+                # die Automatik faktisch ab (16.8mm bei ~4mm/Tag Aufbau).
                 due = []
                 for z in program["zones"]:
                     if not z["enabled"]:
                         continue
                     eff_deficit = float(z.get("deficit_mm", 0)) - rain_credit
                     slider = _clamp(float(z.get("frequency_pref", 0.5)), 0.0, 1.0)
-                    eff_min_deficit = float(z.get("min_deficit_mm", 0)) * (0.4 + 1.6 * slider)
+                    eff_min_deficit = float(z.get("min_deficit_mm", 0)) * (FREQ_SLIDER_MIN + FREQ_SLIDER_SPAN * slider)
                     if eff_deficit >= eff_min_deficit:
                         due.append(z)
                 budget = max((float(z.get("deficit_mm", 0)) - rain_credit for z in due), default=0.0)
@@ -1147,31 +1199,107 @@ class IrrigationManager:
             if program.get("enabled") and program.get("mode") == "smart_et":
                 self._update_water_balance(program)
 
+        if app_state.irrigation.sequential.enabled:
+            if self._tick_sequential(d):
+                return
+        else:
+            for program in app_state.irrigation.programs:
+                if not program["enabled"]:
+                    continue
+                blocked_days = program.get("blocked_days") or [False] * 7
+                if blocked_days[d.weekday()]:
+                    continue
+                # Catch-up-Fenster statt exakter Minute: löst aus, wenn die heutige
+                # Startzeit in den letzten SCHEDULE_CATCHUP_MIN lag — übersteht
+                # Backend-Neustarts/verpasste Ticks. last_run_at (heute) verhindert
+                # Doppel-Auslösung.
+                start_today = d.replace(hour=program["start_hour"], minute=program["start_min"],
+                                        second=0, microsecond=0)
+                elapsed_min = (d - start_today).total_seconds() / 60.0
+                # Pro Tag nur EIN Auto-Versuch (Lauf oder Skip) — sonst würde das
+                # Catch-up-Fenster bei jedem Tick erneut auslösen und die History fluten.
+                attempted_today = program.get("last_auto_attempt_date") == _local_date_key()
+                if 0 <= elapsed_min < SCHEDULE_CATCHUP_MIN and not attempted_today:
+                    res = self.run_program(program["id"], manual=False, force_weather=False)
+                    # Tagesversuch nur verbrauchen, wenn die Entscheidung endgültig war.
+                    if res["ok"] or res.get("error") not in TRANSIENT_BLOCKERS:
+                        program["last_auto_attempt_date"] = _local_date_key()
+                        self._save_programs()
+                    if not res["ok"]:
+                        web_log(f"[IRR] Programm {program['name']} uebersprungen: {res['error']}")
+                    return
+        self.recompute_decision()
+        self.publish_decision()
+
+    def _sequential_chain(self, weekday: int) -> list[dict[str, Any]]:
+        """Alle heute faelligen Programme, sortiert nach ihrer (bisherigen) Startzeit."""
+        due = []
         for program in app_state.irrigation.programs:
             if not program["enabled"]:
                 continue
             blocked_days = program.get("blocked_days") or [False] * 7
-            if blocked_days[d.weekday()]:
+            if blocked_days[weekday]:
                 continue
-            # Catch-up-Fenster statt exakter Minute: löst aus, wenn die heutige
-            # Startzeit in den letzten SCHEDULE_CATCHUP_MIN lag — übersteht
-            # Backend-Neustarts/verpasste Ticks. last_run_at (heute) verhindert
-            # Doppel-Auslösung.
-            start_today = d.replace(hour=program["start_hour"], minute=program["start_min"],
-                                    second=0, microsecond=0)
+            due.append(program)
+        due.sort(key=lambda p: (p["start_hour"], p["start_min"]))
+        return due
+
+    def _tick_sequential(self, d: datetime) -> bool:
+        """Sequenzieller Modus: alle faelligen Programme direkt hintereinander ab
+        einer gemeinsamen Startzeit statt einzeln zu ihrer eigenen Uhrzeit."""
+        s = app_state.irrigation.sequential
+        chain = self._sequential_chain(d.weekday())
+        if not chain:
+            return False
+
+        today = _local_date_key()
+        active_id = s.active_program_id if s.active_date == today else ""
+        if active_id and active_id not in {p["id"] for p in chain}:
+            # Programm wurde deaktiviert/gesperrt seit Kettenstart — Zeiger vergessen.
+            active_id = ""
+
+        if active_id:
+            # Kette läuft bereits heute: direkt mit dem naechsten Programm fortfahren,
+            # sobald das vorige fertig ist (self._active ist hier bereits None).
+            idx = next((i for i, p in enumerate(chain) if p["id"] == active_id), -1)
+            remaining = chain[idx + 1:]
+            if not remaining:
+                return False
+            next_program = remaining[0]
+        else:
+            # Kette heute noch nicht gestartet: Catch-up-Fenster ab der gemeinsamen Startzeit.
+            # Hing der Start an einem vorübergehenden Blocker (MQTT/V20), ist chain[0]
+            # noch unversucht — dann länger nachfassen statt den Tag zu verlieren.
+            start_today = d.replace(hour=s.start_hour, minute=s.start_min, second=0, microsecond=0)
             elapsed_min = (d - start_today).total_seconds() / 60.0
-            # Pro Tag nur EIN Auto-Versuch (Lauf oder Skip) — sonst würde das
-            # Catch-up-Fenster bei jedem Tick erneut auslösen und die History fluten.
-            attempted_today = program.get("last_auto_attempt_date") == _local_date_key()
-            if 0 <= elapsed_min < SCHEDULE_CATCHUP_MIN and not attempted_today:
-                program["last_auto_attempt_date"] = _local_date_key()
-                self._save_programs()
-                res = self.run_program(program["id"], manual=False, force_weather=False)
-                if not res["ok"]:
-                    web_log(f"[IRR] Programm {program['name']} uebersprungen: {res['error']}")
-                return
-        self.recompute_decision()
-        self.publish_decision()
+            window = (SCHEDULE_CATCHUP_MIN if chain[0].get("last_auto_attempt_date") == today
+                      else TRANSIENT_RETRY_MIN)
+            if not (0 <= elapsed_min < window):
+                return False
+            next_program = chain[0]
+
+        attempted_today = next_program.get("last_auto_attempt_date") == today
+        if attempted_today:
+            # Bereits versucht (Lauf oder Skip) — Kette zum naechsten weiterreichen.
+            s.active_program_id = next_program["id"]
+            s.active_date = today
+            self._save_sequential()
+            return self._tick_sequential(d)
+
+        res = self.run_program(next_program["id"], manual=False, force_weather=False)
+        if not res["ok"] and res.get("error") in TRANSIENT_BLOCKERS:
+            # Vorübergehender Blocker: Kette nicht weiterschalten, beim nächsten
+            # Tick erneut versuchen (Fenster bleibt über active_program_id offen).
+            web_log(f"[IRR] Programm {next_program['name']} verzoegert: {res['error']}")
+            return True
+        next_program["last_auto_attempt_date"] = today
+        self._save_programs()
+        s.active_program_id = next_program["id"]
+        s.active_date = today
+        self._save_sequential()
+        if not res["ok"]:
+            web_log(f"[IRR] Programm {next_program['name']} uebersprungen: {res['error']}")
+        return True
 
     def _tick_overseeding(self, now_ts: float) -> bool:
         o = app_state.irrigation.overseeding

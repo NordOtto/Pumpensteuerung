@@ -282,6 +282,10 @@ class IrrigationManager:
         self._active: _ActiveRun | None = None
         self._last_tick: float = 0.0
         self._last_schedule_minute: str = ""
+        # (program_id, grund, datum) bereits protokollierter Skips — gegen
+        # Mehrfacheintraege bei minuetlich wiederholten Versuchen
+        self._skip_logged: set[tuple[str, str, str]] = set()
+        self._skip_logged_date: str = ""
 
     # ── Persistenz ────────────────────────────────────────────
     def load(self) -> None:
@@ -1188,14 +1192,21 @@ class IrrigationManager:
             if program:
                 program["last_skip_reason"] = ev["reason"]
                 self._save_programs()
-            self._add_history({
-                "type": "skip",
-                "program_id": program_id,
-                "program_name": (program or {}).get("name", program_id),
-                "reason": ev["reason"],
-                "water_budget_mm": ev.get("water_budget_mm", 0),
-                "started_by": started_by or ("manual" if manual else "auto"),
-            })
+            # Nur den ersten Skip je Programm+Grund+Tag protokollieren. Temporaere
+            # Blocker (Zeitfenster, MQTT) werden bewusst minuetlich neu versucht —
+            # ohne diese Sperre schriebe jeder Versuch einen Eintrag und wuerde
+            # den Verlauf zumuellen.
+            key = (program_id, ev["reason"], _local_date_key())
+            if key not in self._skip_logged:
+                self._skip_logged.add(key)
+                self._add_history({
+                    "type": "skip",
+                    "program_id": program_id,
+                    "program_name": (program or {}).get("name", program_id),
+                    "reason": ev["reason"],
+                    "water_budget_mm": ev.get("water_budget_mm", 0),
+                    "started_by": started_by or ("manual" if manual else "auto"),
+                })
             self.recompute_decision(program_id)
             self.publish_decision()
             return {"ok": False, "error": ev["reason"], "decision": ev}
@@ -1308,6 +1319,11 @@ class IrrigationManager:
         if now - self._last_tick < TICK_S:
             return
         self._last_tick = now
+
+        today = _local_date_key()
+        if self._skip_logged_date != today:
+            self._skip_logged.clear()
+            self._skip_logged_date = today
 
         if self._active:
             if self._active.paused:

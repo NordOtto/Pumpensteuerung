@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { useStatus } from "@/lib/ws";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 type Sample = { ts: number; pressure: number; flow: number; frequency: number; power: number | null; water_temp: number | null; running: boolean };
 type Range = { label: string; seconds: number };
+
+const CHARTS_KEY = "pumpe.analytics.charts";
 
 const RANGES: Range[] = [
   { label: "1 h",  seconds: 3600 },
@@ -27,8 +30,24 @@ export default function AnalyticsPage() {
   const [range, setRange] = useState<Range>(RANGES[0]);
   const [samples, setSamples] = useState<Sample[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showCharts, setShowCharts] = useState(false);
 
+  // Auswahl pro Gerät merken (wie beim Dashboard)
   useEffect(() => {
+    if (typeof window !== "undefined" && localStorage.getItem(CHARTS_KEY) === "1") {
+      setShowCharts(true);
+    }
+  }, []);
+  const toggleCharts = () => {
+    setShowCharts((v) => {
+      if (typeof window !== "undefined") localStorage.setItem(CHARTS_KEY, v ? "0" : "1");
+      return !v;
+    });
+  };
+
+  // Messwerte nur laden, solange sie sichtbar sind — spart das 5s-Polling
+  useEffect(() => {
+    if (!showCharts) return;
     let cancelled = false;
     async function load() {
       setLoading(true);
@@ -44,7 +63,7 @@ export default function AnalyticsPage() {
     load();
     const id = setInterval(load, 5_000);
     return () => { cancelled = true; clearInterval(id); };
-  }, [range]);
+  }, [range, showCharts]);
 
   const liveSample = status ? {
     ts: Math.floor(Date.now() / 1000),
@@ -65,46 +84,14 @@ export default function AnalyticsPage() {
   return (
     <div className="flex flex-col gap-2.5">
 
-      {/* Charts section */}
-      <div className="rounded-card border border-border bg-bg1 p-4">
-        <div className="mb-3.5 flex items-center justify-between">
-          <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-tx3">Verlauf</div>
-          <div className="flex gap-1 rounded-tile border border-border bg-bg2 p-1">
-            {RANGES.map((r) => (
-              <button key={r.label} type="button" onClick={() => setRange(r)}
-                className={cn(
-                  "rounded-md px-3 py-1 text-[11px] font-bold uppercase tracking-wider transition",
-                  r.seconds === range.seconds ? "bg-primary text-white" : "text-tx3 hover:text-tx"
-                )}>
-                {r.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {loading && chartSamples.length === 0 ? (
-          <div className="py-8 text-center text-sm text-tx3">Lade Verlauf...</div>
-        ) : chartSamples.length < 2 ? (
-          <div className="py-8 text-center text-sm text-tx3">Noch nicht genug Daten. Backend sammelt alle 5 s einen Sample.</div>
-        ) : (
-          <div className="grid gap-3 lg:grid-cols-3">
-            <HistoryChart samples={chartSamples} accessor={(s) => s.pressure} color="var(--color-blue)"  unit="bar"   label="Druck" />
-            <HistoryChart samples={chartSamples} accessor={(s) => s.flow}     color="var(--color-green)" unit="L/min" label="Durchfluss" />
-            <HistoryChart samples={chartSamples} accessor={(s) => s.frequency} color="var(--color-amber)" unit="Hz"   label="Pumpenfrequenz" />
-            <HistoryChart samples={chartSamples} accessor={(s) => s.power ?? 0}      color="var(--color-purple)" unit="W"  label="Leistung" />
-            <HistoryChart samples={chartSamples} accessor={(s) => s.water_temp ?? 0} color="var(--color-blue)"   unit="°C" label="Wassertemp" />
-          </div>
-        )}
-      </div>
-
-      {/* History list */}
+      {/* Bewässerungs-Historie zuerst — danach wird auf dieser Seite gesucht */}
       <div className="rounded-card border border-border bg-bg1 p-4">
         <div className="mb-3 text-[10px] font-bold uppercase tracking-[0.12em] text-tx3">Bewässerungs-Historie</div>
         {history.length === 0 ? (
           <div className="text-sm text-tx3">Noch keine Läufe protokolliert.</div>
         ) : (
           <div className="flex flex-col gap-0">
-            {history.slice(0, 30).map((h, i) => {
+            {history.slice(0, 30).map((h, i, arr) => {
               const reason = String(h.reason ?? h.result ?? "");
               const isSkip = h.type === "skip";
               const src = SOURCE[String(h.started_by ?? "")] ?? null;
@@ -115,7 +102,7 @@ export default function AnalyticsPage() {
               return (
                 <div key={i} className={cn(
                   "flex items-center gap-3 py-2",
-                  i < history.length - 1 ? "border-b border-border2" : ""
+                  i < arr.length - 1 ? "border-b border-border2" : ""
                 )}>
                   <div className="h-8 w-0.5 shrink-0 rounded-full" style={{ background: accentColor }} />
                   <div className="min-w-0 flex-1">
@@ -151,6 +138,49 @@ export default function AnalyticsPage() {
           </div>
         )}
       </div>
+
+      {/* Technik-Diagramme — eingeklappt, sie sind Beiwerk zur Historie */}
+      <button
+        type="button"
+        onClick={toggleCharts}
+        className="flex items-center justify-center gap-1.5 rounded-card border border-border bg-bg1 py-2.5 text-[12px] font-semibold text-tx3 transition hover:text-tx2"
+      >
+        {showCharts ? "Messwerte ausblenden" : "Messwerte anzeigen"}
+        <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", showCharts && "rotate-180")} />
+      </button>
+
+      {showCharts && (
+        <div className="rounded-card border border-border bg-bg1 p-4">
+          <div className="mb-3.5 flex items-center justify-between">
+            <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-tx3">Messwerte</div>
+            <div className="flex gap-1 rounded-tile border border-border bg-bg2 p-1">
+              {RANGES.map((r) => (
+                <button key={r.label} type="button" onClick={() => setRange(r)}
+                  className={cn(
+                    "rounded-md px-3 py-1 text-[11px] font-bold uppercase tracking-wider transition",
+                    r.seconds === range.seconds ? "bg-primary text-white" : "text-tx3 hover:text-tx"
+                  )}>
+                  {r.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {loading && chartSamples.length === 0 ? (
+            <div className="py-8 text-center text-sm text-tx3">Lade Verlauf...</div>
+          ) : chartSamples.length < 2 ? (
+            <div className="py-8 text-center text-sm text-tx3">Noch nicht genug Daten. Backend sammelt alle 5 s einen Sample.</div>
+          ) : (
+            <div className="grid gap-3 lg:grid-cols-3">
+              <HistoryChart samples={chartSamples} accessor={(s) => s.pressure} color="var(--color-blue)"  unit="bar"   label="Druck" />
+              <HistoryChart samples={chartSamples} accessor={(s) => s.flow}     color="var(--color-green)" unit="L/min" label="Durchfluss" />
+              <HistoryChart samples={chartSamples} accessor={(s) => s.frequency} color="var(--color-amber)" unit="Hz"   label="Pumpenfrequenz" />
+              <HistoryChart samples={chartSamples} accessor={(s) => s.power ?? 0}      color="var(--color-purple)" unit="W"  label="Leistung" />
+              <HistoryChart samples={chartSamples} accessor={(s) => s.water_temp ?? 0} color="var(--color-blue)"   unit="°C" label="Wassertemp" />
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

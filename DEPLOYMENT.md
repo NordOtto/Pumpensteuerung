@@ -8,13 +8,23 @@ Diese Datei beschreibt den **schnellen Entwicklungs-Deploy** vom lokalen Windows
 
 ## 1. Ziel & Konventionen
 
-- **Pi-Hostname:** `pumpe.local` (mDNS) — sonst feste IP `192.168.1.86`
-- **SSH-User:** `pi`
+- **Pi-Hostname:** `pumpe.local` (mDNS) — feste IP `192.168.20.156` (Stand 03.08.2026)
+- **SSH-User:** `pi` — Zugang per SSH-Key, zusätzlich ist ein Passwort gesetzt
+- **MQTT-Broker:** `192.168.1.136` (anderes Gerät; zieht demnächst nach `192.168.20.136`)
 - **Service-User für Files:** `pumpe:pumpe`
 - **Frontend-Verzeichnis (LIVE):** `/opt/pumpe/current/frontend/.next/standalone/`
 - **Backend-Verzeichnis (LIVE):** `/opt/pumpe/current/backend/app/`
 - **systemd-Services:** `pumpe-backend.service`, `pumpe-frontend.service`
 - **APK-Auslieferung:** `https://pumpe.local/pumpe.apk` (via nginx)
+
+> **Nach einem IP-Wechsel:** `pumpe.local` kann noch auf die alte Adresse zeigen,
+> bis der mDNS-Cache abgelaufen ist — SSH läuft dann in einen Timeout. In dem Fall
+> alle Befehle mit der IP statt dem Namen ausführen (`pi@192.168.20.156`).
+>
+> Der Pi bezieht seine Adresse aktuell **per DHCP über WLAN** (`wlan0`). Sie kann
+> sich also erneut ändern. Für dauerhaft stabile Erreichbarkeit entweder im Router
+> eine DHCP-Reservierung auf die MAC setzen oder die IP per `nmcli` fest vergeben
+> (siehe [INSTALL.md](INSTALL.md), Abschnitt 2.2).
 
 > **Wichtig:** Der Frontend-Service lädt `/opt/pumpe/current/frontend/.next/standalone/server.js`. Der **verschachtelte** Pfad (`.next/standalone/`) ist Pflicht — ein Deploy direkt nach `/opt/pumpe/current/frontend/` wird **nicht** geladen.
 

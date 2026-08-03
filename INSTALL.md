@@ -69,10 +69,15 @@ wird später (Schritt 7 unten) von ESP32-IP auf Pi-IP umgestellt.
 LOGO 8.4 ──── Switch/Router ──── Pi3B+ (eth0, statische IP)
 ```
 
-Empfohlene IPs:
-- LOGO: 192.168.1.40
-- Pi:   192.168.1.50
-- alter Heimserver mit MQTT-Broker: 192.168.1.136 (bleibt!)
+Aktuelle IPs (Stand 03.08.2026):
+- **Pi:** `192.168.20.156` — erreichbar auch als `pumpe.local` (mDNS)
+- **LOGO:** 192.168.1.40
+- **MQTT-Broker** (alter Heimserver): `192.168.1.136`
+  → zieht demnächst nach `192.168.20.136` um; dann `MQTT_BROKER` in
+  `/opt/pumpe/current/backend/.env` anpassen und `pumpe-backend` neu starten.
+
+> Nach einem IP-Wechsel des Pi kann `pumpe.local` noch auf die alte Adresse
+> zeigen, bis der mDNS-Cache abgelaufen ist. Im Zweifel die IP direkt nutzen.
 
 ### Verkabelungs-Übersicht
 
@@ -101,21 +106,21 @@ Auf dem Dev-Rechner mit dem **Raspberry Pi Imager**:
 2. Vor dem Schreiben das Zahnrad öffnen:
    - Hostname: `pumpe`
    - SSH aktivieren, Public Key hinterlegen
-   - Benutzer/Passwort setzen (Default `pi` ist deaktiviert in neueren Images — eigenen User anlegen)
+   - Benutzer/Passwort setzen — in dieser Installation heißt der User **`pi`**
    - WLAN: am besten **nicht**, sondern Kabel; Ethernet auf statische IP
 3. Schreiben, einsetzen, Pi booten.
 
 ### 2.2 Erstes Login + Grundkonfiguration
 
 ```bash
-ssh deinuser@192.168.1.50
+ssh pi@192.168.20.156        # oder: ssh pi@pumpe.local
 
 # Statische IP setzen (Bookworm: NetworkManager)
 sudo nmcli connection modify "Wired connection 1" \
     ipv4.method manual \
-    ipv4.addresses 192.168.1.50/24 \
-    ipv4.gateway 192.168.1.1 \
-    ipv4.dns "192.168.1.1 1.1.1.1"
+    ipv4.addresses 192.168.20.156/24 \
+    ipv4.gateway 192.168.20.1 \
+    ipv4.dns "192.168.20.1 1.1.1.1"
 sudo nmcli connection up "Wired connection 1"
 
 # System aktuell
@@ -233,7 +238,7 @@ Erst wenn der RTU-Smoke-Test grün ist:
 
 1. **LOGO-Soft Comfort** öffnen, dein bestehendes Programm laden
 2. Modbus-TCP-Block finden (schreibt in HR 3/4/5 = Druck/Flow/Wassertemp)
-3. **Ziel-IP** ändern: ESP32-IP → Pi-IP (192.168.1.50)
+3. **Ziel-IP** ändern: ESP32-IP → Pi-IP (`192.168.20.156`)
 4. Programm in die LOGO laden
 5. Pi-Logs beobachten:
    ```bash

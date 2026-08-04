@@ -90,7 +90,7 @@ FastAPI ──RTU──→ V20 Frequenzumrichter (500ms Takt)
 |---|---|---|
 | Pi | `192.168.20.156` | auch `pumpe.local` (mDNS); SSH-User `pi` |
 | MQTT-Broker | `192.168.1.136` | anderes Gerät, zieht demnächst nach `192.168.20.136` |
-| LOGO 8.4 | `192.168.1.40` | schreibt Sensordaten an die Pi-IP |
+| LOGO 8.4 | `192.168.20.15` | schreibt Sensordaten an die Pi-IP |
 
 Nach einem IP-Wechsel des Pi zeigt `pumpe.local` u. U. noch auf die alte
 Adresse (mDNS-Cache) — dann Befehle mit der IP ausführen.

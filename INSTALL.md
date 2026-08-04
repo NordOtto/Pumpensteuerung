@@ -69,9 +69,9 @@ wird später (Schritt 7 unten) von ESP32-IP auf Pi-IP umgestellt.
 LOGO 8.4 ──── Switch/Router ──── Pi3B+ (eth0, statische IP)
 ```
 
-Aktuelle IPs (Stand 03.08.2026):
+Aktuelle IPs (Stand 04.08.2026):
 - **Pi:** `192.168.20.156` — erreichbar auch als `pumpe.local` (mDNS)
-- **LOGO:** 192.168.1.40
+- **LOGO:** `192.168.20.15`
 - **MQTT-Broker** (alter Heimserver): `192.168.1.136`
   → zieht demnächst nach `192.168.20.136` um; dann `MQTT_BROKER` in
   `/opt/pumpe/current/backend/.env` anpassen und `pumpe-backend` neu starten.

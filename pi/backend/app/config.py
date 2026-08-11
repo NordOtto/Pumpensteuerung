@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    mqtt_broker: str = "192.168.1.136"
+    mqtt_broker: str = "192.168.20.136"
     mqtt_port: int = 1883
     mqtt_user: str = ""
     mqtt_pass: str = ""

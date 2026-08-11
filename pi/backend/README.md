@@ -11,12 +11,12 @@ Pi 3B+
   ├─ uvicorn :8000 (FastAPI)
   │    ├─ pymodbus RTU  ──USB-RS485──▶ V20
   │    ├─ pymodbus TCP-Server :502 ◀── LOGO 8.4 (Sensoren)
-  │    └─ paho-mqtt  ──▶ 192.168.1.136:1883 (bestehender Broker)
+  │    └─ paho-mqtt  ──▶ 192.168.20.136:1883 (bestehender Broker)
   │
   └─ next.js :3001 (UI, separate App in pi/frontend)
 ```
 
-MQTT-Broker bleibt der bestehende **192.168.1.136:1883** — kein lokaler
+MQTT-Broker bleibt der bestehende **192.168.20.136:1883** — kein lokaler
 Mosquitto auf dem Pi. Topic-Schema (`pumpensteuerung/raw/**`,
 `pumpensteuerung/cmd/**`) ist unverändert kompatibel zur Home Assistant
 Integration.

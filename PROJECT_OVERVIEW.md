@@ -22,7 +22,7 @@ Browser / Android-App (HTTPS :443)
 FastAPI (Python, pi/backend/)
   ├─ Modbus RTU  → Sinamics V20 (Befehle, 500ms-Takt)
   ├─ Modbus TCP  ← Siemens LOGO 8.4 (Sensordaten Reg 2–4)
-  ├─ MQTT        → externer Broker 192.168.1.136:1883
+  ├─ MQTT        → externer Broker 192.168.20.136:1883
   │              ↔ Home Assistant (optional)
   ├─ Druckregelung (PI mit Anti-Windup)
   ├─ Bewässerungs-Engine (Smart-ET, Wetter, Durchfluss-Integration)
@@ -183,7 +183,7 @@ Vollständige Registertabelle: [V20_MODBUS_REGISTER.md](V20_MODBUS_REGISTER.md)
 ENV-Variablen in `/opt/pumpe/current/backend/.env` (aus `.env.example` ableiten):
 
 ```env
-MQTT_BROKER=192.168.1.136
+MQTT_BROKER=192.168.20.136
 MQTT_PORT=1883
 MQTT_USER=<mqtt-user>
 MQTT_PASS=<mqtt-password>

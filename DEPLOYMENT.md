@@ -10,7 +10,7 @@ Diese Datei beschreibt den **schnellen Entwicklungs-Deploy** vom lokalen Windows
 
 - **Pi-Hostname:** `pumpe.local` (mDNS) — feste IP `192.168.20.156` (Stand 03.08.2026)
 - **SSH-User:** `pi` — Zugang per SSH-Key, zusätzlich ist ein Passwort gesetzt
-- **MQTT-Broker:** `192.168.1.136` (anderes Gerät; zieht demnächst nach `192.168.20.136`)
+- **MQTT-Broker:** `192.168.20.136` (anderes Gerät, im selben Subnetz wie Pi/LOGO)
 - **Service-User für Files:** `pumpe:pumpe`
 - **Frontend-Verzeichnis (LIVE):** `/opt/pumpe/current/frontend/.next/standalone/`
 - **Backend-Verzeichnis (LIVE):** `/opt/pumpe/current/backend/app/`

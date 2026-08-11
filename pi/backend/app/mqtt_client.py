@@ -1,4 +1,4 @@
-"""MQTT-Bridge zum bestehenden externen Broker (192.168.1.136:1883).
+"""MQTT-Bridge zum bestehenden externen Broker (192.168.20.136:1883).
 
 Verantwortlichkeiten in der neuen Architektur:
   - **Publisht** `pumpensteuerung/raw/**` Telemetrie + HA-State-Topics

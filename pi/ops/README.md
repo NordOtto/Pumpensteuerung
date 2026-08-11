@@ -134,5 +134,5 @@ sudo systemctl restart pumpe-backend
   ```
 - Default-Login admin/admin sobald `auth.py` portiert ist — beim ersten
   Login wird Passwortwechsel erzwungen.
-- Bestehender MQTT-Broker `192.168.1.136:1883` — Pi-Backend authentisiert
+- Bestehender MQTT-Broker `192.168.20.136:1883` — Pi-Backend authentisiert
   mit den Credentials aus `.env`. Kein lokaler Mosquitto.

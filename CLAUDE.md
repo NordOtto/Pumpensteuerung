@@ -63,7 +63,7 @@ Browser (HTTPS :443)
 
 FastAPI ──RTU──→ V20 Frequenzumrichter (500ms Takt)
         ←─TCP──  LOGO 8.4 SPS (schreibt Sensor-Register 2–4)
-        ──MQTT─→ Broker 192.168.1.136:1883 ──┬──→ Home Assistant (Status)
+        ──MQTT─→ Broker 192.168.20.136:1883 ──┬──→ Home Assistant (Status)
                                               └──→ ESP32 ESPHome (Ventile, valve/<zone>/set)
 ```
 
@@ -89,7 +89,7 @@ FastAPI ──RTU──→ V20 Frequenzumrichter (500ms Takt)
 | Gerät | Adresse | Hinweis |
 |---|---|---|
 | Pi | `192.168.20.156` | auch `pumpe.local` (mDNS); SSH-User `pi` |
-| MQTT-Broker | `192.168.1.136` | anderes Gerät, zieht demnächst nach `192.168.20.136` |
+| MQTT-Broker | `192.168.20.136` | anderes Gerät, im selben Subnetz wie Pi/LOGO |
 | LOGO 8.4 | `192.168.20.15` | schreibt Sensordaten an die Pi-IP |
 
 Nach einem IP-Wechsel des Pi zeigt `pumpe.local` u. U. noch auf die alte
@@ -99,7 +99,7 @@ Adresse (mDNS-Cache) — dann Befehle mit der IP ausführen.
 
 ENV-Variablen in `/opt/pumpe/current/backend/.env` (aus `.env.example` ableiten):
 ```
-MQTT_BROKER=192.168.1.136
+MQTT_BROKER=192.168.20.136
 MQTT_PORT=1883
 MQTT_USER=<mqtt-user>
 MQTT_PASS=<mqtt-password>

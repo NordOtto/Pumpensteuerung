@@ -72,9 +72,7 @@ LOGO 8.4 ──── Switch/Router ──── Pi3B+ (eth0, statische IP)
 Aktuelle IPs (Stand 04.08.2026):
 - **Pi:** `192.168.20.156` — erreichbar auch als `pumpe.local` (mDNS)
 - **LOGO:** `192.168.20.15`
-- **MQTT-Broker** (alter Heimserver): `192.168.1.136`
-  → zieht demnächst nach `192.168.20.136` um; dann `MQTT_BROKER` in
-  `/opt/pumpe/current/backend/.env` anpassen und `pumpe-backend` neu starten.
+- **MQTT-Broker:** `192.168.20.136`
 
 > Nach einem IP-Wechsel des Pi kann `pumpe.local` noch auf die alte Adresse
 > zeigen, bis der mDNS-Cache abgelaufen ist. Im Zweifel die IP direkt nutzen.
@@ -165,7 +163,7 @@ sudo -u pumpe nano /opt/pumpe/current/backend/.env
 
 Mindestens setzen:
 ```ini
-MQTT_BROKER=192.168.1.136
+MQTT_BROKER=192.168.20.136
 MQTT_PORT=1883
 MQTT_USER=<aus deinem alten ESP32-secrets.h oder Heimserver>
 MQTT_PASS=<aus deinem alten ESP32-secrets.h oder Heimserver>

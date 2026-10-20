@@ -1,0 +1,41 @@
+{
+  "meta": {
+    "filename": "pumpensteuerung.kicad_pro",
+    "version": 1
+  },
+  "sheets": [
+    [
+      "9e6f2443-112f-4320-930d-2fe5d449a19d",
+      "Root"
+    ],
+    [
+      "b6bb53e8-88b0-49a1-a1a6-05ccdc09b479",
+      "Stromversorgung"
+    ],
+    [
+      "556a28b4-6415-415b-8242-f7db08c77081",
+      "CM5"
+    ],
+    [
+      "74402dcc-2d5f-4a02-bbd9-7e3b91fc7d0f",
+      "Analogeing\u00e4nge"
+    ],
+    [
+      "e1ea3968-dbc4-40f3-b207-6e862dbc44d5",
+      "Analogausg\u00e4nge"
+    ],
+    [
+      "bc45d35a-0953-481a-9a8c-2b6d44c3d0a1",
+      "Digital_RS485_Luefter"
+    ]
+  ],
+  "schematic": {
+    "legacy_lib_dir": "",
+    "legacy_lib_list": []
+  },
+  "boards": [],
+  "libraries": {
+    "pinned_footprint_libs": [],
+    "pinned_symbol_libs": []
+  }
+}

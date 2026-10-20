@@ -1,0 +1,3 @@
+(fp_lib_table
+  (lib (name "PumpCtrl")(type "KiCad")(uri "${KIPRJMOD}/lib/PumpCtrl.pretty")(options "")(descr "Projekt-Footprints"))
+)

@@ -1,0 +1,3 @@
+(sym_lib_table
+  (lib (name "PumpCtrl")(type "KiCad")(uri "${KIPRJMOD}/lib/PumpCtrl.kicad_sym")(options "")(descr "Projektsymbole"))
+)

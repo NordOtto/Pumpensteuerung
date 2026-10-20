@@ -1,0 +1,152 @@
+(kicad_sch
+  (version 20230121)
+  (generator eeschema)
+  (uuid "9e6f2443-112f-4320-930d-2fe5d449a19d")
+  (paper "A3")
+  (title_block
+    (title "Pumpensteuerung — AIO-Steuerplatine (Übersicht)")
+    (date "2026-10-20")
+    (rev "0.1")
+    (company "Brunnensteuerung Wathlingen")
+    (comment 1 "Erzeugt mit hardware/tools/gen_schematic.py — Änderungen bitte dort"))
+  (lib_symbols)
+  (text "Pumpensteuerung — AIO-Steuerplatine, Rev 0.1 (Entwurf)\nErsetzt LOGO! 8.4 + AM2 + Raspberry Pi 3B+. Kern: Raspberry Pi Compute Module 5 (eMMC, WLAN).\nVersorgung 230 V AC → Mean Well IRM-30-24 → 24 V (Sensoren, XTR111, Relais) → 12 V (Lüfter) / 5 V (CM5).\nDetails, GPIO-Belegung und offene Punkte: hardware/SPEC.md"
+    (at 25.4 160 0)
+    (effects
+      (font
+        (size 1.5 1.5))
+      (justify left top))
+    (uuid "b9314609-a059-4724-8270-4c8569905a56"))
+  (sheet
+    (at 25.4 40.64)
+    (size 60.96 25.4)
+    (fields_autoplaced)
+    (stroke
+      (width 0.1524)
+      (type solid))
+    (fill
+      (color 0 0 0 0))
+    (uuid "b6bb53e8-88b0-49a1-a1a6-05ccdc09b479")
+    (property "Sheetname" "Stromversorgung"
+      (at 25.4 39.9284 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (justify left bottom)))
+    (property "Sheetfile" "power.kicad_sch"
+      (at 25.4 66.6246 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (justify left top)))
+    (instances
+      (project "pumpensteuerung"
+        (path "/9e6f2443-112f-4320-930d-2fe5d449a19d"
+          (page "2")))))
+  (sheet
+    (at 101.6 40.64)
+    (size 60.96 25.4)
+    (fields_autoplaced)
+    (stroke
+      (width 0.1524)
+      (type solid))
+    (fill
+      (color 0 0 0 0))
+    (uuid "556a28b4-6415-415b-8242-f7db08c77081")
+    (property "Sheetname" "CM5"
+      (at 101.6 39.9284 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (justify left bottom)))
+    (property "Sheetfile" "cm5.kicad_sch"
+      (at 101.6 66.6246 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (justify left top)))
+    (instances
+      (project "pumpensteuerung"
+        (path "/9e6f2443-112f-4320-930d-2fe5d449a19d"
+          (page "3")))))
+  (sheet
+    (at 177.8 40.64)
+    (size 60.96 25.4)
+    (fields_autoplaced)
+    (stroke
+      (width 0.1524)
+      (type solid))
+    (fill
+      (color 0 0 0 0))
+    (uuid "74402dcc-2d5f-4a02-bbd9-7e3b91fc7d0f")
+    (property "Sheetname" "Analogeingänge"
+      (at 177.8 39.9284 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (justify left bottom)))
+    (property "Sheetfile" "analog_in.kicad_sch"
+      (at 177.8 66.6246 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (justify left top)))
+    (instances
+      (project "pumpensteuerung"
+        (path "/9e6f2443-112f-4320-930d-2fe5d449a19d"
+          (page "4")))))
+  (sheet
+    (at 254 40.64)
+    (size 60.96 25.4)
+    (fields_autoplaced)
+    (stroke
+      (width 0.1524)
+      (type solid))
+    (fill
+      (color 0 0 0 0))
+    (uuid "e1ea3968-dbc4-40f3-b207-6e862dbc44d5")
+    (property "Sheetname" "Analogausgänge"
+      (at 254 39.9284 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (justify left bottom)))
+    (property "Sheetfile" "analog_out.kicad_sch"
+      (at 254 66.6246 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (justify left top)))
+    (instances
+      (project "pumpensteuerung"
+        (path "/9e6f2443-112f-4320-930d-2fe5d449a19d"
+          (page "5")))))
+  (sheet
+    (at 25.4 86.36)
+    (size 60.96 25.4)
+    (fields_autoplaced)
+    (stroke
+      (width 0.1524)
+      (type solid))
+    (fill
+      (color 0 0 0 0))
+    (uuid "bc45d35a-0953-481a-9a8c-2b6d44c3d0a1")
+    (property "Sheetname" "Digital_RS485_Luefter"
+      (at 25.4 85.6484 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (justify left bottom)))
+    (property "Sheetfile" "io.kicad_sch"
+      (at 25.4 112.3446 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (justify left top)))
+    (instances
+      (project "pumpensteuerung"
+        (path "/9e6f2443-112f-4320-930d-2fe5d449a19d"
+          (page "6")))))
+  (sheet_instances
+    (path "/"
+      (page "1"))))

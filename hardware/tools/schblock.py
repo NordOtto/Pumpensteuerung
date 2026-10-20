@@ -560,6 +560,7 @@ class Design:
         self.net_sheets = defaultdict(set)
         self.flag_nets = set()
         self.report = []
+        self.sources = {}        # Netz → (Ref, Pin): Ort, an dem das Netz entsteht
 
     def sheet(self, *a, **kw):
         s = Sheet(self, *a, **kw)
@@ -813,11 +814,31 @@ class Design:
             f.write('(sym_lib_table\n  (lib (name "PumpCtrl")(type "KiCad")(uri "${KIPRJMOD}/lib/PumpCtrl.kicad_sym")(options "")(descr "Projektsymbole"))\n)\n')
         with open(os.path.join(outdir, "fp-lib-table"), "w") as f:
             f.write('(fp_lib_table\n  (lib (name "PumpCtrl")(type "KiCad")(uri "${KIPRJMOD}/lib/PumpCtrl.pretty")(options "")(descr "Projekt-Footprints"))\n)\n')
+        self._write_linkmap(os.path.join(outdir, "..", "tools", "link_map.json"))
         pro = {"meta": {"filename": f"{PROJECT}.kicad_pro", "version": 1},
                "sheets": [[self.root_uuid, "Root"]] + [[s.sheet_uuid_in_root, s.name] for s in self.sheets],
                "boards": [], "libraries": {"pinned_footprint_libs": [], "pinned_symbol_libs": []}}
         with open(os.path.join(outdir, f"{PROJECT}.kicad_pro"), "w") as f:
             json.dump(pro, f, indent=2)
+
+    def _write_linkmap(self, path):
+        """Positionen aller Labels/Power-Symbole und der Netz-Quellen für tools/pdf_links.py."""
+        sheets = []
+        for i, s in enumerate(self.sheets):
+            items = []
+            for b in s.bodies:
+                if b and isinstance(b[4], str) and (b[4].startswith("PWR:") or b[4].startswith("LBL:")):
+                    x0, x1, y0, y1, tag = b
+                    items.append({"net": tag.split(":", 1)[1], "kind": tag[:3], "bbox": [x0, y0, x1, y1],
+                                  "box": s.box_of(((x0 + x1) / 2, (y0 + y1) / 2))})
+            pins = {}
+            for p in s.pins:
+                pins[f"{p.part.ref}.{p.num}"] = {"pt": [p.x, p.y], "type": p.ptype, "box": s.box_of(p.pt),
+                                                 "net": p.part.unit_nets[p.unit][p.num], "lib": p.part.libid}
+            sheets.append({"name": s.name, "page": i + 2, "paper": s.paper, "items": items, "pins": pins,
+                           "boxes": s.boxes})
+        with open(path, "w") as f:
+            json.dump({"sheets": sheets, "sources": self.sources}, f, indent=0)
 
     def _write_sch(self, path, s, is_root, extra):
         libs = [S("lib_symbols")] + [resolve_symbol(l) for l in sorted(s.used_libs)]

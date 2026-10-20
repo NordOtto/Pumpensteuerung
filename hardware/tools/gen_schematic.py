@@ -106,8 +106,8 @@ def buck(sh, name, vout, rfbb, lval, cout_val, cout_n, x, y):
     R(sh, "12k", en, G, (x + 48, uy + 12))
     C(sh, "1µ", vcc, G, (x + 57, uy + 16))
     C(sh, "100nF", boot, sw, (ux + 18, uy - 14), h=True)
-    sh.add("L", "Device:L", lval, LBUCK, {1: sw, 2: vout}, at=(ux + 32, uy - 2.54), rot=90,
-           props={"MPN": f"Bourns SRP7028A-{'100M' if lval.startswith('10') else '220M'}"}, val_side="below")
+    d.sources[vout] = (sh.add("L", "Device:L", lval, LBUCK, {1: sw, 2: vout}, at=(ux + 32, uy - 2.54), rot=90,
+           props={"MPN": f"Bourns SRP7028A-{'100M' if lval.startswith('10') else '220M'}"}, val_side="below").ref, "2")
     R(sh, "100k 1%", vout, fb, (ux + 24, uy + 8))
     R(sh, f"{rfbb} 1%", fb, G, (ux + 24, uy + 22))
     for i in range(cout_n):
@@ -127,7 +127,7 @@ pw.add("RV", "Device:Varistor", "S10K275", "Varistor:RV_Disc_D12mm_W4.2mm_P7.5mm
 pw.lab("AC_L", 78, 45, 0)
 pw.lab("AC_N", 78, 62, 0)
 pw.box("Netzteil 24 V / 30 W", 95, 25, 160, 75)
-pw.add("PS", "Converter_ACDC:IRM-20-24", "IRM-30-24", "PumpCtrl:MeanWell_IRM-30",
+ps1 = pw.add("PS", "Converter_ACDC:IRM-20-24", "IRM-30-24", "PumpCtrl:MeanWell_IRM-30",
        {1: "AC_L", 2: "AC_N", 3: G, 4: "+24V"}, at=(128, 47.54), props={"MPN": "Mean Well IRM-30-24"})
 pw.lab("AC_L", 100, 45, 180)
 pw.lab("AC_N", 100, 62, 180)
@@ -152,7 +152,7 @@ pw.add("U", "Regulator_Switching:AP63203WU", "AP63203WU-7", "Package_TO_SOT_SMD:
        {1: "+3V3", 2: "+5V", 3: "+5V", 4: G, 5: "BUCK3_SW", 6: "BUCK3_BST"}, at=(320, 125), props={"MPN": "AP63203WU-7"})
 C(pw, "10µF/16V", "+5V", G, (290, 128), fp=C0805)
 C(pw, "100nF", "BUCK3_BST", "BUCK3_SW", (338, 112), h=True)
-pw.add("L", "Device:L", "4.7µH", "Inductor_SMD:L_Bourns-SRN6028", {1: "BUCK3_SW", 2: "+3V3"}, at=(355, 122.46), rot=90,
+l3 = pw.add("L", "Device:L", "4.7µH", "Inductor_SMD:L_Bourns-SRN6028", {1: "BUCK3_SW", 2: "+3V3"}, at=(355, 122.46), rot=90,
        props={"MPN": "Bourns SRN6028-4R7M"}, val_side="below")
 C(pw, "22µF/10V", "+3V3", G, (375, 128), fp=C1210)
 C(pw, "22µF/10V", "+3V3", G, (385, 128), fp=C1210)
@@ -268,7 +268,7 @@ hm.add("U", "Interface_Ethernet:LAN8720A", "LAN8720A-CP", "Package_DFN_QFN:VQFN-
         14: "ETH_REFCLK", 15: "PHY_nRST", 16: "RMII_TXEN", 17: "RMII_TXD0", 18: "RMII_TXD1", 19: "ETH_AVDD",
         20: "ETH_TXN", 21: "ETH_TXP", 22: "ETH_RXN", 23: "ETH_RXP", 24: "ETH_RBIAS", 25: G},
        at=(310, 95), props={"MPN": "LAN8720A-CP-TR"})
-hm.add("FB", "Device:FerriteBead", "600Ω@100MHz", "Inductor_SMD:L_0603_1608Metric", {1: "+3V3", 2: "ETH_AVDD"},
+fb1 = hm.add("FB", "Device:FerriteBead", "600Ω@100MHz", "Inductor_SMD:L_0603_1608Metric", {1: "+3V3", 2: "ETH_AVDD"},
        at=(265, 45), val_side="right")
 C(hm, "10µ", "ETH_AVDD", G, (350, 40), fp=C0805)
 C(hm, "100n", "ETH_AVDD", G, (360, 40))
@@ -454,7 +454,7 @@ for k in (1, 2):
 io.box("RS485 isoliert → V20  (Modbus RTU, Halbduplex)", 15, 170, 200, 270,
        note="DE + /RE gemeinsam (RTS/GPIO16), 10k Pull-down = Empfang. 120 Ω per Jumper.\n"
             "Klemme: A = P+, B = N−, GND_ISO an V20-Bezugspotenzial.")
-io.add("U", "Interface_UART:ADM2587E", "ADM2587EBRWZ", "Package_SO:SOIC-20W_7.5x12.8mm_P1.27mm",
+u485 = io.add("U", "Interface_UART:ADM2587E", "ADM2587EBRWZ", "Package_SO:SOIC-20W_7.5x12.8mm_P1.27mm",
        {1: G, 2: "+3V3", 3: G, 4: "RS485_RX", 5: "RS485_DE", 6: "RS485_DE", 7: "RS485_TX", 8: "+3V3",
         9: G, 10: G, 11: "GND_ISO", 12: "VISO", 13: "RS485_A", 14: "GND_ISO", 15: "RS485_B", 16: "GND_ISO",
         17: "RS485_B", 18: "RS485_A", 19: "VISO", 20: "GND_ISO"}, at=(85, 220))
@@ -483,6 +483,10 @@ io.add("J", "Connector_Generic:Conn_01x04", "Lüfter 4-Pin", "Connector:FanPinHe
 R(io, "10k", "+3V3", "FAN_TACH_IN", (345, 185))
 R(io, "10k", "FAN_TACH", "FAN_TACH_IN", (320, 228), h=True)
 io.lab("FAN_TACH", 228, 228, 180)
+
+# Quellen für die PDF-Sprungmarken (Klick auf Versorgung → dorthin, wo sie entsteht)
+d.sources.update({"+24V": (ps1.ref, "4"), "GND": (ps1.ref, "3"), "+3V3": (l3.ref, "2"),
+                  "ETH_AVDD": (fb1.ref, "2"), "VISO": (u485.ref, "12"), "GND_ISO": (u485.ref, "11")})
 
 ROOT_NOTES = [
     ("Pumpensteuerung — AIO-Steuerplatine, Rev 0.2 (Entwurf)\n"

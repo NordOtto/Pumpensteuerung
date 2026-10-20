@@ -174,6 +174,10 @@ kicad-cli sch export netlist -o /tmp/n.net hardware/kicad/pumpensteuerung.kicad_
 python3 hardware/tools/check_netlist.py /tmp/n.net hardware/tools/intended_netlist.json   # Zeichnung = Absicht?
 python3 hardware/tools/mini_erc.py               # Treiber-/Versorgungsprüfung
 python3 hardware/tools/make_bom.py               # bom.csv
+kicad-cli sch export pdf -o hardware/pumpensteuerung_schaltplan.pdf hardware/kicad/pumpensteuerung.kicad_sch
+python3 hardware/tools/pdf_links.py hardware/pumpensteuerung_schaltplan.pdf   # Sprungmarken (pip install pypdf)
 ```
+
+**Sprungmarken im PDF:** Ein Klick auf ein Power-Symbol (+5V, +3V3, +24V …) oder ein Label springt zu der Stelle, an der das Netz entsteht, also zu Regler, Netzteil oder treibendem Pin. Bei Signalen ohne eindeutige Quelle geht es zur Gegenseite auf dem anderen Blatt. Die Quelle ist orange umrahmt, der Rahmen erscheint nur am Bildschirm, nicht im Ausdruck. Die Quellen der Versorgungen stehen in `gen_schematic.py` (`d.sources`).
 
 `tools/schblock.py` setzt Bauteile an feste Koordinaten und zieht die Drähte selbst (L-/Z-Wege um Bauteilkörper, fremde Pins und Drähte herum). Wo kein Weg frei ist, setzt es lokale Labels. Der Netzlistenvergleich findet jeden Zeichenfehler. Bis zum Layout bitte im Generator ändern, danach in KiCad direkt weiterarbeiten. Die Dateien sind im KiCad-7-Format, KiCad 8–10 konvertiert sie beim Öffnen.

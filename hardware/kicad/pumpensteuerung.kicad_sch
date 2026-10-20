@@ -1,7 +1,7 @@
 (kicad_sch
   (version 20230121)
   (generator eeschema)
-  (uuid "12fb2b20-dd6c-4acb-b1fb-fea61cd86825")
+  (uuid "affa2b30-0eb5-462c-a24e-5aa620be781a")
   (paper "A3")
   (title_block
     (title "Pumpensteuerung — Übersicht")
@@ -17,7 +17,7 @@
       (font
         (size 1.27 1.27))
       (justify left top))
-    (uuid "d6feff20-1132-48e7-9166-26764b9a8b42"))
+    (uuid "17de53c8-cd7d-48e6-a4dd-30871ffef937"))
   (sheet
     (at 25.4 45.72)
     (size 60.96 20.32)
@@ -26,7 +26,7 @@
       (type solid))
     (fill
       (color 0 0 0 0))
-    (uuid "6104fff9-cc64-4501-9570-fd76e9ee35eb")
+    (uuid "2765987f-396e-42ec-a78b-2206c5b8dfda")
     (property "Sheetname" "Stromversorgung"
       (at 25.4 45.0084 0)
       (effects
@@ -41,7 +41,7 @@
         (justify left top)))
     (instances
       (project "pumpensteuerung"
-        (path "/12fb2b20-dd6c-4acb-b1fb-fea61cd86825"
+        (path "/affa2b30-0eb5-462c-a24e-5aa620be781a"
           (page "2")))))
   (sheet
     (at 101.6 45.72)
@@ -51,7 +51,7 @@
       (type solid))
     (fill
       (color 0 0 0 0))
-    (uuid "caee2257-56d1-4621-a632-1fa204766517")
+    (uuid "528e1391-c2eb-463e-b2f6-61f367a91ca2")
     (property "Sheetname" "Steuerung_ESP32S3"
       (at 101.6 45.0084 0)
       (effects
@@ -66,7 +66,7 @@
         (justify left top)))
     (instances
       (project "pumpensteuerung"
-        (path "/12fb2b20-dd6c-4acb-b1fb-fea61cd86825"
+        (path "/affa2b30-0eb5-462c-a24e-5aa620be781a"
           (page "3")))))
   (sheet
     (at 177.8 45.72)
@@ -76,7 +76,7 @@
       (type solid))
     (fill
       (color 0 0 0 0))
-    (uuid "f47faf80-0c77-4103-a9af-fae1b413ee59")
+    (uuid "bb478f10-051b-4667-9000-94c3a2606007")
     (property "Sheetname" "HMI_ESP32P4"
       (at 177.8 45.0084 0)
       (effects
@@ -91,7 +91,7 @@
         (justify left top)))
     (instances
       (project "pumpensteuerung"
-        (path "/12fb2b20-dd6c-4acb-b1fb-fea61cd86825"
+        (path "/affa2b30-0eb5-462c-a24e-5aa620be781a"
           (page "4")))))
   (sheet
     (at 254 45.72)
@@ -101,7 +101,7 @@
       (type solid))
     (fill
       (color 0 0 0 0))
-    (uuid "d8119baf-99ae-44c1-829b-fb7699132104")
+    (uuid "206cf03c-49c6-47e7-a8d5-dc8a455d96eb")
     (property "Sheetname" "Analogeingänge"
       (at 254 45.0084 0)
       (effects
@@ -116,7 +116,7 @@
         (justify left top)))
     (instances
       (project "pumpensteuerung"
-        (path "/12fb2b20-dd6c-4acb-b1fb-fea61cd86825"
+        (path "/affa2b30-0eb5-462c-a24e-5aa620be781a"
           (page "5")))))
   (sheet
     (at 25.4 83.82)
@@ -126,7 +126,7 @@
       (type solid))
     (fill
       (color 0 0 0 0))
-    (uuid "8c6cb836-af31-40c1-ad6d-daf7c32cc1cc")
+    (uuid "8fa63f93-3376-4aa5-9f48-e42b8374e612")
     (property "Sheetname" "Analogausgänge"
       (at 25.4 83.1084 0)
       (effects
@@ -141,7 +141,7 @@
         (justify left top)))
     (instances
       (project "pumpensteuerung"
-        (path "/12fb2b20-dd6c-4acb-b1fb-fea61cd86825"
+        (path "/affa2b30-0eb5-462c-a24e-5aa620be781a"
           (page "6")))))
   (sheet
     (at 101.6 83.82)
@@ -151,7 +151,7 @@
       (type solid))
     (fill
       (color 0 0 0 0))
-    (uuid "c4febc4d-b363-4cba-ae84-11cb756fa46f")
+    (uuid "efb12316-2cc7-4a78-b937-1d1144acfea4")
     (property "Sheetname" "Digital_RS485_Luefter"
       (at 101.6 83.1084 0)
       (effects
@@ -166,7 +166,7 @@
         (justify left top)))
     (instances
       (project "pumpensteuerung"
-        (path "/12fb2b20-dd6c-4acb-b1fb-fea61cd86825"
+        (path "/affa2b30-0eb5-462c-a24e-5aa620be781a"
           (page "7")))))
   (sheet_instances
     (path "/"

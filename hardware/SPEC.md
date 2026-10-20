@@ -160,14 +160,20 @@ Beim Booten sind beide Ausgänge über `OD` gesperrt, bis die Software `AO_EN` s
 - [ ] **Sicherungswert** gegen den IRM-30-Einschaltstrom prüfen. LCSC-Nummern ergänzen.
 - [ ] **Gehäuse** (Fusion): Display als Front, Platine dahinter, Klemmen unten, RJ45 und beide USB-C seitlich zugänglich.
 
-## 10. Neu erzeugen und prüfen
+## 10. Schaltplan-Stil, neu erzeugen und prüfen
+
+Der Stil entspricht `pool_ui/hardware/pool-pcb`:
+- Jede Funktion steht in einem gestrichelten Block mit Titel, die Erläuterungen als Notiz darunter.
+- Bauteile sind mit echten Drähten verbunden.
+- Versorgung über Power-Symbole, Global-Labels nur für Signale, die einen Block verlassen.
+- Kein Block ragt in das Schriftfeld.
 
 ```bash
-python3 hardware/tools/gen_schematic.py          # Schaltplan schreiben
+python3 hardware/tools/gen_schematic.py          # Schaltplan schreiben (Platzierung je Block in dieser Datei)
 kicad-cli sch export netlist -o /tmp/n.net hardware/kicad/pumpensteuerung.kicad_sch
-python3 hardware/tools/check_netlist.py /tmp/n.net hardware/tools/intended_netlist.json
+python3 hardware/tools/check_netlist.py /tmp/n.net hardware/tools/intended_netlist.json   # Zeichnung = Absicht?
 python3 hardware/tools/mini_erc.py               # Treiber-/Versorgungsprüfung
 python3 hardware/tools/make_bom.py               # bom.csv
 ```
 
-Der Schaltplan wird generiert, Änderungen also im Generator vornehmen. Ab dem Layout wird in KiCad direkt weitergearbeitet. Die Dateien sind im KiCad-7-Format, KiCad 8/9 öffnet und konvertiert sie. Im neueren KiCad zusätzlich ERC laufen lassen und *Felder automatisch platzieren*.
+`tools/schblock.py` setzt Bauteile an feste Koordinaten und zieht die Drähte selbst (L-/Z-Wege um Bauteilkörper, fremde Pins und Drähte herum). Wo kein Weg frei ist, setzt es lokale Labels. Der Netzlistenvergleich findet jeden Zeichenfehler. Bis zum Layout bitte im Generator ändern, danach in KiCad direkt weiterarbeiten. Die Dateien sind im KiCad-7-Format, KiCad 8–10 konvertiert sie beim Öffnen.

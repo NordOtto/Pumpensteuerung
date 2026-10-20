@@ -8,7 +8,7 @@ import json, os, sys
 sys.path.insert(0, os.path.dirname(__file__))
 import gen_schematic as g  # baut das Design im Speicher auf
 from libs import pins as sym_pins
-from schgen import resolve_symbol
+from schblock import resolve_symbol
 
 types = {}
 for sheet, part in g.d.parts:

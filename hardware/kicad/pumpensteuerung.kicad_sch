@@ -1,34 +1,34 @@
 (kicad_sch
   (version 20230121)
   (generator eeschema)
-  (uuid "549b275a-f11d-44a5-81ed-03dfc55c7e93")
+  (uuid "12fb2b20-dd6c-4acb-b1fb-fea61cd86825")
   (paper "A3")
   (title_block
-    (title "Pumpensteuerung — AIO-Steuerplatine (Übersicht)")
+    (title "Pumpensteuerung — Übersicht")
     (date "2026-10-20")
     (rev "0.2")
     (company "Brunnensteuerung Wathlingen")
-    (comment 1 "Erzeugt mit hardware/tools/gen_schematic.py — Änderungen bitte dort"))
+    (comment 1 "")
+    (comment 2 "Erzeugt mit hardware/tools/gen_schematic.py"))
   (lib_symbols)
-  (text "Pumpensteuerung — AIO-Steuerplatine, Rev 0.2 (Entwurf)\nErsetzt LOGO! 8.4 + AM2 + Raspberry Pi 3B+. Zwei Controller ohne Linux:\n  ESP32-S3 = Steuerung (Sensoren, PI-Druckregelung, V20 per RS485, Relais, AO, Trockenlaufschutz)\n  ESP32-P4 (M5Stack Stamp-P4) = App/HMI (Web-UI, Bewässerung, Wetter, MQTT/HA, 7\"-DSI-Touch, LAN)\n  Verbindung: UART (S3-UART0 ↔ P4), P4 kann S3 resetten/flashen.\nVersorgung 230 V AC → IRM-30-24 → 24 V → 12 V (Lüfter) / 5 V (P4, Display) → 3,3 V (S3, Logik).\nDetails, GPIO-Belegung und offene Punkte: hardware/SPEC.md"
-    (at 25.4 160 0)
+  (text "Pumpensteuerung — AIO-Steuerplatine, Rev 0.2 (Entwurf)\nErsetzt LOGO! 8.4 + AM2 + Raspberry Pi 3B+. Zwei Controller ohne Linux:\n  ESP32-S3 = Steuerung (Sensoren, PI-Druckregelung, V20 per RS485, Relais, AO, Trockenlaufschutz)\n  ESP32-P4 (M5Stack Stamp-P4) = App/HMI (Web-UI, Bewässerung, Wetter, MQTT/HA, 7\"-DSI-Touch, LAN)\n  Verbindung: UART (S3-UART0 ↔ P4), P4 kann S3 resetten/flashen.\nVersorgung 230 V AC → IRM-30-24 → 24 V → 12 V (Lüfter) / 5 V (P4, Display) → 3,3 V (S3, Logik).\nDetails: hardware/SPEC.md"
+    (at 25.4 140 0)
     (effects
       (font
-        (size 1.5 1.5))
+        (size 1.27 1.27))
       (justify left top))
-    (uuid "ada7a130-ba66-47f6-9c42-a80a1214f6eb"))
+    (uuid "d6feff20-1132-48e7-9166-26764b9a8b42"))
   (sheet
-    (at 25.4 40.64)
-    (size 60.96 25.4)
-    (fields_autoplaced)
+    (at 25.4 45.72)
+    (size 60.96 20.32)
     (stroke
       (width 0.1524)
       (type solid))
     (fill
       (color 0 0 0 0))
-    (uuid "d0c58ce4-29ac-46c5-a502-120670bc415b")
+    (uuid "6104fff9-cc64-4501-9570-fd76e9ee35eb")
     (property "Sheetname" "Stromversorgung"
-      (at 25.4 39.9284 0)
+      (at 25.4 45.0084 0)
       (effects
         (font
           (size 1.27 1.27))
@@ -41,20 +41,19 @@
         (justify left top)))
     (instances
       (project "pumpensteuerung"
-        (path "/549b275a-f11d-44a5-81ed-03dfc55c7e93"
+        (path "/12fb2b20-dd6c-4acb-b1fb-fea61cd86825"
           (page "2")))))
   (sheet
-    (at 101.6 40.64)
-    (size 60.96 25.4)
-    (fields_autoplaced)
+    (at 101.6 45.72)
+    (size 60.96 20.32)
     (stroke
       (width 0.1524)
       (type solid))
     (fill
       (color 0 0 0 0))
-    (uuid "64a1a5a1-99bc-43e6-9942-0c95d88bbd7a")
+    (uuid "caee2257-56d1-4621-a632-1fa204766517")
     (property "Sheetname" "Steuerung_ESP32S3"
-      (at 101.6 39.9284 0)
+      (at 101.6 45.0084 0)
       (effects
         (font
           (size 1.27 1.27))
@@ -67,20 +66,19 @@
         (justify left top)))
     (instances
       (project "pumpensteuerung"
-        (path "/549b275a-f11d-44a5-81ed-03dfc55c7e93"
+        (path "/12fb2b20-dd6c-4acb-b1fb-fea61cd86825"
           (page "3")))))
   (sheet
-    (at 177.8 40.64)
-    (size 60.96 25.4)
-    (fields_autoplaced)
+    (at 177.8 45.72)
+    (size 60.96 20.32)
     (stroke
       (width 0.1524)
       (type solid))
     (fill
       (color 0 0 0 0))
-    (uuid "206dd7c8-531a-4c09-8172-c61de17cd39f")
+    (uuid "f47faf80-0c77-4103-a9af-fae1b413ee59")
     (property "Sheetname" "HMI_ESP32P4"
-      (at 177.8 39.9284 0)
+      (at 177.8 45.0084 0)
       (effects
         (font
           (size 1.27 1.27))
@@ -93,20 +91,19 @@
         (justify left top)))
     (instances
       (project "pumpensteuerung"
-        (path "/549b275a-f11d-44a5-81ed-03dfc55c7e93"
+        (path "/12fb2b20-dd6c-4acb-b1fb-fea61cd86825"
           (page "4")))))
   (sheet
-    (at 254 40.64)
-    (size 60.96 25.4)
-    (fields_autoplaced)
+    (at 254 45.72)
+    (size 60.96 20.32)
     (stroke
       (width 0.1524)
       (type solid))
     (fill
       (color 0 0 0 0))
-    (uuid "0f5f50cd-1435-4a95-a7b1-edf36ed8df6d")
+    (uuid "d8119baf-99ae-44c1-829b-fb7699132104")
     (property "Sheetname" "Analogeingänge"
-      (at 254 39.9284 0)
+      (at 254 45.0084 0)
       (effects
         (font
           (size 1.27 1.27))
@@ -119,59 +116,57 @@
         (justify left top)))
     (instances
       (project "pumpensteuerung"
-        (path "/549b275a-f11d-44a5-81ed-03dfc55c7e93"
+        (path "/12fb2b20-dd6c-4acb-b1fb-fea61cd86825"
           (page "5")))))
   (sheet
-    (at 25.4 86.36)
-    (size 60.96 25.4)
-    (fields_autoplaced)
+    (at 25.4 83.82)
+    (size 60.96 20.32)
     (stroke
       (width 0.1524)
       (type solid))
     (fill
       (color 0 0 0 0))
-    (uuid "962a49ea-bbbb-4af2-a36b-2b241ad1f4a6")
+    (uuid "8c6cb836-af31-40c1-ad6d-daf7c32cc1cc")
     (property "Sheetname" "Analogausgänge"
-      (at 25.4 85.6484 0)
+      (at 25.4 83.1084 0)
       (effects
         (font
           (size 1.27 1.27))
         (justify left bottom)))
     (property "Sheetfile" "analog_out.kicad_sch"
-      (at 25.4 112.3446 0)
+      (at 25.4 104.7246 0)
       (effects
         (font
           (size 1.27 1.27))
         (justify left top)))
     (instances
       (project "pumpensteuerung"
-        (path "/549b275a-f11d-44a5-81ed-03dfc55c7e93"
+        (path "/12fb2b20-dd6c-4acb-b1fb-fea61cd86825"
           (page "6")))))
   (sheet
-    (at 101.6 86.36)
-    (size 60.96 25.4)
-    (fields_autoplaced)
+    (at 101.6 83.82)
+    (size 60.96 20.32)
     (stroke
       (width 0.1524)
       (type solid))
     (fill
       (color 0 0 0 0))
-    (uuid "89e89a5e-e09b-4837-b78a-e024eabf4c21")
+    (uuid "c4febc4d-b363-4cba-ae84-11cb756fa46f")
     (property "Sheetname" "Digital_RS485_Luefter"
-      (at 101.6 85.6484 0)
+      (at 101.6 83.1084 0)
       (effects
         (font
           (size 1.27 1.27))
         (justify left bottom)))
     (property "Sheetfile" "io.kicad_sch"
-      (at 101.6 112.3446 0)
+      (at 101.6 104.7246 0)
       (effects
         (font
           (size 1.27 1.27))
         (justify left top)))
     (instances
       (project "pumpensteuerung"
-        (path "/549b275a-f11d-44a5-81ed-03dfc55c7e93"
+        (path "/12fb2b20-dd6c-4acb-b1fb-fea61cd86825"
           (page "7")))))
   (sheet_instances
     (path "/"

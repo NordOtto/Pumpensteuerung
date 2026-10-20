@@ -5,38 +5,34 @@
   },
   "sheets": [
     [
-      "549b275a-f11d-44a5-81ed-03dfc55c7e93",
+      "12fb2b20-dd6c-4acb-b1fb-fea61cd86825",
       "Root"
     ],
     [
-      "d0c58ce4-29ac-46c5-a502-120670bc415b",
+      "6104fff9-cc64-4501-9570-fd76e9ee35eb",
       "Stromversorgung"
     ],
     [
-      "64a1a5a1-99bc-43e6-9942-0c95d88bbd7a",
+      "caee2257-56d1-4621-a632-1fa204766517",
       "Steuerung_ESP32S3"
     ],
     [
-      "206dd7c8-531a-4c09-8172-c61de17cd39f",
+      "f47faf80-0c77-4103-a9af-fae1b413ee59",
       "HMI_ESP32P4"
     ],
     [
-      "0f5f50cd-1435-4a95-a7b1-edf36ed8df6d",
+      "d8119baf-99ae-44c1-829b-fb7699132104",
       "Analogeing\u00e4nge"
     ],
     [
-      "962a49ea-bbbb-4af2-a36b-2b241ad1f4a6",
+      "8c6cb836-af31-40c1-ad6d-daf7c32cc1cc",
       "Analogausg\u00e4nge"
     ],
     [
-      "89e89a5e-e09b-4837-b78a-e024eabf4c21",
+      "c4febc4d-b363-4cba-ae84-11cb756fa46f",
       "Digital_RS485_Luefter"
     ]
   ],
-  "schematic": {
-    "legacy_lib_dir": "",
-    "legacy_lib_list": []
-  },
   "boards": [],
   "libraries": {
     "pinned_footprint_libs": [],

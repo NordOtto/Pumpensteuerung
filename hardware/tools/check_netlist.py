@@ -24,7 +24,7 @@ for net, nodes in sorted(want.items()):
     extra = {nd for nd in got[g] if not nd.startswith('#')} - nodes
     if extra:
         print(f"FEHLER {net}: zusätzliche Knoten {sorted(extra)} (KiCad-Netz {g})"); errors += 1
-    if g != net:
+    if g != net and not g.startswith("Net-("):
         print(f"Hinweis {net}: heißt in KiCad {g}")
 single = [k for k, v in want.items() if len(v) < 2]
 for k in single:

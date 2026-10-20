@@ -1,18 +1,289 @@
 (kicad_symbol_lib
   (version 20220914)
   (generator kicad_symbol_editor)
+  (symbol "GND_ISO"
+    (power)
+    (pin_names
+      (offset 0))
+    (in_bom yes)
+    (on_board yes)
+    (property "Reference" "#PWR"
+      (at 0 -5.08 0)
+      (effects
+        (font
+          (size 1.27 1.27)) hide))
+    (property "Value" "GND_ISO"
+      (at 0 -3.302 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Footprint" ""
+      (at 0 -1.27 0)
+      (effects
+        (font
+          (size 1.27 1.27)) hide))
+    (property "Datasheet" ""
+      (at 0 -1.27 0)
+      (effects
+        (font
+          (size 1.27 1.27)) hide))
+    (property "ki_keywords" "global ground"
+      (at 0 0 0)
+      (effects
+        (font
+          (size 1.27 1.27)) hide))
+    (property "ki_description" "Power symbol creates a global label with name \"GNDPWR\" , global ground"
+      (at 0 0 0)
+      (effects
+        (font
+          (size 1.27 1.27)) hide))
+    (symbol "GND_ISO_0_1"
+      (polyline
+        (pts
+          (xy 0 -1.27)
+          (xy 0 0))
+        (stroke
+          (width 0)
+          (type default))
+        (fill
+          (type none)))
+      (polyline
+        (pts
+          (xy -1.016 -1.27)
+          (xy -1.27 -2.032)
+          (xy -1.27 -2.032))
+        (stroke
+          (width 0.2032)
+          (type default))
+        (fill
+          (type none)))
+      (polyline
+        (pts
+          (xy -0.508 -1.27)
+          (xy -0.762 -2.032)
+          (xy -0.762 -2.032))
+        (stroke
+          (width 0.2032)
+          (type default))
+        (fill
+          (type none)))
+      (polyline
+        (pts
+          (xy 0 -1.27)
+          (xy -0.254 -2.032)
+          (xy -0.254 -2.032))
+        (stroke
+          (width 0.2032)
+          (type default))
+        (fill
+          (type none)))
+      (polyline
+        (pts
+          (xy 0.508 -1.27)
+          (xy 0.254 -2.032)
+          (xy 0.254 -2.032))
+        (stroke
+          (width 0.2032)
+          (type default))
+        (fill
+          (type none)))
+      (polyline
+        (pts
+          (xy 1.016 -1.27)
+          (xy -1.016 -1.27)
+          (xy -1.016 -1.27))
+        (stroke
+          (width 0.2032)
+          (type default))
+        (fill
+          (type none)))
+      (polyline
+        (pts
+          (xy 1.016 -1.27)
+          (xy 0.762 -2.032)
+          (xy 0.762 -2.032)
+          (xy 0.762 -2.032))
+        (stroke
+          (width 0.2032)
+          (type default))
+        (fill
+          (type none))))
+    (symbol "GND_ISO_1_1"
+      (pin power_in line
+        (at 0 0 270)
+        (length 0) hide
+        (name "GND_ISO"
+          (effects
+            (font
+              (size 1.27 1.27))))
+        (number "1"
+          (effects
+            (font
+              (size 1.27 1.27)))))))
+  (symbol "VISO"
+    (power)
+    (pin_names
+      (offset 0))
+    (in_bom yes)
+    (on_board yes)
+    (property "Reference" "#PWR"
+      (at 0 -3.81 0)
+      (effects
+        (font
+          (size 1.27 1.27)) hide))
+    (property "Value" "VISO"
+      (at 0 3.81 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Footprint" ""
+      (at 0 0 0)
+      (effects
+        (font
+          (size 1.27 1.27)) hide))
+    (property "Datasheet" ""
+      (at 0 0 0)
+      (effects
+        (font
+          (size 1.27 1.27)) hide))
+    (property "ki_keywords" "global power"
+      (at 0 0 0)
+      (effects
+        (font
+          (size 1.27 1.27)) hide))
+    (property "ki_description" "Power symbol creates a global label with name \"VDD\""
+      (at 0 0 0)
+      (effects
+        (font
+          (size 1.27 1.27)) hide))
+    (symbol "VISO_0_1"
+      (polyline
+        (pts
+          (xy -0.762 1.27)
+          (xy 0 2.54))
+        (stroke
+          (width 0)
+          (type default))
+        (fill
+          (type none)))
+      (polyline
+        (pts
+          (xy 0 0)
+          (xy 0 2.54))
+        (stroke
+          (width 0)
+          (type default))
+        (fill
+          (type none)))
+      (polyline
+        (pts
+          (xy 0 2.54)
+          (xy 0.762 1.27))
+        (stroke
+          (width 0)
+          (type default))
+        (fill
+          (type none))))
+    (symbol "VISO_1_1"
+      (pin power_in line
+        (at 0 0 90)
+        (length 0) hide
+        (name "VISO"
+          (effects
+            (font
+              (size 1.27 1.27))))
+        (number "1"
+          (effects
+            (font
+              (size 1.27 1.27)))))))
+  (symbol "ETH_AVDD"
+    (power)
+    (pin_names
+      (offset 0))
+    (in_bom yes)
+    (on_board yes)
+    (property "Reference" "#PWR"
+      (at 0 -3.81 0)
+      (effects
+        (font
+          (size 1.27 1.27)) hide))
+    (property "Value" "ETH_AVDD"
+      (at 0 3.556 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Footprint" ""
+      (at 0 0 0)
+      (effects
+        (font
+          (size 1.27 1.27)) hide))
+    (property "Datasheet" ""
+      (at 0 0 0)
+      (effects
+        (font
+          (size 1.27 1.27)) hide))
+    (property "ki_keywords" "global power"
+      (at 0 0 0)
+      (effects
+        (font
+          (size 1.27 1.27)) hide))
+    (property "ki_description" "Power symbol creates a global label with name \"+3.3VA\""
+      (at 0 0 0)
+      (effects
+        (font
+          (size 1.27 1.27)) hide))
+    (symbol "ETH_AVDD_0_1"
+      (polyline
+        (pts
+          (xy -0.762 1.27)
+          (xy 0 2.54))
+        (stroke
+          (width 0)
+          (type default))
+        (fill
+          (type none)))
+      (polyline
+        (pts
+          (xy 0 0)
+          (xy 0 2.54))
+        (stroke
+          (width 0)
+          (type default))
+        (fill
+          (type none)))
+      (polyline
+        (pts
+          (xy 0 2.54)
+          (xy 0.762 1.27))
+        (stroke
+          (width 0)
+          (type default))
+        (fill
+          (type none))))
+    (symbol "ETH_AVDD_1_1"
+      (pin power_in line
+        (at 0 0 90)
+        (length 0) hide
+        (name "ETH_AVDD"
+          (effects
+            (font
+              (size 1.27 1.27))))
+        (number "1"
+          (effects
+            (font
+              (size 1.27 1.27)))))))
   (symbol "Stamp_P4"
     (pin_names
       (offset 1.016))
     (in_bom yes)
     (on_board yes)
     (property "Reference" "U"
-      (at 0 44.45 0)
+      (at 0 60.96 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Value" "M5Stack Stamp-P4"
-      (at 0 -44.45 0)
+      (at 0 -58.42 0)
       (effects
         (font
           (size 1.27 1.27))))
@@ -28,159 +299,16 @@
           (size 1.27 1.27)) hide))
     (symbol "Stamp_P4_0_1"
       (rectangle
-        (start -15.24 43.18)
-        (end 15.24 -43.18)
+        (start -16.51 59.69)
+        (end 16.51 -57.15)
         (stroke
           (width 0.254)
           (type default))
         (fill
           (type background))))
     (symbol "Stamp_P4_1_1"
-      (pin passive line
-        (at -20.32 40.64 0)
-        (length 5.08)
-        (name "LPG15_LPRXD"
-          (effects
-            (font
-              (size 1 1))))
-        (number "1"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at 20.32 40.64 180)
-        (length 5.08)
-        (name "LPG14_LPTXD"
-          (effects
-            (font
-              (size 1 1))))
-        (number "2"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at -20.32 38.1 0)
-        (length 5.08)
-        (name "LPG12"
-          (effects
-            (font
-              (size 1 1))))
-        (number "3"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at 20.32 38.1 180)
-        (length 5.08)
-        (name "LPG11_SDA"
-          (effects
-            (font
-              (size 1 1))))
-        (number "4"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at -20.32 35.56 0)
-        (length 5.08)
-        (name "LPG10"
-          (effects
-            (font
-              (size 1 1))))
-        (number "5"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at 20.32 35.56 180)
-        (length 5.08)
-        (name "LPG9_SCL"
-          (effects
-            (font
-              (size 1 1))))
-        (number "6"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at -20.32 33.02 0)
-        (length 5.08)
-        (name "LPG8"
-          (effects
-            (font
-              (size 1 1))))
-        (number "7"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at 20.32 33.02 180)
-        (length 5.08)
-        (name "LPG7"
-          (effects
-            (font
-              (size 1 1))))
-        (number "8"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at -20.32 30.48 0)
-        (length 5.08)
-        (name "LPG1"
-          (effects
-            (font
-              (size 1 1))))
-        (number "9"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at 20.32 30.48 180)
-        (length 5.08)
-        (name "G50_ADC2"
-          (effects
-            (font
-              (size 1 1))))
-        (number "10"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at -20.32 27.94 0)
-        (length 5.08)
-        (name "LPG0"
-          (effects
-            (font
-              (size 1 1))))
-        (number "11"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at 20.32 27.94 180)
-        (length 5.08)
-        (name "G49_ADC2"
-          (effects
-            (font
-              (size 1 1))))
-        (number "12"
-          (effects
-            (font
-              (size 1 1)))))
       (pin power_in line
-        (at -20.32 25.4 0)
-        (length 5.08)
-        (name "GND"
-          (effects
-            (font
-              (size 1 1))))
-        (number "13"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin power_in line
-        (at 20.32 25.4 180)
+        (at -21.59 57.15 0)
         (length 5.08)
         (name "5VIN"
           (effects
@@ -191,7 +319,7 @@
             (font
               (size 1 1)))))
       (pin passive line
-        (at -20.32 22.86 0)
+        (at -21.59 54.61 0)
         (length 5.08)
         (name "VBUS"
           (effects
@@ -202,260 +330,7 @@
             (font
               (size 1 1)))))
       (pin passive line
-        (at 20.32 22.86 180)
-        (length 5.08)
-        (name "LPG4"
-          (effects
-            (font
-              (size 1 1))))
-        (number "16"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at -20.32 20.32 0)
-        (length 5.08)
-        (name "G27_USB1_D+"
-          (effects
-            (font
-              (size 1 1))))
-        (number "17"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at 20.32 20.32 180)
-        (length 5.08)
-        (name "LPG6"
-          (effects
-            (font
-              (size 1 1))))
-        (number "18"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at -20.32 17.78 0)
-        (length 5.08)
-        (name "G26_USB1_D-"
-          (effects
-            (font
-              (size 1 1))))
-        (number "19"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at 20.32 17.78 180)
-        (length 5.08)
-        (name "G23"
-          (effects
-            (font
-              (size 1 1))))
-        (number "20"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at -20.32 15.24 0)
-        (length 5.08)
-        (name "G22"
-          (effects
-            (font
-              (size 1 1))))
-        (number "21"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at 20.32 15.24 180)
-        (length 5.08)
-        (name "G21"
-          (effects
-            (font
-              (size 1 1))))
-        (number "22"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at -20.32 12.7 0)
-        (length 5.08)
-        (name "G20"
-          (effects
-            (font
-              (size 1 1))))
-        (number "23"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at 20.32 12.7 180)
-        (length 5.08)
-        (name "G19"
-          (effects
-            (font
-              (size 1 1))))
-        (number "24"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at -20.32 10.16 0)
-        (length 5.08)
-        (name "G18"
-          (effects
-            (font
-              (size 1 1))))
-        (number "25"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at 20.32 10.16 180)
-        (length 5.08)
-        (name "G17"
-          (effects
-            (font
-              (size 1 1))))
-        (number "26"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at -20.32 7.62 0)
-        (length 5.08)
-        (name "G16"
-          (effects
-            (font
-              (size 1 1))))
-        (number "27"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at 20.32 7.62 180)
-        (length 5.08)
-        (name "3V3_OUT"
-          (effects
-            (font
-              (size 1 1))))
-        (number "28"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at -20.32 5.08 0)
-        (length 5.08)
-        (name "LPG13"
-          (effects
-            (font
-              (size 1 1))))
-        (number "29"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at 20.32 5.08 180)
-        (length 5.08)
-        (name "G37_U0TXD"
-          (effects
-            (font
-              (size 1 1))))
-        (number "30"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at -20.32 2.54 0)
-        (length 5.08)
-        (name "G39"
-          (effects
-            (font
-              (size 1 1))))
-        (number "31"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at 20.32 2.54 180)
-        (length 5.08)
-        (name "G38_U0RXD"
-          (effects
-            (font
-              (size 1 1))))
-        (number "32"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at -20.32 0 0)
-        (length 5.08)
-        (name "G34_JTAG_EN"
-          (effects
-            (font
-              (size 1 1))))
-        (number "33"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at 20.32 0 180)
-        (length 5.08)
-        (name "EN"
-          (effects
-            (font
-              (size 1 1))))
-        (number "34"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at -20.32 -2.54 0)
-        (length 5.08)
-        (name "LPG5"
-          (effects
-            (font
-              (size 1 1))))
-        (number "35"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at 20.32 -2.54 180)
-        (length 5.08)
-        (name "G35_BOOT"
-          (effects
-            (font
-              (size 1 1))))
-        (number "36"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at -20.32 -5.08 0)
-        (length 5.08)
-        (name "LPG2"
-          (effects
-            (font
-              (size 1 1))))
-        (number "37"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin power_in line
-        (at 20.32 -5.08 180)
-        (length 5.08)
-        (name "GND"
-          (effects
-            (font
-              (size 1 1))))
-        (number "38"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at -20.32 -7.62 0)
+        (at -21.59 52.07 0)
         (length 5.08)
         (name "SYS_5V"
           (effects
@@ -466,29 +341,370 @@
             (font
               (size 1 1)))))
       (pin passive line
-        (at 20.32 -7.62 180)
+        (at -21.59 49.53 0)
         (length 5.08)
-        (name "USB2_HOST_DP"
+        (name "3V3_OUT"
           (effects
             (font
               (size 1 1))))
-        (number "40"
+        (number "28"
           (effects
             (font
               (size 1 1)))))
       (pin passive line
-        (at -20.32 -10.16 0)
+        (at -21.59 44.45 0)
         (length 5.08)
-        (name "USB2_HOST_DM"
+        (name "EN"
           (effects
             (font
               (size 1 1))))
-        (number "41"
+        (number "34"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at -21.59 41.91 0)
+        (length 5.08)
+        (name "G35_BOOT"
+          (effects
+            (font
+              (size 1 1))))
+        (number "36"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at -21.59 39.37 0)
+        (length 5.08)
+        (name "G34_JTAG_EN"
+          (effects
+            (font
+              (size 1 1))))
+        (number "33"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at -21.59 34.29 0)
+        (length 5.08)
+        (name "G21"
+          (effects
+            (font
+              (size 1 1))))
+        (number "22"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at -21.59 31.75 0)
+        (length 5.08)
+        (name "G22"
+          (effects
+            (font
+              (size 1 1))))
+        (number "21"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at -21.59 29.21 0)
+        (length 5.08)
+        (name "G20"
+          (effects
+            (font
+              (size 1 1))))
+        (number "23"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at -21.59 26.67 0)
+        (length 5.08)
+        (name "G23"
+          (effects
+            (font
+              (size 1 1))))
+        (number "20"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at -21.59 21.59 0)
+        (length 5.08)
+        (name "LPG9_SCL"
+          (effects
+            (font
+              (size 1 1))))
+        (number "6"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at -21.59 19.05 0)
+        (length 5.08)
+        (name "LPG11_SDA"
+          (effects
+            (font
+              (size 1 1))))
+        (number "4"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at -21.59 13.97 0)
+        (length 5.08)
+        (name "G19"
+          (effects
+            (font
+              (size 1 1))))
+        (number "24"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at -21.59 11.43 0)
+        (length 5.08)
+        (name "G18"
+          (effects
+            (font
+              (size 1 1))))
+        (number "25"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at -21.59 8.89 0)
+        (length 5.08)
+        (name "G17"
+          (effects
+            (font
+              (size 1 1))))
+        (number "26"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at -21.59 6.35 0)
+        (length 5.08)
+        (name "G16"
+          (effects
+            (font
+              (size 1 1))))
+        (number "27"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at -21.59 1.27 0)
+        (length 5.08)
+        (name "G37_U0TXD"
+          (effects
+            (font
+              (size 1 1))))
+        (number "30"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at -21.59 -1.27 0)
+        (length 5.08)
+        (name "G38_U0RXD"
+          (effects
+            (font
+              (size 1 1))))
+        (number "32"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at -21.59 -3.81 0)
+        (length 5.08)
+        (name "G39"
+          (effects
+            (font
+              (size 1 1))))
+        (number "31"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at -21.59 -8.89 0)
+        (length 5.08)
+        (name "LPG15_LPRXD"
+          (effects
+            (font
+              (size 1 1))))
+        (number "1"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at -21.59 -11.43 0)
+        (length 5.08)
+        (name "LPG14_LPTXD"
+          (effects
+            (font
+              (size 1 1))))
+        (number "2"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at -21.59 -13.97 0)
+        (length 5.08)
+        (name "LPG12"
+          (effects
+            (font
+              (size 1 1))))
+        (number "3"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at -21.59 -16.51 0)
+        (length 5.08)
+        (name "LPG10"
+          (effects
+            (font
+              (size 1 1))))
+        (number "5"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at -21.59 -19.05 0)
+        (length 5.08)
+        (name "LPG8"
+          (effects
+            (font
+              (size 1 1))))
+        (number "7"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at -21.59 -21.59 0)
+        (length 5.08)
+        (name "LPG7"
+          (effects
+            (font
+              (size 1 1))))
+        (number "8"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at -21.59 -24.13 0)
+        (length 5.08)
+        (name "LPG1"
+          (effects
+            (font
+              (size 1 1))))
+        (number "9"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at -21.59 -26.67 0)
+        (length 5.08)
+        (name "G50_ADC2"
+          (effects
+            (font
+              (size 1 1))))
+        (number "10"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at -21.59 -29.21 0)
+        (length 5.08)
+        (name "LPG0"
+          (effects
+            (font
+              (size 1 1))))
+        (number "11"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at -21.59 -31.75 0)
+        (length 5.08)
+        (name "G49_ADC2"
+          (effects
+            (font
+              (size 1 1))))
+        (number "12"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at -21.59 -34.29 0)
+        (length 5.08)
+        (name "LPG4"
+          (effects
+            (font
+              (size 1 1))))
+        (number "16"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at -21.59 -36.83 0)
+        (length 5.08)
+        (name "G27_USB1_D+"
+          (effects
+            (font
+              (size 1 1))))
+        (number "17"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at -21.59 -39.37 0)
+        (length 5.08)
+        (name "LPG6"
+          (effects
+            (font
+              (size 1 1))))
+        (number "18"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at -21.59 -41.91 0)
+        (length 5.08)
+        (name "G26_USB1_D-"
+          (effects
+            (font
+              (size 1 1))))
+        (number "19"
           (effects
             (font
               (size 1 1)))))
       (pin power_in line
-        (at 20.32 -10.16 180)
+        (at -21.59 -46.99 0)
+        (length 5.08)
+        (name "GND"
+          (effects
+            (font
+              (size 1 1))))
+        (number "13"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin power_in line
+        (at -21.59 -49.53 0)
+        (length 5.08)
+        (name "GND"
+          (effects
+            (font
+              (size 1 1))))
+        (number "38"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin power_in line
+        (at -21.59 -52.07 0)
         (length 5.08)
         (name "GND"
           (effects
@@ -498,151 +714,8 @@
           (effects
             (font
               (size 1 1)))))
-      (pin passive line
-        (at -20.32 -12.7 0)
-        (length 5.08)
-        (name "G24_USBC_D-"
-          (effects
-            (font
-              (size 1 1))))
-        (number "43"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at 20.32 -12.7 180)
-        (length 5.08)
-        (name "G25_USBC_D+"
-          (effects
-            (font
-              (size 1 1))))
-        (number "44"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at -20.32 -15.24 0)
-        (length 5.08)
-        (name "LPG3"
-          (effects
-            (font
-              (size 1 1))))
-        (number "45"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at 20.32 -15.24 180)
-        (length 5.08)
-        (name "G32_RMII_CLK"
-          (effects
-            (font
-              (size 1 1))))
-        (number "46"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at -20.32 -17.78 0)
-        (length 5.08)
-        (name "G36_RMII_MDIO"
-          (effects
-            (font
-              (size 1 1))))
-        (number "47"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at 20.32 -17.78 180)
-        (length 5.08)
-        (name "G35_RMII_TXD1"
-          (effects
-            (font
-              (size 1 1))))
-        (number "48"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at -20.32 -20.32 0)
-        (length 5.08)
-        (name "G41_RMII_TXD0"
-          (effects
-            (font
-              (size 1 1))))
-        (number "49"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at 20.32 -20.32 180)
-        (length 5.08)
-        (name "G33_RMII_TXEN"
-          (effects
-            (font
-              (size 1 1))))
-        (number "50"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at -20.32 -22.86 0)
-        (length 5.08)
-        (name "G31_RMII_MDC"
-          (effects
-            (font
-              (size 1 1))))
-        (number "51"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at 20.32 -22.86 180)
-        (length 5.08)
-        (name "G28_RMII_CRSDV"
-          (effects
-            (font
-              (size 1 1))))
-        (number "52"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at -20.32 -25.4 0)
-        (length 5.08)
-        (name "G30_RMII_RXD1"
-          (effects
-            (font
-              (size 1 1))))
-        (number "53"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at 20.32 -25.4 180)
-        (length 5.08)
-        (name "G29_RMII_RXD0"
-          (effects
-            (font
-              (size 1 1))))
-        (number "54"
-          (effects
-            (font
-              (size 1 1)))))
-      (pin passive line
-        (at -20.32 -27.94 0)
-        (length 5.08)
-        (name "G52_RMII_RST"
-          (effects
-            (font
-              (size 1 1))))
-        (number "55"
-          (effects
-            (font
-              (size 1 1)))))
       (pin power_in line
-        (at 20.32 -27.94 180)
+        (at -21.59 -54.61 0)
         (length 5.08)
         (name "GND"
           (effects
@@ -653,7 +726,117 @@
             (font
               (size 1 1)))))
       (pin passive line
-        (at -20.32 -30.48 0)
+        (at 21.59 57.15 180)
+        (length 5.08)
+        (name "G32_RMII_CLK"
+          (effects
+            (font
+              (size 1 1))))
+        (number "46"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at 21.59 54.61 180)
+        (length 5.08)
+        (name "G36_RMII_MDIO"
+          (effects
+            (font
+              (size 1 1))))
+        (number "47"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at 21.59 52.07 180)
+        (length 5.08)
+        (name "G35_RMII_TXD1"
+          (effects
+            (font
+              (size 1 1))))
+        (number "48"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at 21.59 49.53 180)
+        (length 5.08)
+        (name "G41_RMII_TXD0"
+          (effects
+            (font
+              (size 1 1))))
+        (number "49"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at 21.59 46.99 180)
+        (length 5.08)
+        (name "G33_RMII_TXEN"
+          (effects
+            (font
+              (size 1 1))))
+        (number "50"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at 21.59 44.45 180)
+        (length 5.08)
+        (name "G31_RMII_MDC"
+          (effects
+            (font
+              (size 1 1))))
+        (number "51"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at 21.59 41.91 180)
+        (length 5.08)
+        (name "G28_RMII_CRSDV"
+          (effects
+            (font
+              (size 1 1))))
+        (number "52"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at 21.59 39.37 180)
+        (length 5.08)
+        (name "G30_RMII_RXD1"
+          (effects
+            (font
+              (size 1 1))))
+        (number "53"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at 21.59 36.83 180)
+        (length 5.08)
+        (name "G29_RMII_RXD0"
+          (effects
+            (font
+              (size 1 1))))
+        (number "54"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at 21.59 34.29 180)
+        (length 5.08)
+        (name "G52_RMII_RST"
+          (effects
+            (font
+              (size 1 1))))
+        (number "55"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at 21.59 29.21 180)
         (length 5.08)
         (name "DSI_D0_N"
           (effects
@@ -664,7 +847,7 @@
             (font
               (size 1 1)))))
       (pin passive line
-        (at 20.32 -30.48 180)
+        (at 21.59 26.67 180)
         (length 5.08)
         (name "DSI_D0_P"
           (effects
@@ -674,19 +857,8 @@
           (effects
             (font
               (size 1 1)))))
-      (pin power_in line
-        (at -20.32 -33.02 0)
-        (length 5.08)
-        (name "GND"
-          (effects
-            (font
-              (size 1 1))))
-        (number "59"
-          (effects
-            (font
-              (size 1 1)))))
       (pin passive line
-        (at 20.32 -33.02 180)
+        (at 21.59 24.13 180)
         (length 5.08)
         (name "DSI_CK_P"
           (effects
@@ -697,7 +869,7 @@
             (font
               (size 1 1)))))
       (pin passive line
-        (at -20.32 -35.56 0)
+        (at 21.59 21.59 180)
         (length 5.08)
         (name "DSI_CK_N"
           (effects
@@ -707,19 +879,8 @@
           (effects
             (font
               (size 1 1)))))
-      (pin power_in line
-        (at 20.32 -35.56 180)
-        (length 5.08)
-        (name "GND"
-          (effects
-            (font
-              (size 1 1))))
-        (number "62"
-          (effects
-            (font
-              (size 1 1)))))
       (pin passive line
-        (at -20.32 -38.1 0)
+        (at 21.59 19.05 180)
         (length 5.08)
         (name "DSI_D1_N"
           (effects
@@ -730,7 +891,7 @@
             (font
               (size 1 1)))))
       (pin passive line
-        (at 20.32 -38.1 180)
+        (at 21.59 16.51 180)
         (length 5.08)
         (name "DSI_D1_P"
           (effects
@@ -741,13 +902,123 @@
             (font
               (size 1 1)))))
       (pin power_in line
-        (at -20.32 -40.64 0)
+        (at 21.59 11.43 180)
+        (length 5.08)
+        (name "GND"
+          (effects
+            (font
+              (size 1 1))))
+        (number "59"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin power_in line
+        (at 21.59 8.89 180)
+        (length 5.08)
+        (name "GND"
+          (effects
+            (font
+              (size 1 1))))
+        (number "62"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin power_in line
+        (at 21.59 6.35 180)
         (length 5.08)
         (name "GND"
           (effects
             (font
               (size 1 1))))
         (number "65"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at 21.59 1.27 180)
+        (length 5.08)
+        (name "USB2_HOST_DP"
+          (effects
+            (font
+              (size 1 1))))
+        (number "40"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at 21.59 -1.27 180)
+        (length 5.08)
+        (name "USB2_HOST_DM"
+          (effects
+            (font
+              (size 1 1))))
+        (number "41"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at 21.59 -3.81 180)
+        (length 5.08)
+        (name "G24_USBC_D-"
+          (effects
+            (font
+              (size 1 1))))
+        (number "43"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at 21.59 -6.35 180)
+        (length 5.08)
+        (name "G25_USBC_D+"
+          (effects
+            (font
+              (size 1 1))))
+        (number "44"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at 21.59 -8.89 180)
+        (length 5.08)
+        (name "LPG3"
+          (effects
+            (font
+              (size 1 1))))
+        (number "45"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at 21.59 -11.43 180)
+        (length 5.08)
+        (name "LPG13"
+          (effects
+            (font
+              (size 1 1))))
+        (number "29"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at 21.59 -13.97 180)
+        (length 5.08)
+        (name "LPG5"
+          (effects
+            (font
+              (size 1 1))))
+        (number "35"
+          (effects
+            (font
+              (size 1 1)))))
+      (pin passive line
+        (at 21.59 -16.51 180)
+        (length 5.08)
+        (name "LPG2"
+          (effects
+            (font
+              (size 1 1))))
+        (number "37"
           (effects
             (font
               (size 1 1))))))))

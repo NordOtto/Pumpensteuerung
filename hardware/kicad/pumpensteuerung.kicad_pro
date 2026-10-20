@@ -5,27 +5,31 @@
   },
   "sheets": [
     [
-      "9e6f2443-112f-4320-930d-2fe5d449a19d",
+      "549b275a-f11d-44a5-81ed-03dfc55c7e93",
       "Root"
     ],
     [
-      "b6bb53e8-88b0-49a1-a1a6-05ccdc09b479",
+      "d0c58ce4-29ac-46c5-a502-120670bc415b",
       "Stromversorgung"
     ],
     [
-      "556a28b4-6415-415b-8242-f7db08c77081",
-      "CM5"
+      "64a1a5a1-99bc-43e6-9942-0c95d88bbd7a",
+      "Steuerung_ESP32S3"
     ],
     [
-      "74402dcc-2d5f-4a02-bbd9-7e3b91fc7d0f",
+      "206dd7c8-531a-4c09-8172-c61de17cd39f",
+      "HMI_ESP32P4"
+    ],
+    [
+      "0f5f50cd-1435-4a95-a7b1-edf36ed8df6d",
       "Analogeing\u00e4nge"
     ],
     [
-      "e1ea3968-dbc4-40f3-b207-6e862dbc44d5",
+      "962a49ea-bbbb-4af2-a36b-2b241ad1f4a6",
       "Analogausg\u00e4nge"
     ],
     [
-      "bc45d35a-0953-481a-9a8c-2b6d44c3d0a1",
+      "89e89a5e-e09b-4837-b78a-e024eabf4c21",
       "Digital_RS485_Luefter"
     ]
   ],

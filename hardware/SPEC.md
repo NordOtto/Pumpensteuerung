@@ -1,30 +1,40 @@
 # Hardware-Spezifikation: AIO-Steuerplatine Pumpensteuerung
 
-> **Stand:** Rev 0.1, 2026-10-20. Schaltplan ist fertig und netzlistengeprüft, Layout folgt.
-> **Ziel:** LOGO! 8.4 + AM2 + Raspberry Pi 3B+ durch **eine** Platine mit Raspberry Pi **Compute Module 5** ersetzen.
-> Versorgung direkt mit 230 V, Einbau in ein 3D-gedrucktes Gehäuse. Die bestehende Software (FastAPI, Next.js, OTA, App) läuft weiter.
+> **Stand:** Rev 0.2, 2026-10-20. Schaltplan netzlistengeprüft, Layout folgt.
+> **Ziel:** LOGO! 8.4 + AM2 + Raspberry Pi 3B+ durch **eine** Platine mit ESP32-S3 (Steuerung) und ESP32-P4 (App/HMI mit 7"-Touch, LAN) ersetzen.
+> Versorgung direkt mit 230 V, Einbau in ein 3D-gedrucktes Gehäuse.
+> Rev 0.1 (Compute Module 5) liegt im Git-Verlauf.
 
 ## 1. Überblick
 
+**Architektur (Rev 0.2):** Zwei ESP32, kein Linux.
+
+| Controller | Aufgabe | Muss laufen, damit … |
+|---|---|---|
+| **ESP32-S3-WROOM-1-N16R8** (Steuerung) | Sensoren (ADS1115), PI-Druckregelung, V20 per Modbus RTU, Trockenlaufschutz, Relais, Dosierpumpe (AO), Lüfter | … der Druck gehalten wird |
+| **M5Stack Stamp-P4** (App/HMI) | Web-UI per HTTP im LAN, Bewässerungs-Engine, Wetter (OWM/Ecowitt), MQTT/HA, Presets, Zeitschaltuhr, 7"-Touch (LVGL), OTA für beide | … automatisch bewässert und bedient wird |
+
+Fällt der P4 aus oder wird gerade aktualisiert, regelt der S3 weiter mit den zuletzt gesetzten Sollwerten.
+
 ```
-230 V AC ─ F1 T2A ─ RV1 ─ IRM-30-24 ─┬─ +24 V ─┬─ Sensorspeisung AI1–6 (je PTC 50 mA)
-                                      │         ├─ XTR111 ×2 (AO 0/4–20 mA)
-                                      │         ├─ Relais K1/K2 (Spule 24 V)
-                                      │         ├─ DI-Speisung (PTC 200 mA)
+230 V AC ─ F1 T2A ─ RV1 ─ IRM-30-24 ─┬─ +24 V ─┬─ Sensorspeisung AI1–6, XTR111, Relais, DI
                                       │         ├─ LMR33630 → +12 V (Lüfter)
-                                      │         └─ LMR33630 → +5 V/3 A → CM5 → +3V3 (Logik)
-CM5 ── I²C1 ── ADS1115 ×2 (AI1–6, 24V/5V-Überwachung), MCP4728 (AO-Sollwert)
-    ── UART0 ── ADM2587E (isoliert) ── RS485 ── V20 (Modbus RTU)
-    ── GPIO ── DI1–4 (TLP293-4), K1/K2, Lüfter-PWM/Tacho, LEDs, Taster
-    ── Ethernet 10/100 (HR911105A), WLAN onboard, USB-C (nur rpiboot)
+                                      │         └─ LMR33630 → +5 V/3 A ─┬─ Stamp-P4 (5VIN), Display (PTC 1,1 A)
+                                      │                                  └─ AP63203 → +3V3 (S3, ADC/DAC, RS485, PHY)
+USB-C (S3) ─ SS14 ─► +5 V  (Werkbankbetrieb ohne 230 V)
+
+ESP32-S3 ── I²C ── ADS1115 ×2, MCP4728          ESP32-P4 ── RMII ── LAN8720A ── RJ45
+         ── UART1 ── ADM2587E ── RS485 ── V20             ── MIPI-DSI 2-Lane ── FPC 15p ── 7"-Display
+         ── GPIO ── DI1–4, K1/K2, Lüfter                   ── I²C ── Touch (über FPC)
+         ── UART0 ◄═══════ Link (115200+) ═══════► G21/G22, dazu P4→S3 EN/IO0 (Reset/Flash)
 ```
 
-Schaltplan-Blätter: `kicad/pumpensteuerung.kicad_sch` → Stromversorgung, CM5, Analogeingänge, Analogausgänge, Digital/RS485/Lüfter.
-PDF: `pumpensteuerung_schaltplan.pdf`. Stückliste: `bom.csv` (223 Bauteile, 88 Positionen).
+Schaltplan-Blätter: Stromversorgung, Steuerung_ESP32S3, HMI_ESP32P4, Analogeingänge, Analogausgänge, Digital/RS485/Lüfter.
+PDF: `pumpensteuerung_schaltplan.pdf`. Stückliste: `bom.csv`.
 
 ## 2. Klemmen
 
-| Klemme | Raster | Belegung | Verwendung |
+| Klemme (Ref. siehe Schaltplan) | Raster | Belegung | Verwendung |
 |---|---|---|---|
 | J1 | 5,08 | L / N | 230 V AC Eingang |
 | J7–J12 | 3,5 | +24V / IN / GND | AI1–AI6 |
@@ -33,7 +43,11 @@ PDF: `pumpensteuerung_schaltplan.pdf`. Stückliste: `bom.csv` (223 Bauteile, 88 
 | J16, J17 | 5,08 | NO / COM / NC | Relais K1 (z. B. Freigabe Dosierpumpe), K2 |
 | J18 | 3,5 | A / B / GND_ISO | RS485 → V20 (A = P+, B = N−) |
 | J19 | 2,54 | 4-Pin-Lüfter | Arctic P9 Max (12 V) |
-| J6 | 2,54 | 3V3, SDA, SCL, GPIO4/7/8/9/10/11, GND | Erweiterung (I²C/SPI) |
+| Erweiterung S3 | 2,54 | 3V3, SDA, SCL, IO39–42/47/48, GND | Reserve-I/O Steuerung |
+| Erweiterung P4 | 2,54 | 3V3, G16–G18, GND | Reserve-I/O App |
+| DSI | FPC 1,0 | 15-polig | 7"-Display |
+| Display 5V | 2,54 | 5V / GND | Display-Versorgung |
+| RJ45 | — | 10/100 Ethernet | LAN |
 
 ## 3. Belegung der Analogeingänge
 
@@ -58,26 +72,50 @@ PDF: `pumpensteuerung_schaltplan.pdf`. Stückliste: `bom.csv` (223 Bauteile, 88 
 - Ein Fehlanschluss von 24 V auf IN ist abgesichert: Im Strommodus löst der PTC aus, im Spannungsmodus begrenzt der 22k den Strom in den ADC auf 0,9 mA.
 - ADC2 AIN2 misst die 24-V-Schiene (Teiler 11:1), AIN3 die 5-V-Schiene (Teiler 2:1). Damit gehen Versorgungswarnungen ins Dashboard.
 
-## 4. GPIO-Belegung (CM5, BCM)
+## 4. Pinbelegung
 
-| GPIO | CM5-Pin | Netz | Funktion |
+### ESP32-S3 (Steuerung)
+
+| GPIO | Netz | Funktion |
+|---|---|---|
+| 8 / 9 | I2C_SDA / SCL | ADS1115 0x48 + 0x49, MCP4728 0x60 (4,7k Pull-ups) |
+| 17 / 18 / 16 | RS485_TX / RX / DE | UART1 im RS485-Halbduplexmodus (DE = RTS), 10k Pull-down = Empfang |
+| 4 / 5 / 6 / 7 | DI1–DI4 | **aktiv LOW** |
+| 10 / 11 | RELAY1 / RELAY2 | HIGH = Relais an |
+| 12 / 13 | AO_EN / AO_FAULT | AO freigeben / Fehler (LOW) |
+| 14 / 15 | FAN_PWM / FAN_TACH | LEDC 25 kHz → 74LVC1G07, Tacho per PCNT |
+| 1 / 2 | ADC1_ALERT / ADC2_ALERT | Conversion-Ready |
+| 21 | STATUS_LED | gelb |
+| 38 | SERVICE_BTN | aktiv LOW |
+| 19 / 20 | USB D− / D+ | USB-C: Flashen und Konsole (USB-Serial/JTAG) |
+| RXD0 / TXD0 | LINK | UART0 zum P4, gleichzeitig ROM-Bootloader-Port |
+| EN / IO0 | — | Taster RESET/BOOT, zusätzlich vom P4 über 2N7002 gesteuert |
+| 39–42, 47, 48 | S3_EXP* | Erweiterung J (mit I²C, 3V3, GND) |
+| 3, 45, 46, 35–37 | — | frei lassen (Straps / Octal-PSRAM) |
+
+### Stamp-P4 (App/HMI)
+
+| Pad | GPIO | Netz | Funktion |
 |---|---|---|---|
-| 2 / 3 | 58 / 56 | I2C_SDA / SCL | I²C1: ADS1115 0x48 + 0x49, MCP4728 0x60 (4,7k Pull-ups) |
-| 14 / 15 | 55 / 51 | RS485_TX / RX | UART0 → `/dev/ttyAMA0` |
-| 17 | 50 | RS485_DE | RTS0 → DE + /RE (Halbduplex, 10k Pull-down = Empfang) |
-| 18 | 49 | FAN_PWM | PWM 25 kHz → 74LVC1G07 (Open Drain) → Lüfter |
-| 23 | 47 | FAN_TACH | Lüfter-Tacho (Pull-up 3V3, 10k Serie) |
-| 5 / 6 / 12 / 13 | 34 / 30 / 31 / 28 | DI1–DI4 | **aktiv LOW** (24 V an Klemme → GPIO = 0) |
-| 24 / 25 | 45 / 41 | RELAY1 / RELAY2 | HIGH = Relais an (Pull-down: aus beim Booten) |
-| 19 | 26 | AO_EN | HIGH = AO-Ausgänge freigegeben (sonst 0 mA) |
-| 20 | 27 | AO_FAULT | LOW = Fehler an AO1/AO2 (Drahtbruch, Bürde zu hoch) |
-| 22 / 27 | 46 / 48 | ADC1_ALERT / ADC2_ALERT | Conversion-Ready (optional) |
-| 26 | 24 | STATUS_LED | gelbe LED |
-| 21 | 25 | SERVICE_BTN | Taster, aktiv LOW (z. B. Trockenlauf-Sperre quittieren) |
-| 4, 7–11 | — | EXP_* | Erweiterungsstecker J6 |
-| 16 | 29 | — | frei lassen (CTS0, wird von `uart0_ctsrts` belegt) |
+| 14 | — | +5V | Versorgung (5VIN) |
+| 22 / 21 | G21 / G22 | LINK TX / RX | UART zum S3 (100 Ω in RX) |
+| 23 / 20 | G23 / G20 | P4_S3_RST / P4_S3_BOOT | S3 resetten bzw. in den Bootloader → OTA für die Steuerung |
+| 6 / 4 | LPG9 / LPG11 | TP_SCL / TP_SDA | Touch-I²C über FPC |
+| 24 | G19 | P4_LED | blaue LED |
+| 25–27 | G18 / G17 / G16 | P4_EXP* | Erweiterung |
+| 46–55 | G32, G36, G35, G41, G33, G31, G28, G30, G29, G52 | RMII | LAN8720A (CLK, MDIO, TXD1, TXD0, TXEN, MDC, CRS_DV, RXD1, RXD0, nRST) |
+| 57–64 | — | DSI_* | MIPI-DSI 2 Lanes → FPC |
+| 34 / 36 + 48 | EN / G35 | — | Taster RESET / BOOT (G35 ist zugleich RMII_TXD1) |
 
-Sonstiges: Ethernet-LEDs an `Ethernet_nLED2/3`, ACT-LED an `LED_nACT`, Taster an `nRPIBOOT` und `PWR_Button`. Jumper JP1 schützt das EEPROM gegen Schreiben, die CR2032 hängt an `VBAT` (RTC).
+Der modul-eigene USB-C des Stamp-P4 bleibt der Flash- und Konsolenport des P4. Das Modul deshalb so an den Platinenrand setzen, dass die Buchse (ragt 1,8 mm über) von außen erreichbar ist.
+
+### Ethernet (LAN8720A)
+
+25-MHz-Quarz, Strap `nINTSEL = 0` (10k an LED2) → Pin 14 liefert 50 MHz REFCLKO über 33 Ω an G32. Leitungen mit 4 × 49,9 Ω an die gefilterte 3,3 V (Ferrit). Mittelanzapfungen der MagJack liegen auf derselben Spannung. PHY-Adresse 0, MDIO-Pull-up 1,5k. ESP-IDF-Treiber: `esp_eth_phy_new_lan87xx`.
+
+### Display
+
+FPC 15-polig, 1,0 mm, Raspberry-Pi-Belegung (1 GND, 2/3 D1−/+, 5/6 CK−/+, 8/9 D0−/+, 11 SCL, 12 SDA, 15 3V3). Das Display braucht 5 V zusätzlich über eine separate 2-Pin-Leiste mit PTC 1,1 A. Gedacht ist es für das Waveshare 7-DSI-TOUCH-C (1024 × 600, ESP32-P4-Support). **Vor dem Layout die Pinbelegung am gekauften Display prüfen.**
 
 ## 5. Analogausgänge
 
@@ -89,15 +127,12 @@ Beim Booten sind beide Ausgänge über `OD` gesperrt, bis die Software `AO_EN` s
 
 | Verbraucher | Leistung |
 |---|---|
-| CM5 (5 V, Spitzenlast inkl. WLAN) | 8 W / 0,9 ≈ 9 W |
-| Lüfter 12 V | 2,4 W / 0,9 ≈ 2,7 W |
+| Stamp-P4 + 7"-Display (5 V, ca. 1,3 A) | 6,5 W / 0,9 ≈ 7,2 W |
+| ESP32-S3, ADC/DAC, RS485 iso, PHY (3,3 V, ca. 0,6 A) | 2 W / 0,8 ≈ 2,5 W |
+| Lüfter 12 V | 2,7 W |
 | 6 × Sensorschleife 22 mA | 3,2 W |
-| 2 × AO 20 mA | 1,0 W |
-| 2 × Relais | 0,4 W |
-| RS485 isoliert, Logik | ≈ 0,7 W |
+| 2 × AO 20 mA, 2 × Relais | 1,4 W |
 | **Summe** | **≈ 17 W** von 30 W (IRM-30-24) |
-
-Die 3V3-Schiene kommt aus dem CM5 (max. 600 mA). Bedarf: ADM2587E ≤ 200 mA, Rest < 30 mA.
 
 ## 7. Sicherheit
 
@@ -106,23 +141,24 @@ Die 3V3-Schiene kommt aus dem CM5 (max. 600 mA). Bedarf: ADM2587E ≤ 200 mA, Re
 - **Trockenlaufschutz unabhängig von der Software:** Schwimmer- oder Niveauschalter **direkt** auf einen Freigabe-DI des V20 verdrahten. Zusätzlich V20-Parameter P2014 (Modbus-Timeout) setzen, damit der FU stoppt, wenn der Pi hängt. Die Software-Sperre bleibt als zweite Ebene.
 - **Gehäuse:** ASA oder PETG, kein PLA.
 
-## 8. Nötige Software-Änderungen (Repo `pi/`)
+## 8. Software
 
-1. **`modbus_tcp.py` → neues `analog_in.py`:** ADS1115 per I²C lesen (z. B. `smbus2`), Skalierung wie in Abschnitt 3, gleiche State-Felder (`flow_rate`, `pressure_bar`, `water_temp`). Neu dazu kommen `tank_level`, `supply_24v` und `supply_5v`.
-2. **Füllstand Regentonne** in State, HA-Discovery und UI ergänzen.
-3. **RS485:** DE läuft jetzt über RTS (GPIO17). UART0 mit RTS per Overlay aktivieren (auf dem CM5 voraussichtlich `dtoverlay=uart0-pi5,ctsrts`, gegen die Overlay-README prüfen), in `modbus_rtu.py` den Kernel-RS485-Modus einschalten (`serial.rs485.RS485Settings`). Port bleibt `/dev/ttyAMA0`.
-4. **Lüfter:** Auf dem CM5 hängt GPIO18 an einem anderen PWM-Kanal als beim Pi 3B+ (RP1: PWM0, Kanal 2). `PWM_CHIP`, `PWM_CHANNEL` und das Overlay in `fan_ctrl.py` und `setup.sh` anpassen. Das Signal bleibt **nicht invertiert**.
-5. **Neue Module:** `dio.py` (DI1–4, aktiv LOW, entprellt; K1/K2) und `analog_out.py` (MCP4728 + `AO_EN` + `AO_FAULT`) für die Dosierpumpe.
-6. **Spannungsüberwachung** 24 V und 5 V als Warnungen.
+1. **S3-Firmware (neu, ESP-IDF):** Treiber für ADS1115, MCP4728, DI, Relais und Lüfter. Dazu PI-Regelung aus `pressure_ctrl.py`, Modbus-Master zum V20 aus `modbus_rtu.py` und Trockenlaufschutz. Skalierung der AI wie in Abschnitt 3. Läuft autark mit gespeicherten Sollwerten.
+2. **Link-Protokoll S3 ↔ P4:** Der S3 sendet zyklisch (z. B. 10 Hz) seinen Zustand, der P4 schickt Kommandos (Sollwert, Start/Stop, Relais, AO, Quittieren). Kompakte Frames mit CRC oder Modbus-RTU-Slave auf dem S3. Der P4 flasht neue S3-Firmware über UART0 + EN/IO0 (`esp-serial-flasher`).
+3. **P4-Firmware (Port des Backends):** Logik aus `irrigation.py`, `presets.py`, `timeguard.py`, `weather_provider.py` und `mqtt_client.py`/`ha_discovery.py` nach C/C++ übernehmen. REST + WebSocket mit `esp_http_server`.
+4. **Web-UI:** Die bestehende Next.js-UI als statischen Export (`output: 'export'`) aus dem Flash ausliefern, sofern ohne SSR-Abhängigkeiten machbar. Sonst eine schlanke Variante. HTTP im LAN, kein TLS.
+5. **Display:** LVGL-Oberfläche mit Druck, Durchfluss, Status, Start/Stop, Quittieren und Bewässerung manuell.
+6. **Zeit:** Es gibt keine RTC-Batterie mehr. Zeit per NTP über LAN. Bis zur Synchronisierung keine zeitgesteuerten Starts.
 
 ## 9. Offene Punkte vor dem Layout
 
-- [ ] **Footprint DF40C-100DS-0.4V** und CM5-Position (Abstand der Stecker, M2.5-Löcher) aus den offiziellen CM5-IO-Board-KiCad-Dateien übernehmen. Die Pinbelegung in `tools/cm5_pins.py` gegen das Datenblatt RP-008180-DS gegenprüfen.
-- [ ] **Footprint IRM-30-24** (in KiCad 7 nicht enthalten) nach dem Mean-Well-Datenblatt anlegen. Das Symbol nutzt IRM-20, die Pinfolge ist identisch.
-- [ ] **Ethernet:** Mit HR911105A läuft nur 10/100 (2 Paare). Für Gigabit wäre eine 4-Paar-MagJack nötig. Mittelanzapfungen sind mit je 100 nF gegen GND belegt, gegen das CM5-Design-Guide prüfen.
-- [ ] **Sicherungswert** gegen den Einschaltstrom laut IRM-30-Datenblatt prüfen (T2A angenommen).
-- [ ] **LCSC-Nummern** für die JLCPCB-Bestückung ergänzen.
-- [ ] **Gehäuse** (Fusion): Klemmen an einer Seite, RJ45 und USB-C zugänglich, Lüfterkanal zum V20.
+- [ ] **Footprint Stamp-P4** aus dem offiziellen `Stamp-P4.kicad_mod` (M5Stack, Abschnitt „PCB“) übernehmen. Das Modul wird **gelötet**: RMII und DSI liegen nur an den Randpads oben, nicht im 2,54-mm-Raster.
+- [ ] **Footprint IRM-30-24** nach dem Mean-Well-Datenblatt anlegen.
+- [ ] **Display-Pinbelegung** (FPC und Versorgung) am konkreten 7"-DSI-Display bestätigen.
+- [ ] **DSI-Routing:** 100 Ω differentiell, Paare längengleich, so kurz wie möglich vom Modulrand zum FPC.
+- [ ] **RMII-Routing:** 50 Ω, PHY direkt an der oberen Modulkante.
+- [ ] **Sicherungswert** gegen den IRM-30-Einschaltstrom prüfen. LCSC-Nummern ergänzen.
+- [ ] **Gehäuse** (Fusion): Display als Front, Platine dahinter, Klemmen unten, RJ45 und beide USB-C seitlich zugänglich.
 
 ## 10. Neu erzeugen und prüfen
 

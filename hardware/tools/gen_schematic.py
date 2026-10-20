@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Erzeugt den KiCad-Schaltplan der Pumpensteuerung (AIO-Platine mit CM5).
+"""Erzeugt den KiCad-Schaltplan der Pumpensteuerung (AIO-Platine, ESP32-S3 + ESP32-P4).
 
 Aufruf:  python3 hardware/tools/gen_schematic.py   (schreibt nach hardware/kicad/)
 Benötigt die KiCad-Standardbibliotheken unter /usr/share/kicad (KiCad ≥ 7).
@@ -8,7 +8,6 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
-from cm5_pins import CM5_A, CM5_B, gpio_pad, ptypes  # noqa: E402
 from schgen import Design, make_conn_symbol  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -34,7 +33,7 @@ TB508 = "TerminalBlock_Phoenix:TerminalBlock_Phoenix_MKDS-1,5-{n}-5.08_1x0{n}_P5
 BTN = "Button_Switch_SMD:SW_SPST_TL3342"
 LBUCK = "Inductor_SMD:L_Bourns_SRP7028A_7.3x6.6mm"
 
-d = Design(date="2026-10-20", rev="0.1", company="Brunnensteuerung Wathlingen")
+d = Design(date="2026-10-20", rev="0.2", company="Brunnensteuerung Wathlingen")
 
 G = "GND"
 
@@ -101,7 +100,7 @@ def buck(sh, name, vout_net, rfbb, lval, cout_val, cout_n):
 
 
 # ══ Blatt 1: Stromversorgung ══════════════════════════════════
-pw = d.sheet("Stromversorgung", "power.kicad_sch", "Stromversorgung 230 V → 24 V / 12 V / 5 V")
+pw = d.sheet("Stromversorgung", "power.kicad_sch", "Stromversorgung 230 V → 24 V / 12 V / 5 V / 3,3 V")
 pw.group("230 V AC Eingang  (Netzbereich — Abstand ≥ 6 mm + Frässchlitz zur Niederspannung)")
 TERM(pw, ["AC_L_IN", "AC_N"], pitch=5.08, val="230V L/N")
 pw.add("F", "Device:Fuse", "T2A 250V 5x20", "Fuse:Fuseholder_Clip-5x20mm_Keystone_3517_Inline_P23.11x6.76mm_D1.70mm_Horizontal",
@@ -112,8 +111,18 @@ pw.add("PS", "Converter_ACDC:IRM-20-24", "IRM-30-24", "PumpCtrl:MeanWell_IRM-30"
 pw.group("24 V Schiene")
 CP(pw, "100µF/50V", "+24V", G)
 TVS(pw, "SMAJ30A", "+24V", G, lib="Diode:SMAJ30A")
-pw.group("24 V → 5 V / 3 A  (CM5)")
+pw.group("24 V → 5 V / 3 A  (Stamp-P4 + 7\"-Display)")
 buck(pw, "BUCK5", "+5V", "24.9k", "10µH", "22µF/16V", 3)
+pw.group("5 V → 3,3 V / 2 A  (ESP32-S3, ADC/DAC, RS485, PHY)  +  USB-Versorgung für Werkbank")
+pw.add("U", "Regulator_Switching:AP63203WU", "AP63203WU-7", "Package_TO_SOT_SMD:TSOT-23-6",
+       {1: "+3V3", 2: "+5V", 3: "+5V", 4: G, 5: "BUCK3_SW", 6: "BUCK3_BST"}, props={"MPN": "AP63203WU-7"})
+C(pw, "10µF/16V", "+5V", G, fp=C0805)
+C(pw, "100nF", "BUCK3_BST", "BUCK3_SW")
+pw.add("L", "Device:L", "4.7µH", "Inductor_SMD:L_Bourns-SRN6028", {1: "BUCK3_SW", 2: "+3V3"},
+       props={"MPN": "Bourns SRN6028-4R7M"})
+C(pw, "22µF/10V", "+3V3", G, fp=C1210)
+C(pw, "22µF/10V", "+3V3", G, fp=C1210)
+pw.add("D", "Diode:SS14", "SS14", SMA, {1: "+5V", 2: "USB_S3_VBUS"})
 pw.group("24 V → 12 V  (Lüfter)")
 buck(pw, "BUCK12", "+12V", "9.09k", "22µH", "22µF/25V", 2)
 pw.group("Anzeige & Power-Flags")
@@ -121,85 +130,130 @@ R(pw, "2.2k", "+5V", "PWR_LED_A")
 LED(pw, "grün PWR", "PWR_LED_A", G)
 FLAG(pw, "+5V")
 FLAG(pw, "+12V")
+FLAG(pw, "+3V3")
 
-# ══ Blatt 2: Compute Module 5 ═════════════════════════════════
-cm = d.sheet("CM5", "cm5.kicad_sch", "Raspberry Pi Compute Module 5 + Ethernet / USB / Bedienung", width=594.0, height=420.0, paper="A2")
-symA = make_conn_symbol("CM5_ConnA", CM5_A, ptypes(CM5_A), ref="J", value="CM5 Stecker A (Pin 1–100)",
-                        fp="PumpCtrl:Hirose_DF40C-100DS-0.4V")
-symB = make_conn_symbol("CM5_ConnB", CM5_B, ptypes(CM5_B), ref="J", value="CM5 Stecker B (Pin 101–200)",
-                        fp="PumpCtrl:Hirose_DF40C-100DS-0.4V")
-
-GPIO = {
-    2: "I2C_SDA", 3: "I2C_SCL", 4: "EXP_GPIO4", 5: "DI1", 6: "DI2", 7: "EXP_GPIO7", 8: "EXP_GPIO8",
-    9: "EXP_GPIO9", 10: "EXP_GPIO10", 11: "EXP_GPIO11",
-    12: "DI3", 13: "DI4", 14: "RS485_TX", 15: "RS485_RX", 17: "RS485_DE",   # GPIO16 frei (CTS0 bei uart0_ctsrts)
-    18: "FAN_PWM", 19: "AO_EN", 20: "AO_FAULT", 21: "SERVICE_BTN", 22: "ADC1_ALERT", 23: "FAN_TACH",
-    24: "RELAY1", 25: "RELAY2", 26: "STATUS_LED", 27: "ADC2_ALERT",
+# ══ Blatt 2: Steuerung ESP32-S3 ═══════════════════════════════
+st = d.sheet("Steuerung_ESP32S3", "ctrl_s3.kicad_sch", "Steuerung: ESP32-S3-WROOM-1 (Regelung, I/O, V20, Sicherheit)")
+S3 = {  # Modul-Pin → Netz
+    1: G, 40: G, 41: G, 2: "+3V3", 3: "S3_EN",
+    27: "S3_IO0", 39: "ADC1_ALERT", 38: "ADC2_ALERT",
+    4: "DI1", 5: "DI2", 6: "DI3", 7: "DI4",                    # IO4–IO7
+    12: "I2C_SDA", 17: "I2C_SCL",                              # IO8 / IO9
+    18: "RELAY1", 19: "RELAY2",                                # IO10 / IO11
+    20: "AO_EN", 21: "AO_FAULT",                               # IO12 / IO13
+    22: "FAN_PWM", 8: "FAN_TACH",                              # IO14 / IO15
+    9: "RS485_DE", 10: "RS485_TX", 11: "RS485_RX",             # IO16 / IO17 / IO18
+    13: "USB_S3_DN", 14: "USB_S3_DP",                          # IO19 / IO20
+    23: "STATUS_LED", 31: "SERVICE_BTN",                       # IO21 / IO38
+    32: "S3_EXP39", 33: "S3_EXP40", 34: "S3_EXP41", 35: "S3_EXP42", 24: "S3_EXP47", 25: "S3_EXP48",
+    36: "LINK_P4_TO_S3", 37: "LINK_S3_TO_P4",                  # UART0 RXD0/TXD0 (auch Flash-Port)
 }
-mapA = {}
-for pad, name in CM5_A.items():
-    if name == "GND":
-        mapA[pad] = G
-    elif name == "+5V_IN":
-        mapA[pad] = "+5V"
-    elif name in ("CM5_3V3", "GPIO_VREF"):
-        mapA[pad] = "+3V3"
-mapA.update({4: "ETH1_P", 6: "ETH1_N", 10: "ETH0_N", 12: "ETH0_P", 15: "ETH_nLED3", 17: "ETH_nLED2",
-             20: "EEPROM_nWP", 21: "LED_nACT", 76: "VBAT", 92: "PWR_BTN", 93: "nRPIBOOT"})
-for gp, net in GPIO.items():
-    mapA[gpio_pad(gp)] = net
-mapB = {pad: G for pad, name in CM5_B.items() if name == "GND"}
-mapB.update({3: "USB_DN", 5: "USB_DP"})       # CM5-Pin 103 / 105
+st.group("ESP32-S3-WROOM-1-N16R8  (IO3/IO45/IO46 = Straps, IO35–37 = Octal-PSRAM → frei lassen)")
+st.add("U", "RF_Module:ESP32-S3-WROOM-1", "ESP32-S3-WROOM-1-N16R8", "RF_Module:ESP32-S3-WROOM-1", S3,
+       nc=(15, 16, 26, 28, 29, 30), props={"MPN": "ESP32-S3-WROOM-1-N16R8"})
+C(st, "10µF", "+3V3", G, fp=C0805)
+C(st, "100nF", "+3V3", G)
+st.group("Reset / Boot  (auch vom P4 aus steuerbar → P4 kann die Steuerung per OTA flashen)")
+R(st, "10k", "+3V3", "S3_EN")
+C(st, "1µF", "S3_EN", G)
+st.add("SW", "Switch:SW_Push", "RESET S3", BTN, {1: "S3_EN", 2: G})
+R(st, "10k", "+3V3", "S3_IO0")
+st.add("SW", "Switch:SW_Push", "BOOT S3", BTN, {1: "S3_IO0", 2: G})
+NMOS(st, "P4_S3_RST", "S3_EN")
+R(st, "100k", "P4_S3_RST", G)
+NMOS(st, "P4_S3_BOOT", "S3_IO0")
+R(st, "100k", "P4_S3_BOOT", G)
+st.group("USB-C  (S3 flashen / Konsole; versorgt die Platine auf der Werkbank ohne 230 V)")
+st.add("J", "Connector:USB_C_Receptacle_USB2.0_16P", "USB-C S3", "Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12",
+       {"A6": "USB_S3_DP", "B6": "USB_S3_DP", "A7": "USB_S3_DN", "B7": "USB_S3_DN", "A5": "USB_S3_CC1",
+        "B5": "USB_S3_CC2", "A4": "USB_S3_VBUS", "A9": "USB_S3_VBUS", "B4": "USB_S3_VBUS", "B9": "USB_S3_VBUS",
+        "A8": None, "B8": None, "A1": G, "B1": G, "A12": G, "B12": G, "S1": G})
+R(st, "5.1k", "USB_S3_CC1", G)
+R(st, "5.1k", "USB_S3_CC2", G)
+st.group("Bedienung, LED, I²C-Pull-ups, Erweiterung")
+st.add("SW", "Switch:SW_Push", "SERVICE", BTN, {1: "SERVICE_BTN", 2: G})
+R(st, "10k", "+3V3", "SERVICE_BTN")
+R(st, "470", "STATUS_LED", "STAT_LED_A")
+LED(st, "gelb STATUS", "STAT_LED_A", G)
+R(st, "4.7k", "+3V3", "I2C_SDA")
+R(st, "4.7k", "+3V3", "I2C_SCL")
+st.add("J", "Connector_Generic:Conn_01x10", "Erweiterung S3", "Connector_PinHeader_2.54mm:PinHeader_1x10_P2.54mm_Vertical",
+       {1: "+3V3", 2: "I2C_SDA", 3: "I2C_SCL", 4: "S3_EXP39", 5: "S3_EXP40", 6: "S3_EXP41", 7: "S3_EXP42",
+        8: "S3_EXP47", 9: "S3_EXP48", 10: G})
 
-cm.group("Compute Module 5 (2× Hirose DF40C-100DS-0.4V)")
-cm.add("J", symA, "CM5 Stecker A", "PumpCtrl:Hirose_DF40C-100DS-0.4V", mapA, nc_rest=True,
-       props={"MPN": "Hirose DF40C-100DS-0.4V(51)"})
-cm.add("J", symB, "CM5 Stecker B", "PumpCtrl:Hirose_DF40C-100DS-0.4V", mapB, nc_rest=True,
-       props={"MPN": "Hirose DF40C-100DS-0.4V(51)"})
-cm.group("Versorgung CM5")
-C(cm, "22µF/16V", "+5V", G, fp=C1210)
-C(cm, "22µF/16V", "+5V", G, fp=C1210)
-C(cm, "100nF", "+3V3", G)
-cm.group("Ethernet 10/100 (MagJack, Paar 0/1)")
-cm.add("J", "Connector:RJ45_Hanrun_HR911105A_Horizontal", "HR911105A", "Connector_RJ:RJ45_Hanrun_HR911105A_Horizontal",
-       {1: "ETH0_P", 2: "ETH0_N", 3: "ETH1_P", 6: "ETH1_N", 4: "ETH_TCT", 5: "ETH_RCT", 7: None, 8: G,
-        9: "ETH_LEDG_A", 10: "ETH_nLED2", 12: "ETH_LEDY_A", 11: "ETH_nLED3", "SH": G})
-C(cm, "100nF", "ETH_TCT", G)
-C(cm, "100nF", "ETH_RCT", G)
-R(cm, "330", "+3V3", "ETH_LEDG_A")
-R(cm, "330", "+3V3", "ETH_LEDY_A")
-cm.group("USB-C (nur Daten: eMMC flashen per rpiboot)")
-cm.add("J", "Connector:USB_C_Receptacle_USB2.0_16P", "USB-C", "Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12",
-       {"A6": "USB_DP", "B6": "USB_DP", "A7": "USB_DN", "B7": "USB_DN", "A5": "USB_CC1", "B5": "USB_CC2",
-        "A4": "USB_VBUS", "A9": "USB_VBUS", "B4": "USB_VBUS", "B9": "USB_VBUS", "A8": None, "B8": None,
-        "A1": G, "B1": G, "A12": G, "B12": G, "S1": G})
-R(cm, "5.1k", "USB_CC1", G)
-R(cm, "5.1k", "USB_CC2", G)
-R(cm, "10k", "USB_VBUS", G)
-cm.group("Bedienung, RTC-Batterie, LEDs")
-cm.add("SW", "Switch:SW_Push", "BOOT (rpiboot)", BTN, {1: "nRPIBOOT", 2: G})
-cm.add("SW", "Switch:SW_Push", "POWER", BTN, {1: "PWR_BTN", 2: G})
-cm.add("SW", "Switch:SW_Push", "SERVICE", BTN, {1: "SERVICE_BTN", 2: G})
-R(cm, "10k", "+3V3", "SERVICE_BTN")
-cm.add("JP", "Jumper:Jumper_2_Open", "EEPROM WP", JMP2, {1: "EEPROM_nWP", 2: G})
-cm.add("BT", "Device:Battery_Cell", "CR2032", "Battery:BatteryHolder_Keystone_3002_1x2032", {1: "VBAT", 2: G})
-R(cm, "1k", "+3V3", "ACT_LED_A")
-LED(cm, "grün ACT", "ACT_LED_A", "LED_nACT")
-R(cm, "470", "STATUS_LED", "STAT_LED_A")
-LED(cm, "gelb STATUS", "STAT_LED_A", G)
-cm.group("I²C-Pull-ups & Erweiterungsstecker")
-R(cm, "4.7k", "+3V3", "I2C_SDA")
-R(cm, "4.7k", "+3V3", "I2C_SCL")
-cm.add("J", "Connector_Generic:Conn_01x10", "Erweiterung (I²C/SPI/GPIO)", "Connector_PinHeader_2.54mm:PinHeader_1x10_P2.54mm_Vertical",
-       {1: "+3V3", 2: "I2C_SDA", 3: "I2C_SCL", 4: "EXP_GPIO4", 5: "EXP_GPIO7", 6: "EXP_GPIO8", 7: "EXP_GPIO9",
-        8: "EXP_GPIO10", 9: "EXP_GPIO11", 10: G})
-cm.group("Befestigung")
+# ══ Blatt 3: HMI / App  ESP32-P4 ══════════════════════════════
+hm = d.sheet("HMI_ESP32P4", "hmi_p4.kicad_sch", "App/HMI: M5Stack Stamp-P4, Ethernet (LAN8720A), 7\"-DSI-Touch",
+             width=594.0, height=420.0, paper="A2")
+from stamp_p4_pins import STAMP_P4, ptypes as p4types  # noqa: E402
+sym_p4 = make_conn_symbol("Stamp_P4", STAMP_P4, p4types(), ref="U", value="M5Stack Stamp-P4",
+                          fp="PumpCtrl:M5Stack_Stamp-P4")
+P4 = {13: G, 38: G, 42: G, 56: G, 59: G, 62: G, 65: G, 14: "+5V",
+      6: "TP_SCL", 4: "TP_SDA",
+      22: "LINK_P4_TO_S3", 21: "LINK_S3_TO_P4_R", 23: "P4_S3_RST", 20: "P4_S3_BOOT",
+      24: "P4_LED", 25: "P4_EXP18", 26: "P4_EXP17", 27: "P4_EXP16",
+      34: "P4_EN", 36: "RMII_TXD1", 48: "RMII_TXD1",
+      46: "RMII_CLK_P4", 47: "RMII_MDIO", 49: "RMII_TXD0", 50: "RMII_TXEN", 51: "RMII_MDC",
+      52: "RMII_CRSDV", 53: "RMII_RXD1", 54: "RMII_RXD0", 55: "PHY_nRST",
+      57: "DSI_D0_N", 58: "DSI_D0_P", 60: "DSI_CK_P", 61: "DSI_CK_N", 63: "DSI_D1_N", 64: "DSI_D1_P"}
+hm.group("M5Stack Stamp-P4 (ESP32-P4, 16 MB Flash, 32 MB PSRAM) — eigener USB-C am Platinenrand zugänglich")
+hm.add("U", sym_p4, "M5Stack Stamp-P4", "PumpCtrl:M5Stack_Stamp-P4", P4, nc_rest=True,
+       props={"MPN": "M5Stack S013 Stamp-P4"})
+C(hm, "22µF/16V", "+5V", G, fp=C1210)
+C(hm, "100nF", "+5V", G)
+hm.add("SW", "Switch:SW_Push", "RESET P4", BTN, {1: "P4_EN", 2: G})
+hm.add("SW", "Switch:SW_Push", "BOOT P4", BTN, {1: "RMII_TXD1", 2: G})
+R(hm, "100", "LINK_S3_TO_P4", "LINK_S3_TO_P4_R")
+R(hm, "470", "P4_LED", "P4_LED_A")
+LED(hm, "blau APP", "P4_LED_A", G)
+hm.add("J", "Connector_Generic:Conn_01x05", "Erweiterung P4", "Connector_PinHeader_2.54mm:PinHeader_1x05_P2.54mm_Vertical",
+       {1: "+3V3", 2: "P4_EXP16", 3: "P4_EXP17", 4: "P4_EXP18", 5: G})
+hm.group("Ethernet-PHY LAN8720A  (25-MHz-Quarz, REFCLKO 50 MHz → P4)")
+hm.add("U", "Interface_Ethernet:LAN8720A", "LAN8720A-CP", "Package_DFN_QFN:VQFN-24-1EP_4x4mm_P0.5mm_EP2.5x2.5mm_ThermalVias",
+       {1: "ETH_AVDD", 2: "ETH_LED2", 3: "ETH_LED1", 4: "ETH_XO", 5: "ETH_XI", 6: "ETH_VDDCR",
+        7: "RMII_RXD1", 8: "RMII_RXD0", 9: "+3V3", 10: None, 11: "RMII_CRSDV", 12: "RMII_MDIO", 13: "RMII_MDC",
+        14: "ETH_REFCLK", 15: "PHY_nRST", 16: "RMII_TXEN", 17: "RMII_TXD0", 18: "RMII_TXD1", 19: "ETH_AVDD",
+        20: "ETH_TXN", 21: "ETH_TXP", 22: "ETH_RXN", 23: "ETH_RXP", 24: "ETH_RBIAS", 25: G},
+       props={"MPN": "LAN8720A-CP-TR"})
+hm.add("FB", "Device:FerriteBead", "600Ω@100MHz", "Inductor_SMD:L_0603_1608Metric", {1: "+3V3", 2: "ETH_AVDD"})
+C(hm, "10µF", "ETH_AVDD", G, fp=C0805)
+C(hm, "100nF", "ETH_AVDD", G)
+C(hm, "100nF", "ETH_AVDD", G)
+C(hm, "100nF", "+3V3", G)
+C(hm, "1µF", "ETH_VDDCR", G)
+C(hm, "470pF", "ETH_VDDCR", G)
+R(hm, "12.1k 1%", "ETH_RBIAS", G)
+hm.add("Y", "Device:Crystal_GND24", "25MHz 18pF", "Crystal:Crystal_SMD_3225-4Pin_3.2x2.5mm",
+       {1: "ETH_XI", 2: G, 3: "ETH_XO", 4: G})
+C(hm, "22pF", "ETH_XI", G)
+C(hm, "22pF", "ETH_XO", G)
+R(hm, "33", "ETH_REFCLK", "RMII_CLK_P4")
+R(hm, "1.5k", "+3V3", "RMII_MDIO")
+R(hm, "10k", "+3V3", "PHY_nRST")
+R(hm, "10k", "ETH_LED2", G)            # nINTSEL = 0 → Pin 14 liefert REFCLKO
+for net in ("ETH_TXP", "ETH_TXN", "ETH_RXP", "ETH_RXN"):
+    R(hm, "49.9 1%", net, "ETH_AVDD")
+hm.add("J", "Connector:RJ45_Hanrun_HR911105A_Horizontal", "HR911105A", "Connector_RJ:RJ45_Hanrun_HR911105A_Horizontal",
+       {1: "ETH_TXP", 2: "ETH_TXN", 3: "ETH_RXP", 6: "ETH_RXN", 4: "ETH_AVDD", 5: "ETH_AVDD", 7: None, 8: G,
+        9: "ETH_LEDG_A", 10: G, 12: "ETH_LEDY_A", 11: G, "SH": G})
+R(hm, "330", "ETH_LED2", "ETH_LEDG_A")
+R(hm, "330", "ETH_LED1", "ETH_LEDY_A")
+hm.group("7\"-Display: MIPI-DSI 2-Lane, FPC 15-pol. 1,0 mm (Raspberry-Pi-Standard) + 5-V-Versorgung")
+hm.add("J", "Connector_Generic_MountingPin:Conn_01x15_MountingPin", "DSI 15p 1.0mm",
+       "Connector_FFC-FPC:TE_1-84952-5_1x15-1MP_P1.0mm_Horizontal",
+       {1: G, 2: "DSI_D1_N", 3: "DSI_D1_P", 4: G, 5: "DSI_CK_N", 6: "DSI_CK_P", 7: G, 8: "DSI_D0_N",
+        9: "DSI_D0_P", 10: G, 11: "TP_SCL", 12: "TP_SDA", 13: G, 14: None, 15: "+3V3", "MP": G},
+       props={"MPN": "TE 1-84952-5"})
+R(hm, "4.7k", "+3V3", "TP_SCL")
+R(hm, "4.7k", "+3V3", "TP_SDA")
+hm.add("F", "Device:Polyfuse", "1.1A hold", PTC1812, {1: "+5V", 2: "DISP_5V"}, props={"MPN": "Bourns MF-MSMF110-2"})
+hm.add("J", "Connector_Generic:Conn_01x02", "Display 5V", "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical",
+       {1: "DISP_5V", 2: G})
+C(hm, "22µF/16V", "DISP_5V", G, fp=C1210)
+hm.group("Befestigung")
 for _ in range(4):
-    cm.add("H", "Mechanical:MountingHole_Pad", "CM5 M2.5", "MountingHole:MountingHole_2.7mm_M2.5_Pad_Via", {1: G})
-for _ in range(4):
-    cm.add("H", "Mechanical:MountingHole", "Gehäuse M3", "MountingHole:MountingHole_3.2mm_M3", {})
+    hm.add("H", "Mechanical:MountingHole", "Gehäuse M3", "MountingHole:MountingHole_3.2mm_M3", {})
 
-# ══ Blatt 3: Analogeingänge ═══════════════════════════════════
+# ══ Blatt 4: Analogeingänge ═══════════════════════════════════
 ai = d.sheet("Analogeingänge", "analog_in.kicad_sch", "6 × Universal-Analogeingang 0–10 V / 4–20 mA (Jumper)",
              width=594.0, height=420.0, paper="A2")
 USE = {1: "Druck 0–10 V", 2: "Durchfluss 4–20 mA", 3: "Wassertemp 4–20 mA", 4: "Regentonne 4–20 mA",
@@ -237,7 +291,7 @@ C(ai, "100nF", "+3V3", G)
 R(ai, "10k", "+3V3", "ADC1_ALERT")
 R(ai, "10k", "+3V3", "ADC2_ALERT")
 
-# ══ Blatt 4: Analogausgänge ═══════════════════════════════════
+# ══ Blatt 5: Analogausgänge ═══════════════════════════════════
 ao = d.sheet("Analogausgänge", "analog_out.kicad_sch", "2 × Analogausgang 0/4–20 mA (Dosierpumpe + Reserve)")
 ao.group("DAC (I²C 0x60, interne Ref. 2,048 V)  &  Ausgangsfreigabe")
 ao.add("U", "Analog_DAC:MCP4728", "MCP4728-E/UN", "Package_SO:MSOP-10_3x3mm_P0.5mm",
@@ -267,7 +321,7 @@ for k in (1, 2):
     TVS(ao, "SMAJ26A", f"{p}_OUT", G)
     TERM(ao, [f"{p}_OUT", G], val=f"{p}: I+ / GND")
 
-# ══ Blatt 5: Digital-E/A, RS485, Lüfter ═══════════════════════
+# ══ Blatt 6: Digital-E/A, RS485, Lüfter ═══════════════════════
 io = d.sheet("Digital_RS485_Luefter", "io.kicad_sch", "Digitaleingänge, Relais, RS485 (V20), Lüfter",
              width=594.0, height=420.0, paper="A2")
 io.group("Digitaleingänge 24 V (Schaltschwelle ≈ 12 V, aktiv = GPIO LOW)")
@@ -327,9 +381,12 @@ R(io, "10k", "+3V3", "FAN_TACH_IN")
 R(io, "10k", "FAN_TACH_IN", "FAN_TACH")
 
 ROOT_NOTES = [
-    ("Pumpensteuerung — AIO-Steuerplatine, Rev 0.1 (Entwurf)\n"
-     "Ersetzt LOGO! 8.4 + AM2 + Raspberry Pi 3B+. Kern: Raspberry Pi Compute Module 5 (eMMC, WLAN).\n"
-     "Versorgung 230 V AC → Mean Well IRM-30-24 → 24 V (Sensoren, XTR111, Relais) → 12 V (Lüfter) / 5 V (CM5).\n"
+    ("Pumpensteuerung — AIO-Steuerplatine, Rev 0.2 (Entwurf)\n"
+     "Ersetzt LOGO! 8.4 + AM2 + Raspberry Pi 3B+. Zwei Controller ohne Linux:\n"
+     "  ESP32-S3 = Steuerung (Sensoren, PI-Druckregelung, V20 per RS485, Relais, AO, Trockenlaufschutz)\n"
+     "  ESP32-P4 (M5Stack Stamp-P4) = App/HMI (Web-UI, Bewässerung, Wetter, MQTT/HA, 7\"-DSI-Touch, LAN)\n"
+     "  Verbindung: UART (S3-UART0 ↔ P4), P4 kann S3 resetten/flashen.\n"
+     "Versorgung 230 V AC → IRM-30-24 → 24 V → 12 V (Lüfter) / 5 V (P4, Display) → 3,3 V (S3, Logik).\n"
      "Details, GPIO-Belegung und offene Punkte: hardware/SPEC.md", (25.4, 160.0)),
 ]
 

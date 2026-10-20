@@ -152,7 +152,7 @@ Beim Booten sind beide Ausgänge über `OD` gesperrt, bis die Software `AO_EN` s
 
 ## 9. Offene Punkte vor dem Layout
 
-- [ ] **Footprint Stamp-P4** aus dem offiziellen `Stamp-P4.kicad_mod` (M5Stack, Abschnitt „PCB“) übernehmen. Das Modul wird **gelötet**: RMII und DSI liegen nur an den Randpads oben, nicht im 2,54-mm-Raster.
+- [x] **Footprint Stamp-P4:** Der offizielle M5Stack-Footprint liegt unter `kicad/lib/PumpCtrl.pretty/M5Stack_Stamp-P4.kicad_mod`, im KiCad-9-Format mit eingebettetem STEP-Modell, das sich auch für das Gehäuse eignet. Die Pads 1–65 stimmen mit `tools/stamp_p4_pins.py` überein: 19 Pads je Seite im 1,27-mm-Raster, 20 Pads oben im 1,0-mm-Raster (RMII + DSI) und 7 unten. Pad 42 (GND) ist 1 × 4 mm groß. Das Modul wird SMD gelötet, eine Steckmontage ist nicht möglich.
 - [ ] **Footprint IRM-30-24** nach dem Mean-Well-Datenblatt anlegen.
 - [ ] **Display-Pinbelegung** (FPC und Versorgung) am konkreten 7"-DSI-Display bestätigen.
 - [ ] **DSI-Routing:** 100 Ω differentiell, Paare längengleich, so kurz wie möglich vom Modulrand zum FPC.
